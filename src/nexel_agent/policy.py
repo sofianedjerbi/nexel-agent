@@ -241,7 +241,7 @@ def scripted(obs: dict, rng: random.Random, persona: str = "", memory: dict | No
     if me["hunger"] < 80 or not any(inv.get(f) for f in FOOD):
         need += ["bFQ"]                    # berries, fruit, mushrooms
     if inv.get("wood", 0) < STOCK["wood"]:
-        need += ["T"]
+        need += ["Tt"]
     if inv.get("fiber", 0) < STOCK["fiber"]:
         need += ["vbH"]
     if inv.get("stone", 0) < STOCK["stone"]:
