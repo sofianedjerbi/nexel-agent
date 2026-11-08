@@ -54,6 +54,7 @@ async def play(url, name, persona, deadline, stats, seed):
             sig = (tool, json.dumps(args, sort_keys=True), obs["self"]["x"], obs["self"]["y"])
             stats["_repeats"] += sig == last
             stats["_decisions"] += 1
+            stats[f"_reason:{why.split(':')[0].split(' (')[0]}"] += 1
             last = sig
         stats[f"_inv:{name}"] = sum(obs["self"]["inventory"].values())
 
