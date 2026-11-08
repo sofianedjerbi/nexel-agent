@@ -248,7 +248,9 @@ def scripted(obs: dict, rng: random.Random, persona: str = "", memory: dict | No
         t = find(obs, chars, avoid)
         if t:
             ch = char_at(obs, x + t[1], y + t[2])
-            return act_on(x + t[1], y + t[2], "dig", {}, f"gathering: {obs['legend'].get(ch, ch)}")
+            tool = {"T": "axe", "H": "axe", "M": "pickaxe", "*": "pickaxe"}.get(ch)   # the right tool in hand
+            return act_on(x + t[1], y + t[2], "dig", {"with": tool} if tool and has(tool) else {},
+                          f"gathering: {obs['legend'].get(ch, ch)}")
 
     # ---------------------------------------------------------------- explore, but come home for the night
     if home and (night or rng.random() < 0.3) and abs(home[0] - x) + abs(home[1] - y) > 6:
