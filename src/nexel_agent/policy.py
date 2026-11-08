@@ -241,7 +241,7 @@ def scripted(obs: dict, rng: random.Random, persona: str = "", memory: dict | No
     if inv.get("wood", 0) < STOCK["wood"]:
         need += ["T"]
     if inv.get("fiber", 0) < STOCK["fiber"]:
-        need += ["bH"]
+        need += ["vbH"]
     if inv.get("stone", 0) < STOCK["stone"]:
         need += ["M*" if has("pickaxe") else "M"]
     for chars in need:
