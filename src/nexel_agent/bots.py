@@ -10,6 +10,8 @@ import json
 import random
 import time
 
+from websockets.exceptions import ConnectionClosed
+
 from .client import ApiError, Client
 from .policy import feedback, scripted
 
@@ -17,6 +19,16 @@ PERSONAS = ["builder", "scavenger", "explorer", "hoarder"]
 
 
 async def bot(url, name, persona, deadline, stats, seed):
+    """Play until the deadline, reconnecting if the server restarts."""
+    while time.monotonic() < deadline:
+        try:
+            await play(url, name, persona, deadline, stats, seed)
+        except (ConnectionError, OSError, ConnectionClosed) as e:
+            stats["_reconnects"] += 1
+            await asyncio.sleep(3)
+
+
+async def play(url, name, persona, deadline, stats, seed):
     rng = random.Random(seed)
     async with Client(url) as c:
         await c.hello(name, f"bot-{name}", persona)
