@@ -185,6 +185,8 @@ def scripted(obs: dict, rng: random.Random, persona: str = "", memory: dict | No
             return at_bench("axe", "making an axe")
         if not has("pickaxe") and has("axe") and has("wood", 2) and has("stone", 3) and has("fiber"):
             return at_bench("pickaxe", "making a pickaxe")
+        if not has("hoe") and has("seed") and has("wood", 2) and has("stone", 1):
+            return at_bench("hoe", "making a hoe to farm")
         if not bed and not has("bed") and has("wood", 6) and has("fiber", 3):
             return at_bench("bed", "making a bed")
         if has("bed") and not bed and at_home and free:
@@ -218,9 +220,9 @@ def scripted(obs: dict, rng: random.Random, persona: str = "", memory: dict | No
             spot = find(obs, "o", avoid, max_d=3)
             if spot:
                 return act_on(x + spot[1], y + spot[2], "place", {"item": "seed"}, "planting a seed")
-            spot = find(obs, ".", avoid, max_d=3)
+            spot = find(obs, ".", avoid, max_d=3) if has("hoe") else None
             if spot:
-                return act_on(x + spot[1], y + spot[2], "dig", {}, "tilling soil for seeds")
+                return act_on(x + spot[1], y + spot[2], "dig", {"with": "hoe"}, "tilling soil for seeds")
 
         # ------------------------------------------------------------ persona extras
         if "builder" in persona and at_home:
