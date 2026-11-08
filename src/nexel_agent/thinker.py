@@ -27,19 +27,19 @@ from .tiles import FOOD, RECIPES
 log = logging.getLogger("thinker")
 MODEL_URL = "http://127.0.0.1:8080/v1/chat/completions"
 
-RULES = """You are a person living inside an endless, ancient structure that keeps building itself.
+RULES = """You are a person living on an endless archipelago of wild green islands.
 Nobody rules here. There are no laws and no safe zones: anything can be built, dug, claimed, traded,
 stolen or destroyed. Others like you live here too; they may help you, trade with you, or rob you.
 
 World facts:
 - Top-down tile grid. North = up (y decreases). Coordinates are absolute (x, y).
-- You get hungry; at hunger 0 you lose health. Eat lichen, cooked meat, caps or rations.
-- Energy drops as you work; rest to recover (faster by a heater or with walls around you).
-- Dig adjacent blocks to harvest them: scrap heaps -> scrap, lichen -> lichen + spore, conduits -> cable,
-  structure -> alloy (slow by hand), terminals -> circuit, core nodes -> core (needs a drill).
-- A bench (4 scrap) unlocks tools: cutter (faster scrap/conduits), drill (structure, core nodes), pike (weapon).
-- During lights-out, hostile sentinels hunt. Walls, hatches and pikes help.
-- Accretors are builder machines that extend the structure; they ignore you.
+- You get hungry; at hunger 0 you lose health. Eat berries, mushrooms, eggs, milk, cooked meat or bread.
+- Energy drops as you work; rest to recover (faster by a campfire or with walls around you).
+- Dig adjacent things to harvest them: trees -> wood, berry bushes -> berries + seeds, thickets -> fiber,
+  rocks -> stone (slow by hand), ore rocks -> ore (needs a pickaxe), mushrooms -> mushroom.
+- Digging bare ground tills it. Plant seeds in tilled soil; after a few minutes they ripen into wheat.
+- A workbench (4 wood) unlocks tools: axe (faster trees), pickaxe (rock, ore), spear (weapon).
+- Chickens and cows wander around; they are food. At night, hostile glooms hunt people.
 - Death drops everything you carry where you fell. You come back, empty-handed, somewhere else.
 - Everyone sees what you say nearby; shouting carries far but is tiring.
 """
@@ -300,7 +300,7 @@ class Thinker:
         log.info("%s [%s %.1fs] %s | %s", self.name, source, meta.get("latency_s", 0), thought[:100], line[:140])
 
     def urgent(self, obs):
-        """Reflexes that should not wait for a slow model: eat when starving, flee sentinels."""
+        """Reflexes that should not wait for a slow model: eat when starving, flee glooms."""
         me = obs["self"]
         inv = me["inventory"]
         if me["hunger"] <= 15:
@@ -308,7 +308,7 @@ class Thinker:
             if food:
                 return "eat", {"item": food}, f"(reflex) starving, eating {food}"
         for e in obs["entities"]:
-            if e["kind"] == "sentinel" and abs(e["dx"]) + abs(e["dy"]) <= 2 and me["hp"] < 40:
+            if e["kind"] == "gloom" and abs(e["dx"]) + abs(e["dy"]) <= 2 and me["hp"] < 40:
                 return "move_to", {"x": me["x"] - 4 * (e["dx"] > 0) + 4 * (e["dx"] <= 0),
                                    "y": me["y"] - 4 * (e["dy"] > 0) + 4 * (e["dy"] <= 0)}, "(reflex) fleeing"
         return None
