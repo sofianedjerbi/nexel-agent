@@ -23,7 +23,7 @@ async def bot(url, name, persona, deadline, stats, seed):
     while time.monotonic() < deadline:
         try:
             await play(url, name, persona, deadline, stats, seed)
-        except (ConnectionError, OSError, ConnectionClosed) as e:
+        except (ConnectionError, OSError, ConnectionClosed):
             stats["_reconnects"] += 1
             await asyncio.sleep(3)
 
