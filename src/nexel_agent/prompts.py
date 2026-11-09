@@ -17,6 +17,9 @@ World facts:
 - You get hungry; at hunger 0 you lose health. Eat berries, mushrooms, eggs, milk, cooked meat or bread.
 - Dig adjacent things to harvest them: trees -> wood, berry bushes -> berries + seeds (cut the bare bush -> fiber),
   rocks -> stone (slow by hand), ore rocks -> ore (needs a pickaxe), mushrooms -> mushroom.
+- Underground: with a pickaxe in hand, dig_down digs a hole where you stand and takes you one level down (depth in
+  your stats), onto a ladder; climb on a ladder goes back up. Below is rock with caves (bigger deeper down) and ore.
+  Each level is its own place: people above or below you can't see or hear you.
 - Items lying next to you come to you. Felling, mining, harvesting, crafting and hunting earn experience (xp, level).
 - Digging bare ground tills it. Plant seeds in tilled soil; after a few minutes they ripen into wheat.
 - A workbench (4 wood) unlocks tools: axe (faster trees), pickaxe (rock, ore), spear (weapon).
