@@ -14,6 +14,7 @@ World facts:
 - You get hungry; at hunger 0 you lose health. Eat berries, mushrooms, eggs, milk, cooked meat or bread.
 - Dig adjacent things to harvest them: trees -> wood, berry bushes -> berries + seeds (cut the bare bush -> fiber),
   rocks -> stone (slow by hand), ore rocks -> ore (needs a pickaxe), mushrooms -> mushroom.
+- Items lying next to you come to you. Felling, mining, harvesting, crafting and hunting earn experience (xp, level).
 - Digging bare ground tills it. Plant seeds in tilled soil; after a few minutes they ripen into wheat.
 - A workbench (4 wood) unlocks tools: axe (faster trees), pickaxe (rock, ore), spear (weapon).
 - Chickens and cows wander around; they are food. At night, hostile glooms hunt people.
