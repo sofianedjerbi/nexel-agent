@@ -11,6 +11,8 @@ stolen or destroyed. Others like you live here too; they may help you, trade wit
 
 World facts:
 - Top-down tile grid. North = up (y decreases). Coordinates are absolute (x, y).
+- Hills: `heights` (when there are any) gives each tile's level. You can only walk between tiles of the same level;
+  a capital letter is stairs, linking that tile with the one just south of it. move_to finds the way round.
 - You get hungry; at hunger 0 you lose health. Eat berries, mushrooms, eggs, milk, cooked meat or bread.
 - Dig adjacent things to harvest them: trees -> wood, berry bushes -> berries + seeds (cut the bare bush -> fiber),
   rocks -> stone (slow by hand), ore rocks -> ore (needs a pickaxe), mushrooms -> mushroom.
