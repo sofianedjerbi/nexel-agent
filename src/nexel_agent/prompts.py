@@ -12,7 +12,7 @@ stolen or destroyed. Others like you live here too; they may help you, trade wit
 World facts:
 - Top-down tile grid. North = up (y decreases). Coordinates are absolute (x, y).
 - You get hungry; at hunger 0 you lose health. Eat berries, mushrooms, eggs, milk, cooked meat or bread.
-- Dig adjacent things to harvest them: trees -> wood, berry bushes -> berries + seeds, thickets -> fiber,
+- Dig adjacent things to harvest them: trees -> wood, berry bushes -> berries + seeds (cut the bare bush -> fiber),
   rocks -> stone (slow by hand), ore rocks -> ore (needs a pickaxe), mushrooms -> mushroom.
 - Digging bare ground tills it. Plant seeds in tilled soil; after a few minutes they ripen into wheat.
 - A workbench (4 wood) unlocks tools: axe (faster trees), pickaxe (rock, ore), spear (weapon).
