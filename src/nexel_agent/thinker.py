@@ -34,7 +34,6 @@ stolen or destroyed. Others like you live here too; they may help you, trade wit
 World facts:
 - Top-down tile grid. North = up (y decreases). Coordinates are absolute (x, y).
 - You get hungry; at hunger 0 you lose health. Eat berries, mushrooms, eggs, milk, cooked meat or bread.
-- Energy drops as you work; rest to recover (faster by a campfire or with walls around you).
 - Dig adjacent things to harvest them: trees -> wood, berry bushes -> berries + seeds, thickets -> fiber,
   rocks -> stone (slow by hand), ore rocks -> ore (needs a pickaxe), mushrooms -> mushroom.
 - Digging bare ground tills it. Plant seeds in tilled soil; after a few minutes they ripen into wheat.
@@ -75,7 +74,7 @@ def render_obs(obs: dict) -> str:
     rows = [f"{me['y'] - r + j:>4}" + row for j, row in enumerate(grid)]
     lines = [f"Time: {obs['time']}. You are '@' at ({me['x']},{me['y']}), standing on {me['standing_on']}"
              + (", sheltered" if me["sheltered"] else "") + ".",
-             f"Health {me['hp']}/100, hunger {me['hunger']}/100 (low = starving), energy {me['energy']}/100, "
+             f"Health {me['hp']}/100, hunger {me['hunger']}/100 (low = starving), "
              f"deaths so far {me['deaths']}.",
              "Inventory: " + (", ".join(f"{k} x{v}" for k, v in me["inventory"].items()) or "nothing") + ".",
              "Map (x digits on top are the last digit of x; y on the left):", header, *rows,
@@ -291,7 +290,7 @@ class Thinker:
         ok = bool(reply.get("ok"))
         self.stats[f"{source}:{'ok' if ok else 'fail'}"] += 1
         rec = {"t": time.time(), "tick": obs["tick"], "agent": self.name, "source": source, "pos": [me["x"], me["y"]],
-               "hp": me["hp"], "hunger": me["hunger"], "energy": me["energy"], "thought": thought, "tool": tool,
+               "hp": me["hp"], "hunger": me["hunger"], "thought": thought, "tool": tool,
                "args": args, "ok": ok, "error": reply.get("error"), "result": line, **meta}
         if source != "model" or not ok:
             rec["raw"] = raw[:500]

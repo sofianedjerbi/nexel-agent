@@ -137,12 +137,10 @@ def scripted(obs: dict, rng: random.Random, persona: str = "", memory: dict | No
     bed = me.get("spawn") or memory.get("bed")
     if bed and abs(bed[0] - x) + abs(bed[1] - y) > 40:
         bed = None                         # an old bed far away: settle here instead
-    if (night or me["energy"] < 25) and bed:
+    if night and bed:                      # nights at home, by the bed (it's where you wake up after dying)
         if char_at(obs, *bed) == "B" or char_at(obs, *bed) is None:
-            return act_on(bed[0], bed[1], "sleep", {}, "night: going to bed" if night else "tired: going to bed")
+            return act_on(bed[0], bed[1], "sleep", {}, "night: going to bed")
         memory.pop("bed", None)           # the bed is gone
-    if me["energy"] < 15:
-        return "rest", {}, "exhausted"
 
     # stuck (walled in, or everything nearby unreachable): dig out toward a random side
     if memory.get("fails", 0) >= 4:
