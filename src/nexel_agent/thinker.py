@@ -161,7 +161,7 @@ class Thinker:
         log.info("%s [%s %.1fs] %s | %s", self.name, source, meta.get("latency_s", 0), thought[:100], line[:140])
 
     def urgent(self, obs):
-        """Reflexes that should not wait for a slow model: eat when starving, flee glooms."""
+        """Reflexes that should not wait for a slow model: eat when starving, flee what bites."""
         me = obs["self"]
         inv = me["inventory"]
         if me["hunger"] <= 15:
@@ -169,7 +169,7 @@ class Thinker:
             if food:
                 return "eat", {"item": food}, f"(reflex) starving, eating {food}"
         for e in obs["entities"]:
-            if e["kind"] == "gloom" and abs(e["dx"]) + abs(e["dy"]) <= 2 and me["hp"] < 40:
+            if e["kind"] in ("tusker", "pincer", "strawman", "wyrm") and abs(e["dx"]) + abs(e["dy"]) <= 2 and me["hp"] < 40:
                 return "move_to", {"x": me["x"] - 4 * (e["dx"] > 0) + 4 * (e["dx"] <= 0),
                                    "y": me["y"] - 4 * (e["dy"] > 0) + 4 * (e["dy"] <= 0)}, "(reflex) fleeing"
         return None

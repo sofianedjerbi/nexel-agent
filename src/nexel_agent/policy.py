@@ -1,7 +1,7 @@
 """Scripted policy: used by bots and as the thinker's fallback while the model is busy.
 
 It reads only the observation dict the API returns, so it is a fair baseline for learned or LLM agents.
-Needs are tried in priority order: survive (eat, flee glooms, sleep), set up a home (workbench, bed, chest),
+Needs are tried in priority order: survive (eat, flee what bites, sleep), set up a home (workbench, bed, chest),
 tools, farming next to home, persona extras, then gathering what is still missing, then exploring.
 """
 
@@ -126,12 +126,12 @@ def scripted(obs: dict, rng: random.Random, persona: str = "", memory: dict | No
         if food:
             return "eat", {"item": food}, f"hungry ({me['hunger']}), eating {food}"
     for e in obs["entities"]:
-        if e["kind"] == "gloom" and abs(e["dx"]) + abs(e["dy"]) <= 4:
-            # run to the reachable tile 3-6 steps away that is farthest from the gloom
+        if e["kind"] in ("tusker", "pincer", "strawman", "wyrm") and abs(e["dx"]) + abs(e["dy"]) <= 4:
+            # run to the reachable tile 3-6 steps away that is farthest from it
             far = max(((abs(q[0] - e["dx"]) + abs(q[1] - e["dy"]), q) for q, n in reach.items() if 3 <= n <= 6),
                       default=None)
             if far:
-                return "move_to", {"x": x + far[1][0], "y": y + far[1][1]}, "fleeing a gloom"
+                return "move_to", {"x": x + far[1][0], "y": y + far[1][1]}, f"fleeing a {e['kind']}"
     if any(n for n in obs["items"] if n["dx"] == 0 and n["dy"] == 0):
         return "pick_up", {}, "items underfoot"
     bed = me.get("spawn") or memory.get("bed")
