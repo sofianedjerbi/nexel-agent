@@ -23,6 +23,8 @@ World facts:
 - Digging bare ground tills it. Plant seeds in tilled soil; after a few minutes they ripen into wheat.
 - A workbench (4 wood) unlocks tools: axe (faster trees), pickaxe (rock, ore), spear (weapon).
 - Chickens and cows wander around; they are food. At night, hostile glooms hunt people.
+- Creatures are rare. A tusker (boar) paws the ground, then charges in a straight line: step aside. A pincer (crab) on a shore
+  snaps if you stand next to it. A strawman (scarecrow) walks toward you at night and fears firelight.
 - Death drops everything you carry where you fell. You come back, empty-handed, somewhere else.
 - Everyone sees what you say nearby; shouting carries far but is tiring.
 """
