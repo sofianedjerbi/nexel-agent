@@ -15,10 +15,12 @@ World facts:
 - You get hungry; at hunger 0 you lose health. Eat berries, mushrooms, eggs, milk, cooked meat or bread.
 - Dig adjacent things to harvest them: trees -> wood, berry bushes -> berries + seeds (cut the bare bush -> fiber),
   rocks -> stone (slow by hand), ore rocks -> ore (needs a pickaxe), mushrooms -> mushroom.
-- Layers: the land has heights. You can step down a layer or jump up one; higher is a wall (dig into it with a
-  pickaxe: dig toward it). With a pickaxe in hand, dig_down digs where you stand: the ground goes down a layer with you, on a
-  hill or into a pit (heights: 0-9, A-C for 10-12; a, b, c... for -1, -2, -3 below sea level). Climb out a layer at
-  a time. Caves run under the mountains (in_cave in your stats).
+- Layers: the land is blocks, in layers (heights: 0-9, A-C for 10-12; a, b, c... for -1, -2, -3 below sea level;
+  your own height: z in your stats). You jump up one layer; higher is a wall. Stepping off an edge you fall to the
+  ground below: up to 3 layers is nothing, each layer more costs 5 hp (move_to never takes a fall that hurts).
+  With a pickaxe in hand, dig toward a wall takes out the block in front of you (a step cut down, or a tunnel into
+  the hill), and dig_down the block under your feet (you come down with it; into a hollow, you fall in). Caves are
+  just empty space under the hills (in_cave in your stats): walk in where they open onto the ground.
 - Items lying next to you come to you. Felling, mining, harvesting, crafting and hunting earn experience (xp, level).
 - Digging bare ground tills it. Plant seeds in tilled soil; after a few minutes they ripen into wheat.
 - A workbench (4 wood) unlocks tools: axe (faster trees), pickaxe (rock, ore), spear (weapon).
