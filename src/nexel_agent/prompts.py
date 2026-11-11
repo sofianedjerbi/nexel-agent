@@ -11,16 +11,14 @@ stolen or destroyed. Others like you live here too; they may help you, trade wit
 
 World facts:
 - Top-down tile grid. North = up (y decreases). Coordinates are absolute (x, y).
-- Hills: `heights` (when there are any) gives each tile's level. You can only walk between tiles of the same level;
-  a capital letter is stairs, linking that tile with the one just south of it. You can also hop down one level off
-  any edge you can stand on; going up needs stairs. move_to finds the way.
+- Hills: `heights` (when there are any) gives each tile's level (see Layers). move_to finds the way.
 - You get hungry; at hunger 0 you lose health. Eat berries, mushrooms, eggs, milk, cooked meat or bread.
 - Dig adjacent things to harvest them: trees -> wood, berry bushes -> berries + seeds (cut the bare bush -> fiber),
   rocks -> stone (slow by hand), ore rocks -> ore (needs a pickaxe), mushrooms -> mushroom.
 - Layers: the land has heights. You can step down a layer or jump up one; higher is a wall (dig into it with a
-  pickaxe: dig toward it). With a pickaxe in hand, dig_down digs where you stand: on a hill you go down a layer, on
-  the lowest ground you dig a hole and drop to the level below (depth in your stats). Walking onto a hole drops you.
-  Under a hole, step toward open ground beside it to jump back up.
+  pickaxe: dig toward it). With a pickaxe in hand, dig_down digs where you stand: the ground goes down a layer with you, on a
+  hill or into a pit (heights: 0-9, A-C for 10-12; a, b, c... for -1, -2, -3 below sea level). Climb out a layer at
+  a time. Caves run under the mountains (in_cave in your stats).
 - Items lying next to you come to you. Felling, mining, harvesting, crafting and hunting earn experience (xp, level).
 - Digging bare ground tills it. Plant seeds in tilled soil; after a few minutes they ripen into wheat.
 - A workbench (4 wood) unlocks tools: axe (faster trees), pickaxe (rock, ore), spear (weapon).
