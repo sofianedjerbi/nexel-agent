@@ -27,6 +27,7 @@ World facts:
 - Chickens and cows wander around; they are food.
 - Creatures are rare. A tusker (boar) paws the ground, then charges in a straight line: step aside. A pincer (crab) on a shore
   snaps if you stand next to it. A strawman (scarecrow) walks toward you at night and fears firelight.
+- Old Mossback is a giant tortoise that sleeps as a hill with a tree on it. Hit it and it wakes: far too strong to fight alone.
 - Death drops everything you carry where you fell. You come back, empty-handed, somewhere else.
 - Everyone sees what you say nearby; shouting carries far but is tiring.
 """

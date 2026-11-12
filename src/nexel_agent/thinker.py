@@ -169,7 +169,7 @@ class Thinker:
             if food:
                 return "eat", {"item": food}, f"(reflex) starving, eating {food}"
         for e in obs["entities"]:
-            if e["kind"] in ("tusker", "pincer", "strawman", "wyrm") and abs(e["dx"]) + abs(e["dy"]) <= 2 and me["hp"] < 40:
+            if e["kind"] in ("tusker", "pincer", "strawman", "wyrm", "mossback") and abs(e["dx"]) + abs(e["dy"]) <= 2 and me["hp"] < 40:
                 return "move_to", {"x": me["x"] - 4 * (e["dx"] > 0) + 4 * (e["dx"] <= 0),
                                    "y": me["y"] - 4 * (e["dy"] > 0) + 4 * (e["dy"] <= 0)}, "(reflex) fleeing"
         return None

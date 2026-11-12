@@ -126,7 +126,7 @@ def scripted(obs: dict, rng: random.Random, persona: str = "", memory: dict | No
         if food:
             return "eat", {"item": food}, f"hungry ({me['hunger']}), eating {food}"
     for e in obs["entities"]:
-        if e["kind"] in ("tusker", "pincer", "strawman", "wyrm") and abs(e["dx"]) + abs(e["dy"]) <= 4:
+        if e["kind"] in ("tusker", "pincer", "strawman", "wyrm", "mossback") and abs(e["dx"]) + abs(e["dy"]) <= 4:
             # run to the reachable tile 3-6 steps away that is farthest from it
             far = max(((abs(q[0] - e["dx"]) + abs(q[1] - e["dy"]), q) for q, n in reach.items() if 3 <= n <= 6),
                       default=None)
