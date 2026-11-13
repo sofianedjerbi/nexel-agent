@@ -120,7 +120,7 @@ def scripted(obs: dict, rng: random.Random, persona: str = "", memory: dict | No
         return ("move_to", *move[1:]) if move else (tool, {**args, "dir": d}, why)
 
     # ---------------------------------------------------------------- survive
-    if me["hunger"] < 60:
+    if me["hunger"] < 12:                  # (food is 0 to 20)
         food = max((f for f in FOOD if inv.get(f) and f not in ("wheat",)), key=lambda f: FOOD[f], default=None)
         food = food or ("wheat" if has("wheat") else None)
         if food:
@@ -236,7 +236,7 @@ def scripted(obs: dict, rng: random.Random, persona: str = "", memory: dict | No
 
     # ---------------------------------------------------------------- gather what is missing
     need = []
-    if me["hunger"] < 80 or not any(inv.get(f) for f in FOOD):
+    if me["hunger"] < 16 or not any(inv.get(f) for f in FOOD):
         need += ["bFQ"]                    # berries, fruit, mushrooms
     if inv.get("wood", 0) < STOCK["wood"]:
         need += ["Tt"]

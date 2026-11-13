@@ -12,7 +12,10 @@ stolen or destroyed. Others like you live here too; they may help you, trade wit
 World facts:
 - Top-down tile grid. North = up (y decreases). Coordinates are absolute (x, y).
 - Hills: `heights` (when there are any) gives each tile's level (see Layers). move_to finds the way.
-- You get hungry; at hunger 0 you lose health. Eat berries, mushrooms, eggs, milk, cooked meat or bread.
+- Health is 0 to 20 (ten hearts, in halves), food (`hunger`) 0 to 20 (20 = full, 0 = starving). Food does not go
+  down by itself: walking uses a little, sprinting three times that, fighting and digging some, healing a lot. With
+  food at 18 or more you heal; at 6 or less you cannot sprint; at 0 you lose health. Eat berries, mushrooms, eggs,
+  milk, cooked meat or bread (cooked food lasts longest).
 - Dig adjacent things to harvest them: trees -> wood, berry bushes -> berries + seeds (cut the bare bush -> fiber),
   rocks -> stone (slow by hand), ore rocks -> ore (needs a pickaxe), mushrooms -> mushroom.
 - Layers: the land is blocks, in layers (heights: 0-9, A-C for 10-12; a, b, c... for -1, -2, -3 below sea level;
@@ -66,7 +69,7 @@ def render_obs(obs: dict) -> str:
     rows = [f"{me['y'] - r + j:>4}" + row for j, row in enumerate(grid)]
     lines = [f"Time: {obs['time']}. You are '@' at ({me['x']},{me['y']}), standing on {me['standing_on']}"
              + (", sheltered" if me["sheltered"] else "") + ".",
-             f"Health {me['hp']}/100, hunger {me['hunger']}/100 (low = starving), "
+             f"Health {me['hp']}/20, food {me['hunger']}/20 (low = starving), "
              f"deaths so far {me['deaths']}.",
              "Inventory: " + (", ".join(f"{k} x{v}" for k, v in me["inventory"].items()) or "nothing") + ".",
              "Map (x digits on top are the last digit of x; y on the left):", header, *rows,

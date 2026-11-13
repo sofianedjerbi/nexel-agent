@@ -164,7 +164,7 @@ class Thinker:
         """Reflexes that should not wait for a slow model: eat when starving, flee what bites."""
         me = obs["self"]
         inv = me["inventory"]
-        if me["hunger"] <= 15:
+        if me["hunger"] <= 3:              # (food is 0 to 20)
             food = max((f for f in FOOD if inv.get(f)), key=lambda f: FOOD[f], default=None)
             if food:
                 return "eat", {"item": food}, f"(reflex) starving, eating {food}"
