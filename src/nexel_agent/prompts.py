@@ -23,7 +23,7 @@ World facts:
   full: z in your stats). You jump up one layer; higher is a wall. Stepping off an edge you fall to the
   ground below: up to 3 layers is nothing, each layer more costs 5 hp (move_to never takes a fall that hurts).
   With a pickaxe in hand, dig toward a wall takes out the block in front of you (a step cut down, or a tunnel into
-  the hill), and dig_down the block under your feet (you come down with it; into a hollow, you fall in). Caves are
+  the hill), and dig_down the block under your feet (by hand too, slower; you come down with it; into a hollow, you fall in). Caves are
   just empty space under the hills (in_cave in your stats): walk in where they open onto the ground.
 - Items lying next to you come to you. Mining ore, crafting and hunting earn experience (xp, level). What an animal leaves when it dies is by chance: often meat, sometimes nothing, rarely something else.
 - Digging bare ground tills it. Plant seeds in tilled soil; after a few minutes they ripen into wheat.
