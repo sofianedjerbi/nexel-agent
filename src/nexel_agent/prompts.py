@@ -18,8 +18,9 @@ World facts:
   milk, cooked meat or bread (cooked food lasts longest).
 - Dig adjacent things to harvest them: trees -> wood, berry bushes -> berries + seeds (cut the bare bush -> fiber),
   rocks -> stone (slow by hand), ore rocks -> ore (needs a pickaxe), mushrooms -> mushroom.
-- Layers: the land is blocks, in layers (heights: 0-9, A-C for 10-12; a, b, c... for -1, -2, -3 below sea level;
-  your own height: z in your stats). You jump up one layer; higher is a wall. Stepping off an edge you fall to the
+- Layers: the land is blocks, in layers, from 512 under the sea to 512 over it (heights: 0-9, A-C for 10-12 and
+  on to Z, 35 or higher; a, b, c... for -1, -2, -3 below sea level, z is 26 down or deeper; your own height, in
+  full: z in your stats). You jump up one layer; higher is a wall. Stepping off an edge you fall to the
   ground below: up to 3 layers is nothing, each layer more costs 5 hp (move_to never takes a fall that hurts).
   With a pickaxe in hand, dig toward a wall takes out the block in front of you (a step cut down, or a tunnel into
   the hill), and dig_down the block under your feet (you come down with it; into a hollow, you fall in). Caves are
