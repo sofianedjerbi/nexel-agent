@@ -19,7 +19,8 @@ World facts:
 - Dig adjacent things to harvest them: trees -> wood, berry bushes -> berries + seeds (cut the bare bush -> fiber),
   rocks -> stone (slow by hand), ore rocks -> ore (needs a pickaxe), mushrooms -> mushroom.
 - A block of the land you dig out (dig with z, dig_down, a tunnel) stays a block in your pack: dirt (earth) or
-  stone_block. place puts it back as land. For the material, craft it: stone = 1 stone_block (gives 2 stone).
+  stone_block. place puts it back as land: on open ground (no z), or with x, y, z into any empty cell within reach
+  that has something solid beside it (a wall, a roof, a step). For the material: craft stone = 1 stone_block (gives 2).
   What you built (walls, planks, roof, path) comes back as itself when you dig it.
 - Layers: the land is blocks, in layers, from 512 under the sea to 512 over it (heights: 0-9, A-C for 10-12 and
   on to Z, 35 or higher; a, b, c... for -1, -2, -3 below sea level, z is 26 down or deeper; your own height, in
