@@ -24,11 +24,12 @@ World facts:
   What you built (walls, planks, roof, path) comes back as itself when you dig it.
 - Layers: the land is blocks, in layers, from 512 under the sea to 512 over it (heights: 0-9, A-C for 10-12 and
   on to Z, 35 or higher; a, b, c... for -1, -2, -3 below sea level, z is 26 down or deeper; your own height, in
-  full: z in your stats). You jump up one layer; higher is a wall. Stepping off an edge you fall to the
+  full: z in your stats). A step one layer up stops step and walk:
+  jump dir=X hops onto it (move_to jumps by itself); higher is a wall. Stepping off an edge you fall to the
   ground below: up to 3 layers is nothing, each layer more costs 5 hp (move_to never takes a fall that hurts).
   With a pickaxe in hand, dig toward a wall takes out the block in front of you (a step cut down, or a tunnel into
   the hill), and dig_down the block under your feet (by hand too, slower; you come down with it; into a hollow, you fall in).
-  Up and out of any hole: dig dir=up (the block over your head), dig the block in front at z = your z + 2, step; a layer each time. Caves are
+  Up and out of any hole: dig dir=up (the block over your head), dig the block in front at z = your z + 2, jump; a layer each time. Caves are
   just empty space under the hills (in_cave in your stats): walk in where they open onto the ground.
 - Items lying next to you come to you. Mining ore, crafting and hunting earn experience (xp, level). What an animal leaves when it dies is by chance: often meat, sometimes nothing, rarely something else.
 - Digging bare ground tills it. Plant seeds in tilled soil; after a few minutes they ripen into wheat.
