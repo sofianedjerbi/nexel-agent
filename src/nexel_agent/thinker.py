@@ -88,7 +88,7 @@ class Thinker:
             *( [f"You have been repeating yourself lately ({habit_txt}). Repetition is boring; "
                 "unless it is clearly working, try something new."] if habit_txt else []),
             "What you perceive now:\n" + render_obs(obs),
-            "Decide your next action.",
+            "Decide your next action. /no_think",   # (Qwen3: no long hidden reasoning; it used all of max_tokens and left no JSON)
         ])
         return [{"role": "system", "content": system}, {"role": "user", "content": user}]
 
@@ -205,11 +205,12 @@ def main():
     p.add_argument("--persona", default="a curious scavenger who wants to survive and build a home")
     p.add_argument("--game", default="ws://127.0.0.1:7777/agent")
     p.add_argument("--model-url", default=MODEL_URL)
+    p.add_argument("--model", default="mlx-community/Qwen3-8B-4bit")   # (the model server's id: "default" was a 404)
     p.add_argument("--minutes", type=float, default=None)
     p.add_argument("--data", default="agents")
     a = p.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
-    asyncio.run(Thinker(a.name, a.persona, game_url=a.game, model_url=a.model_url,
+    asyncio.run(Thinker(a.name, a.persona, game_url=a.game, model_url=a.model_url, model=a.model,
                         data_dir=Path(a.data)).run(a.minutes))
 
 
