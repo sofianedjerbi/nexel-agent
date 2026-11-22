@@ -2,7 +2,7 @@
 and the fast chat reply's tiny prompt. The plan format and its parser: plans.py.
 """
 
-from .filler import NEEDS
+from .filler import NEEDS, goal_absent
 from .policy import DIRS, reachable
 from .plans import _kind, _optional
 from .sim.specs import LEGEND, TOOL_SPECS
@@ -147,6 +147,8 @@ def compact_obs(obs, goal=None, heard=(), history=(), pending=(), notes="", less
              "Carry: " + (", ".join(f"{k} {v}" for k, v in inv.items()) or "nothing") + ".",
              "Can craft now: " + (", ".join(craftable(inv, grid)) or "nothing") + ".",
              *([f"Your goal '{goal}': {need}"] if need else []),
+             *([f"No {absent} anywhere in view: to '{goal}', go and find one first (move_to toward the map's edge, "
+                "or look_far)."] if (absent := goal_absent(goal, obs)) else []),
              f"Map (@ = you; rows y{me['y'] - VIEW}..{me['y'] + VIEW}, columns x{me['x'] - VIEW}..{me['x'] + VIEW}):",
              *crop,
              "Key: " + ", ".join(f"{c} {LEGEND.get(c, c).split(' (')[0]}" for c in used if c in LEGEND)]

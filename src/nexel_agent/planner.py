@@ -13,9 +13,19 @@ import httpx
 
 from .fastprompt import chat_messages, compact_obs
 from .plans import PlanStream, command_text, parse_command
+from .tiles import FOOD
+from .planwatch import REFUSED, TOLD, did_nothing
 
 log = logging.getLogger("thinker")
 MAX_PLAN = 6                                     # commands taken from one answer
+
+
+def hungry_line(obs) -> str:
+    me = obs["self"]
+    if me["hunger"] > 8 or any(me["inventory"].get(f) for f in FOOD):
+        return ""
+    return (f"You are hungry (food {me['hunger']}/20) and carry no food: get food first "
+            "(berry bushes, mushrooms, fruit trees, eggs, animals).")
 
 
 @dataclass
@@ -36,8 +46,16 @@ class Planner:
         fails = [v for k, v in self.lessons.items.items() if k.startswith("fail:")][-3:]
         user = compact_obs(obs, goal=self.goal, heard=list(self.heard)[-3:], history=list(self.history), pending=list(pending),
                            notes=notes, lessons=" | ".join(f[:110] for f in fails),
-                           habit=f"You keep doing {', '.join(habit)}: try something else." if habit else "")
+                           habit=" ".join(filter(None, [hungry_line(obs),
+                                                        f"You keep doing {', '.join(habit)}: try something else." if habit else ""])))
         return [{"role": "system", "content": self.prefix}, {"role": "user", "content": user}]
+
+    def tell(self, line: str):
+        """A line for the model's 'Done' list, once (not the same warning four times over)."""
+        key = line[:60]
+        for old in [h for h in self.history if h[:60] == key]:
+            self.history.remove(old)
+        self.history.append(line)
 
     def _body(self, messages, max_tokens, temperature, stream):
         return {"model": self.model, "messages": messages, "temperature": temperature, "max_tokens": max_tokens,
@@ -70,14 +88,33 @@ class Planner:
         ttft = first_cmd = None
         n_ok = n_bad = 0
         stale = False
+        plan: list[str] = []                     # this answer's commands, as written
+        ahead = [command_text(i.tool, i.args) for i in ([self.current] if self.current else []) + mine]
 
         def take(raw):
-            nonlocal at, n_ok, n_bad, first_cmd
+            nonlocal at, n_ok, n_bad, first_cmd, stale
             c = parse_command(raw)
             if c is None:
                 n_bad += 1
                 return
             tool, args = c
+            text = command_text(tool, args)
+            plan.append(text)
+            if len(plan) == 1 and (known := self.watch.refused(text)):
+                self.stats["plan_refused"] += 1  # the same plan changed nothing twice already: not again
+                self.tell(did_nothing(known, self.last_skip))
+                self.anchor = None               # and the filler may leave that spot for what is really there
+                stale = True
+                return
+            if plan == ahead[:len(plan)]:       # the plan already running, asked again: it goes on, not from the start
+                self.stats["dup_dropped"] += 1
+                n_ok += 1
+                return
+            me = self.obs["self"]
+            if tool == "move_to" and (args.get("x"), args.get("y")) == (me["x"], me["y"]) and not mine:
+                self.stats["noop_dropped"] += 1  # already standing there
+                n_ok += 1
+                return
             self.queue.append(Item(tool, args, "model", ps.goal or "", at if "dir" in args else None, epoch))
             n_ok += 1
             first_cmd = first_cmd or time.monotonic() - t0
@@ -101,7 +138,8 @@ class Planner:
                         stale = True
                         break
                     for raw in ps.feed(piece):
-                        take(raw)
+                        if not stale:
+                            take(raw)
                 if stale or n_ok + n_bad >= MAX_PLAN:
                     break                        # (a long plan goes stale before it is done: stop decoding it)
         if not stale:
@@ -111,6 +149,13 @@ class Planner:
                 self.goal = ps.goal
             if ps.note:
                 self.add_note(ps.note)
+            n = self.watch.arrived(tuple(plan), self.obs["self"]["inventory"]) if plan else 0
+            if n >= TOLD:                        # asked again, and the pack is as it was when it came last time
+                self.tell(did_nothing(tuple(plan), self.last_skip))
+            if n >= REFUSED and self.epoch == epoch:
+                self.stats["plan_refused"] += 1
+                self.abort("the same plan changed nothing again")
+                self.anchor = None
         if n_ok == 0 and not stale:
             self.stats["parse_fail"] += 1
             self.history.append("(your last answer had no command I could run: use the command forms shown)")

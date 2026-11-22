@@ -16,12 +16,25 @@ GOALS = (                                    # (words in the goal, chars to dig,
     (("mushroom",), "Q", None),
 )
 DANGER = ("tusker", "pincer", "strawman", "wyrm", "mossback")
+
+
+def goal_absent(goal: str | None, obs) -> str | None:
+    """The goal names a thing to gather (wood, stone, berries...) and none of it is anywhere in view: its name."""
+    g = (goal or "").lower()
+    chars = next((c for words, c, _ in GOALS if any(w in g for w in words)), None)
+    if not chars or any(ch in row for row in obs["grid"] for ch in chars):
+        return None
+    return {"Tt": "tree", "M": "rock", "*M": "rock or ore", "bQF": "berry bush, mushroom or fruit tree",
+            "vbH": "bush", "Q": "mushroom"}[chars]
+
+
 NEEDS = {"*": "pickaxe"}                    # cannot be dug without it
 TOOL_FOR = {"T": "axe", "H": "axe", "M": "pickaxe", "*": "pickaxe"}
 
 
-def filler(obs, goal: str | None, memory: dict, rng) -> tuple[str, dict, str] | None:
-    """(tool, args, why) in the spirit of `goal`, or None when nothing sensible is in view."""
+def filler(obs, goal: str | None, memory: dict, rng, anchor=None) -> tuple[str, dict, str] | None:
+    """(tool, args, why) in the spirit of `goal`, or None when nothing sensible is in view. With `anchor` (where the
+    plan just walked to), it stays within 2 tiles of it: the plan is not pulled away from."""
     me = obs["self"]
     x, y = me["x"], me["y"]
     inv = me["inventory"]
@@ -40,6 +53,17 @@ def filler(obs, goal: str | None, memory: dict, rng) -> tuple[str, dict, str] | 
         memory["fails"] = 0
         return explore(obs, reach, avoid, memory, rng)
     g = (goal or "").lower()
+    if anchor:
+        chars = next((c for words, c, _ in GOALS if any(w in g for w in words)), "TtbvQFM")
+        act = gather(obs, chars, inv, avoid, memory, f"{goal}: gathering", max_d=2)
+        if act:
+            return act
+        ax, ay = anchor[0] - x, anchor[1] - y
+        near = [q for q in reach if abs(q[0] - ax) + abs(q[1] - ay) <= 1 and q != (0, 0)]
+        if near:
+            dx, dy = rng.choice(near)
+            return "move_to", {"x": x + dx, "y": y + dy}, "looking around here"
+        return None
     if any(w in g for w in ("explore", "look", "find", "search", "wander", "scout")):
         return explore(obs, reach, avoid, memory, rng)
     if any(w in g for w in ("home", "sleep", "bed")) and me.get("spawn"):
@@ -58,9 +82,9 @@ def filler(obs, goal: str | None, memory: dict, rng) -> tuple[str, dict, str] | 
     return act or explore(obs, reach, avoid, memory, rng)
 
 
-def gather(obs, chars, inv, avoid, memory, why):
+def gather(obs, chars, inv, avoid, memory, why, max_d=8):
     chars = "".join(c for c in chars if c not in NEEDS or inv.get(NEEDS[c]))
-    t = find(obs, chars, avoid, max_d=8) if chars else None
+    t = find(obs, chars, avoid, max_d=max_d) if chars else None
     if not t:
         return None
     me = obs["self"]

@@ -3,8 +3,26 @@ on an older observation): is there still something where it digs, which way is t
 what a failure is remembered by."""
 
 from .policy import DIRS
+from .tiles import FOOD
 
 BARE = set(".,o_'nu-:")                          # plain ground: nothing to harvest
+HUNGRY = 8                                       # eat at this food level or lower, when carrying food
+DANGER = ("tusker", "pincer", "strawman", "wyrm", "mossback")
+
+
+def reflex(obs):
+    """What no plan waits for: eat when hungry (with food), step away from what bites when hurt. (tool, args, why)."""
+    me = obs["self"]
+    inv = me["inventory"]
+    if me["hunger"] <= HUNGRY and me.get("action") != "eat":
+        food = max((f for f in FOOD if inv.get(f)), key=lambda f: FOOD[f], default=None)
+        if food:
+            return "eat", {"item": food}, f"(reflex) hungry ({me['hunger']}/20), eating {food}"
+    for e in obs["entities"]:
+        if e["kind"] in DANGER and abs(e["dx"]) + abs(e["dy"]) <= 2 and me["hp"] <= 12:
+            return "move_to", {"x": me["x"] - 4 * (e["dx"] > 0) + 4 * (e["dx"] <= 0),
+                               "y": me["y"] - 4 * (e["dy"] > 0) + 4 * (e["dy"] <= 0)}, "(reflex) fleeing"
+    return None
 
 
 def gone(obs, it) -> bool:

@@ -10,7 +10,7 @@ import httpx
 
 from megastructure.fastprompt import compact_obs, stable_prefix
 from megastructure.planner import Item
-from megastructure.plans import PlanStream, parse_command, parse_plan
+from megastructure.plans import PlanStream, command_text, parse_command, parse_plan
 from megastructure.thinker import Thinker
 
 
@@ -54,10 +54,10 @@ def test_prompt_is_short_and_its_prefix_stable():
 
 
 # ---------------------------------------------------------------- fakes
-def fake_obs(pos, events=()):
+def fake_obs(pos, events=(), tree=True):
     grid = [["."] * 21 for _ in range(21)]
     r, c = 10 + (-2 - pos[1]), 10 - pos[0]               # a tree at (0,-2)
-    if 0 <= r < 21 and 0 <= c < 21:
+    if tree and 0 <= r < 21 and 0 <= c < 21:
         grid[r][c] = "T"
     grid[10][10] = "@"
     return {"tick": 1, "time": "day 1, 09:00", "grid": ["".join(r) for r in grid], "legend": {".": "grass", "T": "tree"},
@@ -74,8 +74,9 @@ class FakeGame:
 
     async def observe(self):
         ev, self.events = self.events, []
-        obs = fake_obs(tuple(self.pos), ev)
+        obs = fake_obs(tuple(self.pos), ev, tree=getattr(self, "tree", True))
         obs["self"]["inventory"] = dict(getattr(self, "inv", {}))
+        obs["self"]["hunger"] = getattr(self, "hunger", 20)
         return obs
 
     async def act(self, tool, **args):

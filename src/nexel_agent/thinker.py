@@ -22,12 +22,13 @@ from pathlib import Path
 
 import httpx
 
-from .aim import facing, fail_key, gone
+from .aim import HUNGRY, facing, fail_key, gone, reflex
 from .client import ApiError, Client
 from .fastprompt import stable_prefix
-from .filler import filler
+from .filler import filler, goal_absent
 from .lessons import Lessons
 from .planner import Item, Planner
+from .planwatch import PlanWatch
 from .plans import command_text, parse_plan  # noqa: F401  (parse_plan: tools, tests)
 from .playstats import summary
 from .policy import DIRS, feedback
@@ -36,7 +37,7 @@ from .tiles import FOOD
 
 log = logging.getLogger("thinker")
 MODEL_URL = "http://127.0.0.1:8080/v1/chat/completions"
-DANGER = ("tusker", "pincer", "strawman", "wyrm", "mossback")
+ANCHOR_S = 8.0                                    # after a planned walk, the filler stays near its end this long
 
 
 class Thinker(Planner):
@@ -70,6 +71,10 @@ class Thinker(Planner):
         self.last_goto = None                                 # the last planned move_to that worked
         self.failed: dict[tuple, list] = {}                   # fail_key -> [times, error]; forgotten when the pack gains a kind
         self.kinds: set[str] = set()
+        self.watch = PlanWatch()                              # plans asked again that changed nothing
+        self.current: Item | None = None                      # the planned command being played now
+        self.last_skip = ""                                   # why the last planned command was not played
+        self.anchor: tuple | None = None                      # (x, y, until): where the plan just walked; the filler stays near
         self.stats = Counter()
         self.calls: list[dict] = []
         self.busy: list[tuple[float, float, str]] = []      # (start, end, source) of every action on the server
@@ -113,24 +118,13 @@ class Thinker(Planner):
         self.obs = obs
         return obs
 
-    def urgent(self, obs):
-        """Reflexes no plan waits for: eat when starving, step away from what bites when hurt."""
-        me = obs["self"]
-        inv = me["inventory"]
-        if me["hunger"] <= 3:
-            food = max((f for f in FOOD if inv.get(f)), key=lambda f: FOOD[f], default=None)
-            if food:
-                return "eat", {"item": food}, f"(reflex) starving, eating {food}"
-        for e in obs["entities"]:
-            if e["kind"] in DANGER and abs(e["dx"]) + abs(e["dy"]) <= 2 and me["hp"] <= 12:
-                return "move_to", {"x": me["x"] - 4 * (e["dx"] > 0) + 4 * (e["dx"] <= 0),
-                                   "y": me["y"] - 4 * (e["dy"] > 0) + 4 * (e["dy"] <= 0)}, "(reflex) fleeing"
-        return None
+    urgent = staticmethod(reflex)
 
     def next_item(self, obs) -> Item:
         u = self.urgent(obs)
         if u:
-            self.abort(u[2])
+            if u[0] != "eat" or obs["self"]["hunger"] <= 3:   # eating while hungry: the plan goes on after it
+                self.abort(u[2])
             return Item(*u[:2], "reflex", u[2])
         me = obs["self"]
         while self.queue:
@@ -151,15 +145,23 @@ class Thinker(Planner):
                     self.stats["dig_turned"] += 1
             if self.gone(obs, it):
                 self.stats["skipped"] += 1
-                self.history.append(f"(skipped '{command_text(it.tool, it.args)}': nothing there any more)")
+                self.last_skip = f"'{command_text(it.tool, it.args)}': nothing to dig there"
+                self.tell(f"(skipped {self.last_skip})")
                 continue
             known = self.failed.get(fail_key(obs, it))
             if known and known[0] >= 2:              # it failed here twice already, for the same reason: not a third time
                 self.stats["known_fail"] += 1
-                self.abort(f"'{command_text(it.tool, it.args)}' failed {known[0]}x here before: {known[1]}")
+                self.last_skip = f"'{command_text(it.tool, it.args)}' failed {known[0]}x here before: {known[1]}"
+                self.abort(self.last_skip)
                 break
             return it
-        f = filler(obs, self.goal, self.memory, self.rng)
+        me = obs["self"]
+        hungry = me["hunger"] <= HUNGRY and not any(me["inventory"].get(f) for f in FOOD)
+        goal = "food" if hungry else self.goal
+        anchor = self.anchor[:2] if self.anchor and time.monotonic() < self.anchor[2] else None
+        if goal_absent(goal, obs):                   # what the goal wants is nowhere in view: no spot to hold, go find it
+            anchor, goal = None, f"find {goal}"
+        f = filler(obs, goal, self.memory, self.rng, anchor)
         if f is None:
             d = self.rng.choice(list(DIRS))
             f = ("step", {"dir": d}, "looking around")
@@ -182,6 +184,7 @@ class Thinker(Planner):
 
     async def execute(self, game, item: Item, obs):
         t0 = time.monotonic()
+        self.current = item if item.source == "model" else None
         task = asyncio.create_task(game.act(item.tool, **item.args))
         if item.source == "filler":                      # cut short by a plan (the next act replaces it on the server)
             waiter = asyncio.create_task(self.new_plan.wait())
@@ -199,6 +202,7 @@ class Thinker(Planner):
             task.cancel()
             raise
         t1 = time.monotonic()
+        self.current = None
         self.busy.append((t0, t1, item.source))
         ok = bool(reply.get("ok"))
         feedback(self.memory, reply, obs["tick"])
@@ -208,6 +212,9 @@ class Thinker(Planner):
         if item.source == "model":
             self.recent.append(command_text(item.tool, item.args))
             self.last_goto = (item.args["x"], item.args["y"]) if item.tool == "move_to" and ok else None
+            if self.last_goto:
+                me = reply["result"].get("changed", {}).get("pos") or self.last_goto
+                self.anchor = (me[0], me[1], t1 + ANCHOR_S)
         if item.source != "filler" or not ok:
             self.history.append(line[:150])
         if not ok and reply.get("error") not in ("interrupted", "rate_limited", "hands_full"):
