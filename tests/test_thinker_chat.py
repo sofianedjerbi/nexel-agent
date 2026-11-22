@@ -43,18 +43,17 @@ def test_the_json_reply_and_a_name_prefix():
     assert chat_parse("Gatsu0: Hey, I'm harvesting wood. DO: come") == ("Hey, I'm harvesting wood.", "come")
 
 
-def test_hit_by_a_player_it_says_something(tmp_path):
-    """"i hit gatsu - no response, not even a chat": a player's hit gets a line (a tusker's doesn't)."""
-    transport, calls = model_transport(['{"goal":"get wood","do":["dig N"]}'], delay=3.0, chat_line='{"say": "Ow! What was that for?", "do": "nothing"}')
-    game = FakeGame(act_s=0.1, events=[{"type": "attack", "attacker": "Ana", "target": "Vex", "damage": 2, "weapon": "sword", "dx": 1, "dy": 0},
-                                       {"type": "attack", "attacker": "a tusker", "target": "Vex", "damage": 3}])
+def test_a_hit_is_told_to_the_planner_not_answered_by_a_script(tmp_path):
+    """"do not hardcode response logic ... hit him he should hit back or run away": a hit stops the plan and the next
+    plan call hears who hit, with what, and how hurt you are; no scripted line is said."""
+    transport, calls = model_transport(['{"goal":"get wood","do":["dig N"]}'], delay=0.2, chat_line="no")
+    game = FakeGame(act_s=0.1, events=[{"type": "attack", "attacker": "Ana", "target": "Vex", "damage": 2, "weapon": "sword", "dx": 1, "dy": 0}])
     t = thinker(tmp_path)
 
     async def go():
         async with httpx.AsyncClient(transport=transport) as http:
             await t.play(game, http, minutes=1.2 / 60)
     asyncio.run(go())
-    says = [a for a in game.acts if a[1] == "say"]
-    assert len(says) == 1 and says[0][2]["text"] == "Ow! What was that for?", game.acts
-    chat = [c for c in calls if not c[1].get("stream")]
-    assert len(chat) == 1 and "Ana just hit you with sword" in chat[0][1]["messages"][1]["content"]
+    assert not [c for c in calls if not c[1].get("stream")] and not [a for a in game.acts if a[1] == "say"]
+    plans = [c[1]["messages"][-1]["content"] for c in calls if c[1].get("stream")]
+    assert any("Ana just hit you with sword: -2 health" in p for p in plans), plans[-1][-600:]

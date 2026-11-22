@@ -209,8 +209,7 @@ def chat_messages(name: str, persona: str, goal: str, speaker: str, text: str, r
             "questions, anything else.\nExamples:\n"
             'hi -> {"say": "Hey! Just chopping some wood. You?", "do": "nothing"}\n'
             'can you help me dig? -> {"say": "Sure, on my way.", "do": "come"}\n'
-            'stop cutting trees -> {"say": "Alright, I\'ll find something else to do.", "do": "stop"}\n'
-            '*Ana just hit you* -> {"say": "Ow! Hey, what was that for?", "do": "nothing"}')
+            'stop cutting trees -> {"say": "Alright, I\'ll find something else to do.", "do": "stop"}')
     ctx = ("Earlier: " + " | ".join(recent) + "\n") if recent else ""
     status = f"You are at ({me.get('x', '?')}, {me.get('y', '?')}), health {me.get('hp', '?')}, food {me.get('hunger', '?')}/20, carrying: {inv}."
     return [{"role": "system", "content": sys_},
