@@ -22,9 +22,10 @@ from pathlib import Path
 
 import httpx
 
-from .aim import HUNGRY, facing, fail_key, gone, reflex
+from .aim import HUNGRY, facing, fail_key, gone, just_failed, reflex
 from .client import ApiError, Client
 from .fastprompt import stable_prefix
+from .escape import escape_failed, stuck, way_out
 from .filler import filler, goal_absent
 from .lessons import Lessons
 from .planner import Item, Planner
@@ -127,6 +128,8 @@ class Thinker(Planner):
                 self.abort(u[2])
             return Item(*u[:2], "reflex", u[2])
         me = obs["self"]
+        if self.memory.get("climb_to") is not None and stuck(obs, self.memory) and (out := way_out(obs, self.memory)):
+            return Item(*out[:2], "escape", out[2])  # cutting a stair out: no plan pulls it off the wall
         while self.queue:
             it = self.queue.popleft()
             if it.epoch != self.epoch and it.source != "chat":
@@ -149,22 +152,26 @@ class Thinker(Planner):
                 self.tell(f"(skipped {self.last_skip})")
                 continue
             known = self.failed.get(fail_key(obs, it))
-            if known and known[0] >= 2:              # it failed here twice already, for the same reason: not a third time
+            again = just_failed(self.memory, it.tool, it.args, time.monotonic())
+            if (known and known[0] >= 2) or again:   # failed here twice already, or a moment ago: not again now
                 self.stats["known_fail"] += 1
-                self.last_skip = f"'{command_text(it.tool, it.args)}' failed {known[0]}x here before: {known[1]}"
+                self.last_skip = f"'{command_text(it.tool, it.args)}' failed " + (
+                    f"{known[0]}x here before: {known[1]}" if known and known[0] >= 2 else "a moment ago")
                 self.abort(self.last_skip)
                 break
             return it
-        me = obs["self"]
         hungry = me["hunger"] <= HUNGRY and not any(me["inventory"].get(f) for f in FOOD)
         goal = "food" if hungry else self.goal
         anchor = self.anchor[:2] if self.anchor and time.monotonic() < self.anchor[2] else None
         if goal_absent(goal, obs):                   # what the goal wants is nowhere in view: no spot to hold, go find it
             anchor, goal = None, f"find {goal}"
+        if stuck(obs, self.memory) and (out := way_out(obs, self.memory)):
+            return Item(*out[:2], "escape", out[2])  # no walk works from here: get out first (escape.py)
         f = filler(obs, goal, self.memory, self.rng, anchor)
-        if f is None:
-            d = self.rng.choice(list(DIRS))
-            f = ("step", {"dir": d}, "looking around")
+        if f and just_failed(self.memory, f[0], f[1], time.monotonic()):
+            self.stats["backoff"] += 1               # that just failed: not again within a second
+            f = way_out(obs, self.memory) or ("look_far", {"dir": self.rng.choice(list(DIRS))}, "looking around")
+        f = f or ("step", {"dir": self.rng.choice(list(DIRS))}, "looking around")
         return Item(*f[:2], "filler", f[2])
 
     gone = staticmethod(gone)
@@ -220,6 +227,11 @@ class Thinker(Planner):
         if not ok and reply.get("error") not in ("interrupted", "rate_limited", "hands_full"):
             f = self.failed.setdefault(fail_key(obs, item), [0, ""])
             f[0], f[1] = f[0] + 1, str(reply.get("error"))
+            self.memory["last_fail"] = (item.tool, item.args, t1)
+        if item.tool in ("move_to", "step", "walk", "jump") or reply.get("error") == "no_path":
+            self.memory["no_path"] = self.memory.get("no_path", 0) + 1 if reply.get("error") == "no_path" else 0
+        if item.source == "escape" and not ok:
+            escape_failed(self.memory, item.tool, item.args)
         if not ok and item.source in ("model", "align") and reply.get("error") != "interrupted":
             self.abort(f"{command_text(item.tool, item.args)} failed: {reply.get('error')}")
         self._log(item, obs, reply, line, t0)

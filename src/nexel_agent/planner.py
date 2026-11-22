@@ -11,6 +11,7 @@ from dataclasses import dataclass
 
 import httpx
 
+from .escape import stuck, stuck_line
 from .fastprompt import chat_messages, compact_obs
 from .plans import PlanStream, command_text, parse_command
 from .tiles import FOOD
@@ -46,7 +47,7 @@ class Planner:
         fails = [v for k, v in self.lessons.items.items() if k.startswith("fail:")][-3:]
         user = compact_obs(obs, goal=self.goal, heard=list(self.heard)[-3:], history=list(self.history), pending=list(pending),
                            notes=notes, lessons=" | ".join(f[:110] for f in fails),
-                           habit=" ".join(filter(None, [hungry_line(obs),
+                           habit=" ".join(filter(None, [stuck(obs, self.memory) and stuck_line(obs), hungry_line(obs),
                                                         f"You keep doing {', '.join(habit)}: try something else." if habit else ""])))
         return [{"role": "system", "content": self.prefix}, {"role": "user", "content": user}]
 

@@ -45,6 +45,14 @@ def facing(obs, target) -> str | None:
     return None
 
 
+BACKOFF_S = 1.0                                  # an action that just failed is not sent again this soon
+
+
+def just_failed(memory, tool, args, now) -> bool:
+    last = memory.get("last_fail")
+    return bool(last) and last[:2] == (tool, args) and now - last[2] < BACKOFF_S
+
+
 def fail_key(obs, it) -> tuple:
     """What a failure is remembered by: the tool, what it was used with, and the tile it was aimed at."""
     me = obs["self"]
