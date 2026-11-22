@@ -41,3 +41,20 @@ def test_the_json_reply_and_a_name_prefix():
     assert chat_parse('{"say": "Hey! Chopping wood.", "do": "nothing"}') == ("Hey! Chopping wood.", "")
     assert chat_parse('{"say": "On my way.", "do": "come"}') == ("On my way.", "come")
     assert chat_parse("Gatsu0: Hey, I'm harvesting wood. DO: come") == ("Hey, I'm harvesting wood.", "come")
+
+
+def test_hit_by_a_player_it_says_something(tmp_path):
+    """"i hit gatsu - no response, not even a chat": a player's hit gets a line (a tusker's doesn't)."""
+    transport, calls = model_transport(['{"goal":"get wood","do":["dig N"]}'], delay=3.0, chat_line='{"say": "Ow! What was that for?", "do": "nothing"}')
+    game = FakeGame(act_s=0.1, events=[{"type": "attack", "attacker": "Ana", "target": "Vex", "damage": 2, "weapon": "sword", "dx": 1, "dy": 0},
+                                       {"type": "attack", "attacker": "a tusker", "target": "Vex", "damage": 3}])
+    t = thinker(tmp_path)
+
+    async def go():
+        async with httpx.AsyncClient(transport=transport) as http:
+            await t.play(game, http, minutes=1.2 / 60)
+    asyncio.run(go())
+    says = [a for a in game.acts if a[1] == "say"]
+    assert len(says) == 1 and says[0][2]["text"] == "Ow! What was that for?", game.acts
+    chat = [c for c in calls if not c[1].get("stream")]
+    assert len(chat) == 1 and "Ana just hit you with sword" in chat[0][1]["messages"][1]["content"]
