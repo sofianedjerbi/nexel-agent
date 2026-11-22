@@ -12,7 +12,7 @@ from dataclasses import dataclass
 import httpx
 
 from .escape import stuck, stuck_line
-from .fastprompt import chat_messages, compact_obs
+from .fastprompt import chat_messages, chat_parse, compact_obs
 from .plans import PlanStream, command_text, parse_command
 from .tiles import FOOD
 from .planwatch import REFUSED, TOLD, did_nothing
@@ -177,31 +177,36 @@ class Planner:
                  " (dropped: stale)" if stale else "")
 
     # --------------------------------------------------------------- chat
-    def on_chat(self, speaker, text):
+    def on_chat(self, speaker, text, at=None):
         if self.chat_task and not self.chat_task.done():
-            self.chat_next = (speaker, text)
+            self.chat_next = (speaker, text, at)
         else:
-            self.chat_task = asyncio.create_task(self.chat_reply(speaker, text))
+            self.chat_task = asyncio.create_task(self.chat_reply(speaker, text, at))
 
-    async def chat_reply(self, speaker, text):
-        while True:
-            t0 = time.monotonic()
+    async def chat_reply(self, speaker, text, at=None):
+        while True:     # (one line said back, and what was asked of you done: "come" walks to them, "stop" drops the plan)
+            t0, me = time.monotonic(), (self.obs or {}).get("self", {})
             try:
                 r = await self.http.post(self.model_url, timeout=30, json=self._body(
-                    chat_messages(self.name, self.persona, self.goal or "", speaker, text, list(self.heard)[-3:-1]),
-                    40, 0.6, False))
+                    chat_messages(self.name, self.persona, self.goal or "", speaker, text, list(self.heard)[-3:-1], me),
+                    60, 0.6, False))
                 r.raise_for_status()
-                line = (r.json()["choices"][0]["message"]["content"] or "").strip().splitlines()
-                line = line[0].strip().strip('"').strip() if line else ""
+                line, do = chat_parse(r.json()["choices"][0]["message"]["content"] or "")
             except (httpx.HTTPError, KeyError, IndexError, ValueError) as e:
                 log.warning("%s: chat error %r", self.name, e)
-                line = ""
+                line, do = "", ""
+            if do in ("come", "stop"):
+                self.abort(f"{speaker} asked you to {do}")
+                self.history.append(f"({speaker} asked you to {do}: you did)")
             if line:
                 self.queue.appendleft(Item("say", {"text": line[:120]}, "chat", f"answering {speaker}", None, self.epoch))
+            if do == "come" and at:
+                self.queue.insert(1 if line else 0, Item("move_to", {"x": at[0], "y": at[1]}, "chat", f"going to {speaker}", None, self.epoch))
+            if line or do:
                 self.new_plan.set()
                 self.calls.append({"kind": "chat", "latency_s": round(time.monotonic() - t0, 2)})
                 self.decision_log.write(json.dumps({"kind": "chat", "t": time.time(), "to": speaker, "heard": text,
-                                                    "said": line, "latency_s": round(time.monotonic() - t0, 2)}) + "\n")
+                                                    "said": line, "do": do, "latency_s": round(time.monotonic() - t0, 2)}) + "\n")
             if not self.chat_next:
                 return
-            (speaker, text), self.chat_next = self.chat_next, None
+            (speaker, text, at), self.chat_next = self.chat_next, None

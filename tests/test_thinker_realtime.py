@@ -191,7 +191,7 @@ def test_someone_talking_gets_an_answer_fast(tmp_path):
     says = [a for a in game.acts if a[1] == "say"]
     assert says and says[0][2]["text"] == "Sure, take two." and says[0][0] - t0 < 1.0
     chat_call = next(c for c in calls if not c[1].get("stream"))
-    assert chat_call[1]["max_tokens"] <= 40 and "Ana says: hi Vex" in chat_call[1]["messages"][1]["content"]
+    assert chat_call[1]["max_tokens"] <= 60 and "Ana says: hi Vex" in chat_call[1]["messages"][1]["content"]
 
 
 def test_a_planned_dig_at_bare_ground_is_skipped_not_failed(tmp_path):

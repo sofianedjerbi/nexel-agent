@@ -2,6 +2,8 @@
 and the fast chat reply's tiny prompt. The plan format and its parser: plans.py.
 """
 
+import re
+
 from .filler import NEEDS, goal_absent
 from .policy import DIRS, reachable
 from .plans import _kind, _optional
@@ -187,9 +189,31 @@ def compact_obs(obs, goal=None, heard=(), history=(), pending=(), notes="", less
     return "\n".join(lines)
 
 
-def chat_messages(name: str, persona: str, goal: str, speaker: str, text: str, recent=()) -> list[dict]:
-    sys_ = (f"You are {name} in a game world. Who you are: {persona}\nSomeone near you talks to you. Answer in ONE short "
-            "spoken line (at most 15 words), in character. Only the line, no quotes, no name.")
+def chat_messages(name: str, persona: str, goal: str, speaker: str, text: str, recent=(), me=None) -> list[dict]:
+    """A real player talks to you: answer what they said (a question gets its answer), in your voice but plainly, never a
+    riddle ("gatsu is full roleplaying, not answering my messages": "Hmph. Coming." and it never came). Then, on a line
+    of its own, what you do about it: DO: come | stop | nothing."""
+    me = me or {}
+    inv = ", ".join(f"{k} {v}" for k, v in sorted((me.get("inventory") or {}).items(), key=lambda kv: -kv[1])[:6]) or "nothing"
+    sys_ = (f"You are {name}, a player in a survival game world. Your character: {persona}\nA real person playing the game "
+            "talks to you. Reply to what they actually said: answer questions truthfully and usefully (what you are doing, "
+            "where, what you have), be friendly, a little in character, never cryptic. One or two short sentences (at most "
+            "30 words). Then a last line: DO: come (walk over to them, if they ask you to come, follow or help), DO: stop "
+            "(if they ask you to stop or wait) or DO: nothing.")
     ctx = ("Earlier: " + " | ".join(recent) + "\n") if recent else ""
+    status = f"You are at ({me.get('x', '?')}, {me.get('y', '?')}), health {me.get('hp', '?')}, food {me.get('hunger', '?')}/20, carrying: {inv}."
     return [{"role": "system", "content": sys_},
-            {"role": "user", "content": f"{ctx}You are busy with: {goal or 'getting by'}.\n{speaker} says: {text}\n/no_think"}]
+            {"role": "user", "content": f"{ctx}You are busy with: {goal or 'getting by'}. {status}\n{speaker} says: {text}\n/no_think"}]
+
+
+def chat_parse(out: str) -> tuple[str, str]:
+    """(what to say, what to do: come | stop | ""): the reply's lines, its DO: line apart."""
+    out = re.sub(r"<think>.*?</think>", "", out, flags=re.S)
+    say, do = [], ""
+    for l in out.strip().splitlines():
+        m = re.match(r"\s*\**\s*DO\s*:\s*(\w+)", l, re.I)
+        if m:
+            do = m.group(1).lower() if m.group(1).lower() in ("come", "stop") else ""
+        elif l.strip():
+            say.append(l.strip().strip('"').strip())
+    return " ".join(say)[:160], do

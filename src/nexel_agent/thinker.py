@@ -106,7 +106,7 @@ class Thinker(Planner):
             if e.get("type") in ("say", "shout") and e.get("from") != self.name:
                 self.heard.append(f"{e['from']}: \"{str(e.get('text', ''))[:80]}\"")
                 if self.chat:
-                    self.on_chat(e["from"], str(e.get("text", ""))[:200])
+                    self.on_chat(e["from"], str(e.get("text", ""))[:200], (me["x"] + e.get("dx", 0), me["y"] + e.get("dy", 0)))
             elif e.get("type") == "attack" and e.get("target") == self.name:
                 self.heard.append(f"{e.get('attacker')} hit you for {e.get('damage')}")
                 self.abort(f"{e.get('attacker')} hit you")
