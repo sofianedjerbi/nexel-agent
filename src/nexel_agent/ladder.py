@@ -54,7 +54,7 @@ NEEDS_TOOL = {b.char: b.needs_tool for b in BLOCKS if getattr(b, "needs_tool", N
 
 def ladder_text() -> str:
     """For the stable prefix: the milestones, one line."""
-    return "Milestones (the usual way up): " + " > ".join(f"{i + 1} {m[0]}" for i, m in enumerate(MILESTONES)) + "."
+    return "Milestones: " + " > ".join(f"{i + 1} {m[0]}" for i, m in enumerate(MILESTONES)) + "."
 
 
 class Record:
@@ -157,7 +157,7 @@ def station_steps(station, have, obs, depth=0) -> list[str]:
     far = _nearest(obs, STATION_CH.get(station, "?"))
     if far:
         way = _walk(obs, far[1], far[2], "craft")
-        return [f"go within 2 tiles of your {station} at ({far[1]},{far[2]})" + (f": {way.split(', craft')[0]}" if way else "")]
+        return [f"go within 2 tiles of the {station} at ({far[1]},{far[2]})" + (f": {way.split(', craft')[0]}" if way else "")]
     if have.get(station, 0) > 0:
         have[station] -= 1
         return [place_step(station, obs)]
@@ -215,7 +215,7 @@ def goal_recipe(goal: str | None) -> str | None:
 def target_for(goal, inv, rec: Record | None):
     """(what to make, why): the goal's recipe unless it is a keeper already carried, else the next milestone's."""
     name = goal_recipe(goal)
-    if name and not (name in KEEP and inv.get(name)):
+    if name and not (name in KEEP and name not in STATION_CH and inv.get(name)) and not (name in SOURCES and inv.get(name, 0) >= PLENTY):
         return name, f"Your goal '{goal}'"
     m = rec.next_milestone() if rec else None
     for t in TARGETS.get(m, []):

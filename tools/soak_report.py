@@ -9,6 +9,9 @@ import re
 import sys
 from collections import Counter
 
+sys.path.insert(0, "src")
+from megastructure.ladder import Record  # noqa: E402
+
 
 def main(path):
     recs = [json.loads(x) for x in open(path)]
@@ -28,6 +31,7 @@ def main(path):
             for n, k in re.findall(r"([+-]\d+) ([a-z_]+)", r["result"].split("->", 1)[-1]):
                 got[k] += int(n)
     print("inventory change:", dict(got))
+    progress(acts)
     print(f"hp {acts[0]['hp']} -> {acts[-1]['hp']}, food {acts[0]['hunger']} -> {acts[-1]['hunger']}")
     print("stalls declared:", [(s["routine"], s["at"]) for s in stalls])
     bad, i = [], 0
@@ -42,6 +46,23 @@ def main(path):
         if net < 3 and not gain:
             bad.append((round(w[0]["t"] - acts[0]["t"]), r["t"], tuple(r["pos"]), Counter(x["source"] for x in w).most_common(2)))
     print(f"20 s windows with < 3 tiles and no gain: {len(bad)}", [(b[0], b[2], b[3]) for b in bad[:12]])
+
+
+def progress(acts):
+    """Crafted, placed, kinds gained, failures by error, and the milestones replayed from the log (minute reached)."""
+    ok = lambda tool: Counter(str(r["args"].get("recipe" if tool == "craft" else "item")) for r in acts if r["tool"] == tool and r["ok"])
+    print("crafted:", dict(ok("craft")), "| placed:", dict(ok("place")))
+    print("failures:", dict(Counter(f"{r['tool']} {r['error']}" for r in acts if not r["ok"]).most_common(12)))
+    rec, inv, t0, kinds = Record(), Counter(), acts[0]["t"], set()
+    for r in acts:
+        if r["ok"]:
+            for n, k in re.findall(r"([+-]\d+) ([a-z_]+)", r["result"].split("->", 1)[-1]):
+                inv[k] += int(n)
+                kinds |= {k} if int(n) > 0 else set()
+        rec.seen(dict(inv), (r["t"] - t0) / 60)
+        rec.did(r["tool"], r["args"], r["ok"], (r["t"] - t0) / 60)
+    print(f"distinct kinds gained: {len(kinds)} {sorted(kinds)}")
+    print("milestones (minute):", {m: round(v, 1) for m, v in rec.reached.items()})
 
 
 if __name__ == "__main__":

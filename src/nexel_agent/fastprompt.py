@@ -40,24 +40,25 @@ TOOL_HINTS = {
 
 def stable_prefix(name: str, persona: str) -> str:
     """The system message: the same bytes every call (the server caches it), so it is paid for once."""
-    tools = "\n".join(f"- {signature(t)}" + (f": {TOOL_HINTS[t]}" if t in TOOL_HINTS else "") for t in TOOL_SPECS)
-    recipes = "; ".join(f"{n}=" + "+".join(f"{c} {k}" for k, c in RECIPES[n].inputs.items())
-                        + (f" @{RECIPES[n].station}" if RECIPES[n].station else "") for n in CORE_RECIPES if n in RECIPES)
+    tools = "\n".join(f"- {signature(t)}: {TOOL_HINTS[t]}" for t in TOOL_SPECS if t in TOOL_HINTS)
+    tools += "\n- also: " + "; ".join(signature(t) for t in TOOL_SPECS if t not in TOOL_HINTS)   # (rarer: one line)
+    recipes = " ".join(f"{'By hand' if not st else '@' + st}: " + "; ".join(
+        f"{n}=" + "+".join(f"{c} {k}" for k, c in RECIPES[n].inputs.items()) for n in CORE_RECIPES
+        if n in RECIPES and RECIPES[n].station == st) + "." for st in (None, "workbench", "campfire"))
     food = ", ".join(f"{k} +{v}" for k, v in FOOD.items() if k in EVERYDAY_FOOD)
     return f"""You are {name}, living in a wild island world with no laws. Who you are: {persona}
 You play in real time: answer with a short plan; it runs at once while you think of the next one.
 World: top-down grid, north is up (y-1), coordinates are absolute (x,y). Health 0-20, food 0-20 (walking and
 work use food; 0 hurts). Eat: {food}.
 To gather, stand next to a thing and dig toward it: tree -> wood, berry_bush -> berries + seed, bare_bush -> fiber,
-rock -> stone (slow by hand), ore -> ore (pickaxe). Items next to you come to you. Wood and stone are materials:
-you build with what you craft from them. Crafts marked @workbench need a workbench PLACED within 2 tiles: craft one
-(4 wood), place it beside you, stand by it. Seeds go in tilled soil (dig ground with a hoe). Water: you swim. A step one
+rock -> stone (slow by hand), ore -> ore (pickaxe). Items next to you come to you. Wood and stone are materials,
+not things to place. @workbench crafts need a workbench PLACED within 2 tiles: craft it, place it, stay by it. Seeds go in tilled soil (dig ground with a hoe). Water: you swim. A step one
 higher: jump D. Creatures are rare: tusker charges in a line (step aside), pincer snaps on shores, strawman walks
 at you at night. Never wake Old Mossback (G). Dying drops all you carry. Others may help, trade or rob you.
 Commands (D is N, E, S or W; [x] optional):
 {tools}
 Recipes: {recipes}
-{ladder_text()} "Next" in your view says the steps your goal still lacks.
+{ladder_text()} "next" in your view: the steps your goal lacks.
 Answer with ONE JSON object and nothing else:
 {{"goal":"<2-5 words>","do":["<command>", 2 to 5 commands]}}
 Example: {{"goal":"get wood","do":["move_to 4 -2","dig N","move_to 7 -1","dig E"]}} (one dig takes a whole tree, bush or rock)
@@ -76,7 +77,7 @@ def craftable(inv: dict, grid: list[str]) -> list[str]:
         if all(inv.get(k, 0) >= n for k, n in rec.inputs.items()):
             st = rec.station
             out.append(name if not st or STATIONS.get(st) in near else f"{name}(@{st})")
-    return out[:12]
+    return out[:10]
 
 
 def _via(obs, reach, tx, ty):
