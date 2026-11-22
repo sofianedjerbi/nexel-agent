@@ -22,23 +22,23 @@ from pathlib import Path
 
 import httpx
 
-from .aim import HUNGRY, facing, fail_key, gone, just_failed, reflex
+from .aim import facing, fail_key, gone, just_failed, note_outcome, reflex
 from .client import ApiError, Client
+from .fallback import climbing, fallback, stuck
 from .fastprompt import stable_prefix
-from .escape import escape_failed, stuck, way_out
-from .filler import filler, goal_absent
 from .lessons import Lessons
 from .planner import Item, Planner
 from .planwatch import PlanWatch
 from .plans import command_text, parse_plan  # noqa: F401  (parse_plan: tools, tests)
 from .playstats import summary
-from .policy import DIRS, feedback
+from .policy import feedback
 from .prompts import summarize_result
-from .tiles import FOOD
+from .watchdog import Watchdog, stall_line
 
 log = logging.getLogger("thinker")
 MODEL_URL = "http://127.0.0.1:8080/v1/chat/completions"
 ANCHOR_S = 8.0                                    # after a planned walk, the filler stays near its end this long
+MIN_GAP_S = 0.33                                  # between two actions sent, whatever their source (~3 a second)
 
 
 class Thinker(Planner):
@@ -76,6 +76,7 @@ class Thinker(Planner):
         self.current: Item | None = None                      # the planned command being played now
         self.last_skip = ""                                   # why the last planned command was not played
         self.anchor: tuple | None = None                      # (x, y, until): where the plan just walked; the filler stays near
+        self.dog = Watchdog()                                 # no progress for 20 s, whatever the source: that routine is banned here
         self.stats = Counter()
         self.calls: list[dict] = []
         self.busy: list[tuple[float, float, str]] = []      # (start, end, source) of every action on the server
@@ -128,15 +129,15 @@ class Thinker(Planner):
                 self.abort(u[2])
             return Item(*u[:2], "reflex", u[2])
         me = obs["self"]
-        if self.memory.get("climb_to") is not None and stuck(obs, self.memory) and (out := way_out(obs, self.memory)):
-            return Item(*out[:2], "escape", out[2])  # cutting a stair out: no plan pulls it off the wall
+        if it := climbing(self, obs):
+            return it
         while self.queue:
             it = self.queue.popleft()
             if it.epoch != self.epoch and it.source != "chat":
                 continue
             if it.at and (me["x"], me["y"]) != tuple(it.at):
-                if abs(it.at[0] - me["x"]) + abs(it.at[1] - me["y"]) > 12:
-                    self.abort(f"too far from where '{command_text(it.tool, it.args)}' was meant")
+                if abs(it.at[0] - me["x"]) + abs(it.at[1] - me["y"]) > 12 or stuck(obs, self.memory):
+                    self.abort(f"'{command_text(it.tool, it.args)}' was meant from {it.at}, no going back there")
                     break
                 self.queue.appendleft(Item(it.tool, it.args, it.source, it.why, None, it.epoch))
                 return Item("move_to", {"x": it.at[0], "y": it.at[1]}, "align", f"back to {it.at} for the plan",
@@ -160,23 +161,12 @@ class Thinker(Planner):
                 self.abort(self.last_skip)
                 break
             return it
-        hungry = me["hunger"] <= HUNGRY and not any(me["inventory"].get(f) for f in FOOD)
-        goal = "food" if hungry else self.goal
-        anchor = self.anchor[:2] if self.anchor and time.monotonic() < self.anchor[2] else None
-        if goal_absent(goal, obs):                   # what the goal wants is nowhere in view: no spot to hold, go find it
-            anchor, goal = None, f"find {goal}"
-        if stuck(obs, self.memory) and (out := way_out(obs, self.memory)):
-            return Item(*out[:2], "escape", out[2])  # no walk works from here: get out first (escape.py)
-        f = filler(obs, goal, self.memory, self.rng, anchor)
-        if f and just_failed(self.memory, f[0], f[1], time.monotonic()):
-            self.stats["backoff"] += 1               # that just failed: not again within a second
-            f = way_out(obs, self.memory) or ("look_far", {"dir": self.rng.choice(list(DIRS))}, "looking around")
-        f = f or ("step", {"dir": self.rng.choice(list(DIRS))}, "looking around")
-        return Item(*f[:2], "filler", f[2])
+        return fallback(self, obs)
 
     gone = staticmethod(gone)
 
     async def body_loop(self, game):
+        last, routine = 0.0, ""
         while True:
             try:
                 obs = await self.observe(game)
@@ -185,9 +175,27 @@ class Thinker(Planner):
                     raise
                 await asyncio.sleep(0.5)
                 continue
+            me, now = obs["self"], time.monotonic()
+            if routine and (stall := self.dog.record(now, me["x"], me["y"], me["inventory"], routine)):
+                self.on_stall(stall)
             self.new_plan.clear()
             item = self.next_item(obs)
+            routine = item.routine or item.source
+            await asyncio.sleep(max(0.0, last + MIN_GAP_S - time.monotonic()))   # at most ~3 actions a second
+            last = time.monotonic()
             await self.execute(game, item, obs)
+
+    def on_stall(self, stall):
+        """A routine went nowhere for WINDOW_S: banned here (watchdog), its state dropped, the model told."""
+        self.stats["stalls"] += 1
+        for k in ("escape_target", "stair", "climb_to", "stair_dir", "swim_heading", "climb_steps"):
+            self.memory.pop(k, None)
+        self.memory["no_path"] = 0
+        if stall["routine"] in ("model", "align"):
+            self.abort("it went nowhere")
+        self.tell(stall_line(stall))
+        self.decision_log.write(json.dumps({"kind": "stall", **stall}) + "\n")
+        log.info("%s [stall] %s", self.name, stall_line(stall))
 
     async def execute(self, game, item: Item, obs):
         t0 = time.monotonic()
@@ -224,14 +232,7 @@ class Thinker(Planner):
                 self.anchor = (me[0], me[1], t1 + ANCHOR_S)
         if item.source != "filler" or not ok:
             self.history.append(line[:150])
-        if not ok and reply.get("error") not in ("interrupted", "rate_limited", "hands_full"):
-            f = self.failed.setdefault(fail_key(obs, item), [0, ""])
-            f[0], f[1] = f[0] + 1, str(reply.get("error"))
-            self.memory["last_fail"] = (item.tool, item.args, t1)
-        if item.tool in ("move_to", "step", "walk", "jump") or reply.get("error") == "no_path":
-            self.memory["no_path"] = self.memory.get("no_path", 0) + 1 if reply.get("error") == "no_path" else 0
-        if item.source == "escape" and not ok:
-            escape_failed(self.memory, item.tool, item.args)
+        note_outcome(self.memory, self.failed, obs, item, reply, t1)
         if not ok and item.source in ("model", "align") and reply.get("error") != "interrupted":
             self.abort(f"{command_text(item.tool, item.args)} failed: {reply.get('error')}")
         self._log(item, obs, reply, line, t0)

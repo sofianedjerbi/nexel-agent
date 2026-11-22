@@ -149,15 +149,15 @@ def test_relative_command_walks_back_to_where_the_plan_was_made(tmp_path):
 def test_next_call_runs_while_the_plan_plays_and_the_body_never_waits(tmp_path):
     plan = '{"goal":"get wood","do":["move_to 0 -1","dig N","dig N","dig N"]}'
     transport, calls = model_transport([plan], delay=0.4)
-    t, game = thinker(tmp_path, chat=False), FakeGame(act_s=0.15)
+    t, game = thinker(tmp_path, chat=False), FakeGame(act_s=0.35)   # (actions take time: the rate cap is 3/s)
 
     async def go():
         async with httpx.AsyncClient(transport=transport) as http:
-            return await t.play(game, http, minutes=2.2 / 60)
+            return await t.play(game, http, minutes=3.5 / 60)
     s = asyncio.run(go())
     plan_calls = [c[0] for c in calls if c[1].get("stream")]
     model_acts = [a for a in game.acts if a[1] == "dig"]
-    assert len(plan_calls) >= 3
+    assert len(plan_calls) >= 2
     assert any(model_acts[0][0] < c < model_acts[-1][0] for c in plan_calls[1:])   # a call overlapped the plan
     assert game.acts[0][0] - plan_calls[0] < 0.3          # the body moved before the first plan came (filler)
     assert t.stats["filler:cut"] + t.stats["filler:ok"] >= 1

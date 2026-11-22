@@ -53,6 +53,20 @@ def just_failed(memory, tool, args, now) -> bool:
     return bool(last) and last[:2] == (tool, args) and now - last[2] < BACKOFF_S
 
 
+def note_outcome(memory, failed, obs, item, reply, t1):
+    """What one result teaches the body: failures by tile, the last failure (backoff), no_path in a row."""
+    from .escape import escape_failed
+    ok, err = bool(reply.get("ok")), reply.get("error")
+    if not ok and err not in ("interrupted", "rate_limited", "hands_full"):
+        f = failed.setdefault(fail_key(obs, item), [0, ""])
+        f[0], f[1] = f[0] + 1, str(err)
+        memory["last_fail"] = (item.tool, item.args, t1)
+    if item.tool in ("move_to", "step", "walk", "jump") or err == "no_path":
+        memory["no_path"] = memory.get("no_path", 0) + 1 if err == "no_path" else 0
+    if item.source == "escape" and not ok:
+        escape_failed(memory, item.tool, item.args)
+
+
 def fail_key(obs, it) -> tuple:
     """What a failure is remembered by: the tool, what it was used with, and the tile it was aimed at."""
     me = obs["self"]

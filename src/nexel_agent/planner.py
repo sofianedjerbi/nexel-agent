@@ -18,6 +18,7 @@ from .tiles import FOOD
 from .planwatch import REFUSED, TOLD, did_nothing
 
 log = logging.getLogger("thinker")
+REFUSED_WAIT_S, REFUSED_TEMP = 2.0, 0.5           # after a refused plan: wait, and a warmer next answer
 MAX_PLAN = 6                                     # commands taken from one answer
 
 
@@ -37,6 +38,7 @@ class Item:
     why: str = ""
     at: tuple | None = None     # where the plan expected to stand for a relative (dir) command
     epoch: int = 0
+    routine: str = ""           # what the watchdog judges and bans (default: the source)
 
 
 class Planner:
@@ -68,6 +70,7 @@ class Planner:
         while True:
             while self.obs is None or sum(i.source == "model" for i in self.queue) > self.refill_at:
                 await asyncio.sleep(0.05)
+            refused = self.stats["plan_refused"]
             try:
                 self.planning = True
                 await self.plan_once(http)
@@ -77,6 +80,11 @@ class Planner:
                 await asyncio.sleep(1.0)
             finally:
                 self.planning = False
+            if self.stats["plan_refused"] > refused:   # it asked for a plan known to do nothing: a breath, then
+                self.boost = REFUSED_TEMP                # ask again a little less sure of itself (no 2 calls a second)
+                await asyncio.sleep(REFUSED_WAIT_S)
+            else:
+                self.boost = 0.0
 
     async def plan_once(self, http):
         snap, epoch = self.obs, self.epoch
@@ -123,7 +131,7 @@ class Planner:
                 at = None                        # after its own move the plan trusts where that move ended
             self.new_plan.set()
 
-        async with http.stream("POST", self.model_url, json=self._body(msgs, self.max_tokens, self.temperature, True),
+        async with http.stream("POST", self.model_url, json=self._body(msgs, self.max_tokens, self.temperature + getattr(self, "boost", 0.0), True),
                                timeout=120) as r:
             r.raise_for_status()
             async for line in r.aiter_lines():

@@ -28,12 +28,12 @@ def test_the_same_useless_plan_is_told_back_then_refused(tmp_path):
     """gatsu0 walked to (-55,-5) and back for an hour: the model kept asking for a tree that was not in view."""
     t, game = thinker(tmp_path, chat=False), FakeGame(act_s=0.05)
     game.tree = False
-    s, calls = play(t, game, [LIVELOCK], 3.0)
+    s, calls = play(t, game, [LIVELOCK], 6.0)
     t.decision_log.flush()
     log = [json.loads(x) for x in (tmp_path / "Vex" / "decisions.jsonl").read_text().splitlines()]
     walks_there = [r for r in log if r.get("source") == "model" and r["tool"] == "move_to"]
     prompts = [c[1]["messages"][1]["content"] for c in calls if c[1].get("stream")]
-    assert len(prompts) >= 6 and t.stats["plan_refused"] >= 3
+    assert len(prompts) >= 3 and t.stats["plan_refused"] >= 1           # (refused: it waits 2 s before asking again)
     assert len(walks_there) <= 3                                         # (before: one walk there per plan, forever)
     told = [p for p in prompts if "changed nothing" in p]
     assert told and "nothing to dig there" in told[0], prompts[-1]
