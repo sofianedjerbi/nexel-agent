@@ -196,6 +196,15 @@ class Planner:
                  " (dropped: stale)" if stale else "")
 
     # --------------------------------------------------------------- chat
+    def on_hit(self, e, me):
+        """Hit: the plan stops; hit by a player (not "a tusker"), you say something about it ("i hit gatsu - no
+        response, not even a chat"), and the planner hears of it."""
+        who, dmg = str(e.get("attacker")), e.get("damage")
+        self.heard.append(f"{who} hit you for {dmg}")
+        self.abort(f"{who} hit you")
+        if self.chat and not who.startswith("a "):
+            self.on_chat(who, f"*{who} just hit you with {e.get('weapon') or 'a fist'}, {dmg} damage*", (me["x"] + e.get("dx", 0), me["y"] + e.get("dy", 0)))
+
     def on_chat(self, speaker, text, at=None):
         if self.chat_task and not self.chat_task.done():
             self.chat_next = (speaker, text, at)

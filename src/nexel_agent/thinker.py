@@ -107,8 +107,7 @@ class Thinker(Planner):
                 if self.chat:
                     self.on_chat(e["from"], str(e.get("text", ""))[:200], (me["x"] + e.get("dx", 0), me["y"] + e.get("dy", 0)))
             elif e.get("type") == "attack" and e.get("target") == self.name:
-                self.heard.append(f"{e.get('attacker')} hit you for {e.get('damage')}")
-                self.abort(f"{e.get('attacker')} hit you")
+                self.on_hit(e, me)
         if self.last_hp is not None and self.last_hp - me["hp"] >= 3:
             self.abort(f"you lost {self.last_hp - me['hp']} health")
         self.last_hp = me["hp"]
