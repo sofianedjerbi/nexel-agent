@@ -1,6 +1,6 @@
 """One command for AI players: the shared local model server plus N thinkers, each with a persona.
 
-    python -m megastructure.players                      # 2 players, Qwen3-8B, the local game at :7777
+    python -m megastructure.players                      # 2 players, Qwen3-4B, the local game at :7777
     python -m megastructure.players --n 8 --model 30b
     python -m megastructure.players --pick gatsu0,senku0 --minutes 30
     python -m megastructure.players --list               # the roster
@@ -33,7 +33,7 @@ MODELS = {
     "14b": "mlx-community/Qwen3-14B-4bit",
     "30b": "mlx-community/Qwen3-30B-A3B-Instruct-2507-4bit",
 }
-DEFAULT_MODEL = "8b"
+DEFAULT_MODEL = "4b"      # (real-time play: the fastest model that still plans sensibly, 2026-11-22)
 SRC = str(Path(__file__).resolve().parent.parent)    # so children find the package without an install
 
 
