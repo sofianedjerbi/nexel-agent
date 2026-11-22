@@ -39,7 +39,7 @@ MODEL_URL = "http://127.0.0.1:8080/v1/chat/completions"
 
 class Thinker:
     def __init__(self, name, persona, token=None, game_url="ws://127.0.0.1:7777/agent", model_url=MODEL_URL,
-                 model="default", data_dir=Path("agents"), temperature=0.7, max_tokens=300, decision_log=None):
+                 model="default_model", data_dir=Path("agents"), temperature=0.7, max_tokens=300, decision_log=None):
         self.name, self.persona = name, persona
         self.token = token or f"thinker-{name}"
         self.game_url, self.model_url, self.model = game_url, model_url, model
@@ -205,11 +205,12 @@ def main():
     p.add_argument("--persona", default="a curious scavenger who wants to survive and build a home")
     p.add_argument("--game", default="ws://127.0.0.1:7777/agent")
     p.add_argument("--model-url", default=MODEL_URL)
+    p.add_argument("--model", default="default_model", help="model name sent to the server (mlx_lm: default_model)")
     p.add_argument("--minutes", type=float, default=None)
     p.add_argument("--data", default="agents")
     a = p.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
-    asyncio.run(Thinker(a.name, a.persona, game_url=a.game, model_url=a.model_url,
+    asyncio.run(Thinker(a.name, a.persona, game_url=a.game, model_url=a.model_url, model=a.model,
                         data_dir=Path(a.data)).run(a.minutes))
 
 
