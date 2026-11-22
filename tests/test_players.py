@@ -48,7 +48,7 @@ def test_roster_is_big_unique_and_complete():
 
 def test_arg_defaults_and_choice():
     a = players.parse_args([])
-    assert (a.n, a.port, a.game, a.minutes) == (4, 8080, "ws://127.0.0.1:7777/agent", None)
+    assert (a.n, a.port, a.game, a.minutes) == (2, 8080, "ws://127.0.0.1:7777/agent", None)
     assert players.model_name(a.model) == "mlx-community/Qwen3-8B-4bit"
     assert players.model_name("4b") == "mlx-community/Qwen3-4B-Instruct-2507-4bit"
     roster = players.load_roster()

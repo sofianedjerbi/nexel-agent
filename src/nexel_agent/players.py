@@ -1,6 +1,6 @@
 """One command for AI players: the shared local model server plus N thinkers, each with a persona.
 
-    python -m megastructure.players                      # 4 players, Qwen3-8B, the local game at :7777
+    python -m megastructure.players                      # 2 players, Qwen3-8B, the local game at :7777
     python -m megastructure.players --n 8 --model 30b
     python -m megastructure.players --pick gatsu0,senku0 --minutes 30
     python -m megastructure.players --list               # the roster
@@ -61,7 +61,7 @@ def model_name(m: str) -> str:
 
 def parse_args(argv=None) -> argparse.Namespace:
     p = argparse.ArgumentParser(prog="python -m megastructure.players", description=__doc__.split("\n")[0])
-    p.add_argument("--n", type=int, default=4, help="how many players (ignored with --pick)")
+    p.add_argument("--n", type=int, default=2, help="how many players (ignored with --pick); each one is a Python process and the one model server serves them in turn: more than ~4 loads this Mac hard")
     p.add_argument("--pick", help="comma-separated roster names, e.g. gatsu0,senku0")
     p.add_argument("--game", default="ws://127.0.0.1:7777/agent", help="the game's agent websocket")
     p.add_argument("--minutes", type=float, default=None, help="stop after this long (default: run until Ctrl-C)")
