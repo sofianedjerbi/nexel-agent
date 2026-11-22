@@ -32,7 +32,6 @@ from .planwatch import PlanWatch
 from .plans import command_text, parse_plan  # noqa: F401  (parse_plan: tools, tests)
 from .playstats import summary
 from .policy import feedback
-from .prompts import summarize_result
 from .watchdog import Watchdog, stall_line
 
 log = logging.getLogger("thinker")
@@ -222,7 +221,7 @@ class Thinker(Planner):
         ok = bool(reply.get("ok"))
         feedback(self.memory, reply, obs["tick"])
         self.lessons.learn(item.tool, item.args, reply)
-        line = summarize_result(item.tool, item.args, reply)
+        line = self.result_line(item, reply, obs)
         self.stats[f"{item.source}:{'ok' if ok else 'fail'}"] += 1
         if item.source == "model":
             self.recent.append(command_text(item.tool, item.args))
@@ -231,7 +230,7 @@ class Thinker(Planner):
                 me = reply["result"].get("changed", {}).get("pos") or self.last_goto
                 self.anchor = (me[0], me[1], t1 + ANCHOR_S)
         if item.source != "filler" or not ok:
-            self.history.append(line[:150])
+            self.history.append(line[:260])
         note_outcome(self.memory, self.failed, obs, item, reply, t1)
         if not ok and item.source in ("model", "align") and reply.get("error") != "interrupted":
             self.abort(f"{command_text(item.tool, item.args)} failed: {reply.get('error')}")

@@ -6,6 +6,7 @@ import json
 import re
 
 from .filler import NEEDS, goal_absent
+from .ladder import ladder_text, progress_lines
 from .policy import DIRS, reachable
 from .plans import _kind, _optional
 from .sim.specs import LEGEND, TOOL_SPECS
@@ -30,7 +31,7 @@ def signature(tool: str) -> str:
 
 TOOL_HINTS = {
     "move_to": "walk there (finds the way)", "dig": "harvest/dig the thing next to you that way (with: axe, pickaxe, hoe)",
-    "place": "put an item down next to you", "craft": "make a recipe", "attack": "hit within 3 tiles",
+    "place": "put down a thing you carry next to you, e.g. place S workbench (things, not wood or stone)", "craft": "make a recipe", "attack": "hit within 3 tiles",
     "say": "talk to people near", "pick_up": "items on your tile", "store": "into a chest", "take": "from a chest",
     "sleep": "in a bed next to you", "jump": "onto a step 1 higher", "walk": "keep going that way",
     "look_far": "see 48 tiles that way",
@@ -48,13 +49,15 @@ You play in real time: answer with a short plan; it runs at once while you think
 World: top-down grid, north is up (y-1), coordinates are absolute (x,y). Health 0-20, food 0-20 (walking and
 work use food; 0 hurts). Eat: {food}.
 To gather, stand next to a thing and dig toward it: tree -> wood, berry_bush -> berries + seed, bare_bush -> fiber,
-rock -> stone (slow by hand), ore -> ore (pickaxe). Items next to you come to you. Crafts marked @workbench need a
-placed workbench within 2 tiles. Seeds go in tilled soil (dig ground with a hoe). Water: you swim. A step one
+rock -> stone (slow by hand), ore -> ore (pickaxe). Items next to you come to you. Wood and stone are materials:
+you build with what you craft from them. Crafts marked @workbench need a workbench PLACED within 2 tiles: craft one
+(4 wood), place it beside you, stand by it. Seeds go in tilled soil (dig ground with a hoe). Water: you swim. A step one
 higher: jump D. Creatures are rare: tusker charges in a line (step aside), pincer snaps on shores, strawman walks
 at you at night. Never wake Old Mossback (G). Dying drops all you carry. Others may help, trade or rob you.
 Commands (D is N, E, S or W; [x] optional):
 {tools}
 Recipes: {recipes}
+{ladder_text()} "Next" in your view says the steps your goal still lacks.
 Answer with ONE JSON object and nothing else:
 {{"goal":"<2-5 words>","do":["<command>", 2 to 5 commands]}}
 Example: {{"goal":"get wood","do":["move_to 4 -2","dig N","move_to 7 -1","dig E"]}} (one dig takes a whole tree, bush or rock)
@@ -68,7 +71,8 @@ def craftable(inv: dict, grid: list[str]) -> list[str]:
     near = {grid[r + dy][r + dx] for dy in range(-2, 3) for dx in range(-2, 3)
             if 0 <= r + dy < len(grid) and 0 <= r + dx < len(grid)}
     out = []
-    for name, rec in RECIPES.items():
+    for name in sorted(RECIPES, key=lambda n: CORE_RECIPES.index(n) if n in CORE_RECIPES else 99):
+        rec = RECIPES[name]
         if all(inv.get(k, 0) >= n for k, n in rec.inputs.items()):
             st = rec.station
             out.append(name if not st or STATIONS.get(st) in near else f"{name}(@{st})")
@@ -136,12 +140,11 @@ def needs_for(goal: str | None, inv: dict, grid) -> str:
     return f"{name} needs: " + ", ".join(parts) + "."
 
 
-def compact_obs(obs, goal=None, heard=(), history=(), pending=(), notes="", lessons="", habit="") -> str:
+def compact_obs(obs, goal=None, heard=(), history=(), pending=(), notes="", lessons="", habit="", record=None) -> str:
     me, grid = obs["self"], obs["grid"]
     r = len(grid) // 2
     crop = [row[r - VIEW:r + VIEW + 1] for row in grid[r - VIEW:r + VIEW + 1]]
     inv = me["inventory"]
-    need = needs_for(goal, inv, grid)
     used = sorted({c for row in crop for c in row} - {"@"})
     flags = [f for f, on in (("sheltered", me.get("sheltered")), ("in a cave", me.get("in_cave")),
                              ("swimming", me.get("swimming"))) if on]
@@ -149,7 +152,7 @@ def compact_obs(obs, goal=None, heard=(), history=(), pending=(), notes="", less
              + (", " + ", ".join(flags) if flags else "") + f". Health {me['hp']}/20, food {me['hunger']}/20.",
              "Carry: " + (", ".join(f"{k} {v}" for k, v in inv.items()) or "nothing") + ".",
              "Can craft now: " + (", ".join(craftable(inv, grid)) or "nothing") + ".",
-             *([f"Your goal '{goal}': {need}"] if need else []),
+             *progress_lines(obs, goal, record),
              *([f"No {absent} anywhere in view: to '{goal}', go and find one first (move_to toward the map's edge, "
                 "or look_far)."] if (absent := goal_absent(goal, obs)) else []),
              f"Map (@ = you; rows y{me['y'] - VIEW}..{me['y'] + VIEW}, columns x{me['x'] - VIEW}..{me['x'] + VIEW}):",

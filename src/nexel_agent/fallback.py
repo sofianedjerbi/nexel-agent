@@ -7,6 +7,7 @@ import time
 from .aim import HUNGRY, just_failed
 from .escape import stuck, way_out
 from .filler import filler, goal_absent
+from .ladder import gather_goal
 from .planner import Item
 from .policy import DIRS
 from .tiles import FOOD
@@ -33,7 +34,7 @@ def fallback(t, obs) -> Item:
     if stuck(obs, t.memory) and (it := escape(t, obs)):
         return it                                 # no walk works from here: get out first
     hungry = me["hunger"] <= HUNGRY and not any(me["inventory"].get(f) for f in FOOD)
-    goal = "food" if hungry else t.goal
+    goal = "food" if hungry else gather_goal(t.goal, me["inventory"], obs) or t.goal   # (a hoe lacks stone: rocks, not trees)
     anchor = t.anchor[:2] if t.anchor and now < t.anchor[2] else None
     if goal_absent(goal, obs):                    # what the goal wants is nowhere in view: no spot to hold, go find it
         anchor, goal = None, f"find {goal}"

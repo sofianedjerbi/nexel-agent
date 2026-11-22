@@ -53,6 +53,9 @@ def parse_command(item) -> tuple[str, dict] | None:
         elif w.lower() not in FILLER_WORDS or "text" in spec["args"]:
             rest.append(w)
     free = [k for k in keys if k not in args]
+    d = next((i for i, w in enumerate(rest) if w.upper() in ("N", "E", "S", "W")), None)
+    if free and _kind(free[0], spec["args"][free[0]]) == "dir" and d and "text" not in keys[:2]:
+        rest.insert(0, rest.pop(d))               # "place workbench S" means "place S workbench"
     i = 0
     while i < len(rest) and free:
         k = free[0]

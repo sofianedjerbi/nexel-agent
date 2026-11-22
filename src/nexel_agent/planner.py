@@ -13,7 +13,10 @@ import httpx
 
 from .escape import stuck, stuck_line
 from .fastprompt import chat_messages, chat_parse, compact_obs
+from .fixes import failure_line
+from .ladder import Record
 from .plans import PlanStream, command_text, parse_command
+from .prompts import summarize_result
 from .tiles import FOOD
 from .planwatch import REFUSED, TOLD, did_nothing
 
@@ -47,11 +50,27 @@ class Planner:
         habit = [f"'{a}' x{n}" for a, n in Counter(self.recent).most_common(2) if n >= 4]
         notes = "; ".join(x for x in self.notepad().splitlines()[-4:] if x.strip())
         fails = [v for k, v in self.lessons.items.items() if k.startswith("fail:")][-3:]
-        user = compact_obs(obs, goal=self.goal, heard=list(self.heard)[-3:], history=list(self.history), pending=list(pending),
+        self.record.seen(obs["self"]["inventory"], time.time())
+        user = compact_obs(obs, goal=self.goal, record=self.record, heard=list(self.heard)[-3:], history=list(self.history), pending=list(pending),
                            notes=notes, lessons=" | ".join(f[:110] for f in fails),
                            habit=" ".join(filter(None, [stuck(obs, self.memory) and stuck_line(obs), hungry_line(obs),
                                                         f"You keep doing {', '.join(habit)}: try something else." if habit else ""])))
         return [{"role": "system", "content": self.prefix}, {"role": "user", "content": user}]
+
+    @property
+    def record(self) -> Record:
+        """What this player ever held and placed, and the milestones it reached (ladder.py), kept across runs."""
+        if getattr(self, "_record", None) is None:
+            self._record = Record(self.dir / "progress.json")
+        return self._record
+
+    def result_line(self, item, reply, obs) -> str:
+        """The line the model reads back: what changed, or for a failure what would work instead (fixes.py)."""
+        ok = bool(reply.get("ok"))
+        self.record.did(item.tool, item.args, ok, time.time())
+        if ok or reply.get("error") == "interrupted":
+            return summarize_result(item.tool, item.args, reply)
+        return failure_line(item.tool, item.args, reply, obs)
 
     def tell(self, line: str):
         """A line for the model's 'Done' list, once (not the same warning four times over)."""
