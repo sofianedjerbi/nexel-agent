@@ -198,6 +198,8 @@ class Planner:
             if do in ("come", "stop"):
                 self.abort(f"{speaker} asked you to {do}")
                 self.history.append(f"({speaker} asked you to {do}: you did)")
+            if do == "stop":
+                self.history.append(f'({speaker} told you: "{text[:80]}". Do what they asked; pick another goal if it was about yours)')
             if line:
                 self.queue.appendleft(Item("say", {"text": line[:120]}, "chat", f"answering {speaker}", None, self.epoch))
             if do == "come" and at:

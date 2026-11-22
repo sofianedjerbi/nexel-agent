@@ -19,7 +19,7 @@ def test_the_reply_and_its_deed_are_read_apart():
 def test_the_prompt_asks_for_a_real_answer_and_says_where_you_are():
     m = chat_messages("gatsu0", "a grim swordsman", "harvest wood", "doben00", "where are you?", (),
                       {"x": 103, "y": 80, "hp": 20, "hunger": 18, "inventory": {"wood": 40}})
-    assert "never cryptic" in m[0]["content"] and "DO: come" in m[0]["content"]
+    assert "never cryptic" in m[0]["content"] and "no coordinates" in m[0]["content"] and "\"do\"" in m[0]["content"]
     assert "(103, 80)" in m[1]["content"] and "wood 40" in m[1]["content"] and "doben00 says: where are you?" in m[1]["content"]
 
 
@@ -35,3 +35,9 @@ def test_asked_to_come_it_answers_then_walks_to_who_asked(tmp_path):
     i = next(i for i, a in enumerate(game.acts) if a[1] == "say")
     assert game.acts[i][2]["text"] == "Coming!"
     assert any(a[1] == "move_to" and (a[2]["x"], a[2]["y"]) == (3, -2) for a in game.acts[i + 1:]), game.acts
+
+
+def test_the_json_reply_and_a_name_prefix():
+    assert chat_parse('{"say": "Hey! Chopping wood.", "do": "nothing"}') == ("Hey! Chopping wood.", "")
+    assert chat_parse('{"say": "On my way.", "do": "come"}') == ("On my way.", "come")
+    assert chat_parse("Gatsu0: Hey, I'm harvesting wood. DO: come") == ("Hey, I'm harvesting wood.", "come")

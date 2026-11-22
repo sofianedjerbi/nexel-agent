@@ -2,6 +2,7 @@
 and the fast chat reply's tiny prompt. The plan format and its parser: plans.py.
 """
 
+import json
 import re
 
 from .filler import NEEDS, goal_absent
@@ -196,10 +197,15 @@ def chat_messages(name: str, persona: str, goal: str, speaker: str, text: str, r
     me = me or {}
     inv = ", ".join(f"{k} {v}" for k, v in sorted((me.get("inventory") or {}).items(), key=lambda kv: -kv[1])[:6]) or "nothing"
     sys_ = (f"You are {name}, a player in a survival game world. Your character: {persona}\nA real person playing the game "
-            "talks to you. Reply to what they actually said: answer questions truthfully and usefully (what you are doing, "
-            "where, what you have), be friendly, a little in character, never cryptic. One or two short sentences (at most "
-            "30 words). Then a last line: DO: come (walk over to them, if they ask you to come, follow or help), DO: stop "
-            "(if they ask you to stop or wait) or DO: nothing.")
+            "talks to you. Talk like a normal, friendly person in a chat: short, natural, a hint of your character at "
+            "most. Answer what they said; say what you do or have in plain words (no coordinates, no counts unless "
+            "asked). Never menacing, never cryptic, never weird, never repeat their words. At most 20 words.\n"
+            'Reply with JSON only: {"say": "<your line>", "do": "come" | "stop" | "nothing"}. come: only if they ask you '
+            "to come, follow or help them. stop: they ask you to stop or to do something else. nothing: greetings, "
+            "questions, anything else.\nExamples:\n"
+            'hi -> {"say": "Hey! Just chopping some wood. You?", "do": "nothing"}\n'
+            'can you help me dig? -> {"say": "Sure, on my way.", "do": "come"}\n'
+            'stop cutting trees -> {"say": "Alright, I\'ll find something else to do.", "do": "stop"}')
     ctx = ("Earlier: " + " | ".join(recent) + "\n") if recent else ""
     status = f"You are at ({me.get('x', '?')}, {me.get('y', '?')}), health {me.get('hp', '?')}, food {me.get('hunger', '?')}/20, carrying: {inv}."
     return [{"role": "system", "content": sys_},
@@ -207,13 +213,17 @@ def chat_messages(name: str, persona: str, goal: str, speaker: str, text: str, r
 
 
 def chat_parse(out: str) -> tuple[str, str]:
-    """(what to say, what to do: come | stop | ""): the reply's lines, its DO: line apart."""
-    out = re.sub(r"<think>.*?</think>", "", out, flags=re.S)
-    say, do = [], ""
-    for l in out.strip().splitlines():
-        m = re.match(r"\s*\**\s*DO\s*:\s*(\w+)", l, re.I)
-        if m:
-            do = m.group(1).lower() if m.group(1).lower() in ("come", "stop") else ""
-        elif l.strip():
-            say.append(l.strip().strip('"').strip())
-    return " ".join(say)[:160], do
+    """(what to say, what to do: come | stop | ""): the reply's JSON; failing that its text, a DO: in it read apart."""
+    out = re.sub(r"<think>.*?</think>", "", out, flags=re.S).strip()
+    m = re.search(r"\{.*\}", out, re.S)
+    try:
+        d = json.loads(m.group(0)) if m else None
+    except ValueError:
+        d = None
+    if isinstance(d, dict):
+        say, do = str(d.get("say") or ""), str(d.get("do") or "").lower()
+    else:
+        k = re.search(r"\**\s*DO\s*:\s*(\w+)", out, re.I)
+        say, do = (out[:k.start()] if k else out), (k.group(1).lower() if k else "")
+    say = re.sub(r"^\s*[\w.-]+\d\s*:\s*", "", " ".join(say.split())).strip().strip('"').strip()   # (not "gatsu0: ...")
+    return say[:160], do if do in ("come", "stop") else ""
