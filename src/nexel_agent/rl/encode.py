@@ -150,8 +150,12 @@ def legal(obs: dict) -> np.ndarray:
     inv = me.get("inventory", {})
     near = {ch for row in obs["grid"][VIEW_R - USE_R:VIEW_R + USE_R + 1] for ch in row[VIEW_R - USE_R:VIEW_R + USE_R + 1]}
     m = np.ones(N_ACTIONS, bool)
+    hs = obs.get("heights")
     for i, (kind, d, arg) in enumerate(ACTIONS):
-        if kind == "dig" and arg:
+        if kind == "dig_at":            # land in front reaching that high (on the level, the game reads it as tilling)
+            dx, dy = {"N": (0, -1), "E": (1, 0), "S": (0, 1), "W": (-1, 0)}[d]
+            m[i] = bool(hs) and _LEVEL.get(hs[VIEW_R + dy][VIEW_R + dx], 0) - _LEVEL.get(hs[VIEW_R][VIEW_R], 0) >= arg
+        elif kind == "dig" and arg:
             m[i] = bool(inv.get(arg))
         elif kind == "attack":
             m[i] = any(e.get("kind") != "wisp" and abs(e["dx"]) <= 4 and abs(e["dy"]) <= 4 for e in obs.get("entities", []))

@@ -131,6 +131,7 @@ def test_a_pit_is_not_a_trap():
     for _ in range(3):
         assert until_done("dig_down")["ok"]
     low = sim.height(a)
+    assert env.encoded()["mask"][idx("dig_at_N_2")]                  # (legal in a pit: land in front, that high)
     for _ in range(3):
         until_done("dig_at_N_2")
         until_done("jump_N")
@@ -147,3 +148,5 @@ def test_legal_mask_follows_the_rules():
     assert m[idx("craft_workbench")] and m[idx("eat_berries")] and not m[idx("eat_meat")]
     assert not m[idx("craft_axe")]                                    # (no workbench within reach)
     assert not m[idx("dig_N_axe")] and m[idx("dig_N")]
+    if not env.sim.observe(env.a).get("heights"):                     # (flat all round: nothing in front that high)
+        assert not m[idx("dig_at_N_1")] and not m[idx("dig_at_N_2")]
