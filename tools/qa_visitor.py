@@ -12,8 +12,10 @@ import time
 from megastructure.client import Client
 
 SCRIPT = [(1.0, "say", "hi! who are you?"), (2.0, "say", "could you build me a fence over here? I'll give you berries for it"),
-          (3.0, "hit", 2), (3.3, "say", "oops, sorry, misclick"), (8.0, "say", "hey, do you remember me?"),
-          (9.5, "say", "what did I ask you to build?"), (11.0, "say", "anything happen between us earlier?")]
+          (3.0, "hit", 1), (3.6, "hit", 1), (4.0, "say", "oops, sorry, misclick"), (6.0, "hit", 1),
+          (8.0, "say", "hey, do you remember me?"), (9.5, "say", "what did I ask you to build?"),
+          (11.0, "say", "anything happen between us earlier?"), (16.0, "say", "what have you made so far?"),
+          (22.0, "hit", 1), (24.0, "say", "are we still cool after earlier?"), (28.0, "say", "where is your workbench?")]
 
 
 def where(log):
