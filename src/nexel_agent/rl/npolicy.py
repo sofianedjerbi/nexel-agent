@@ -33,7 +33,8 @@ class NumpyPolicy:
         x = relu(conv2d(x, p[f + "cnn.0.weight"], p[f + "cnn.0.bias"]))
         x = relu(conv2d(x, p[f + "cnn.2.weight"], p[f + "cnn.2.bias"], stride=2))
         x = relu(conv2d(x, p[f + "cnn.4.weight"], p[f + "cnn.4.bias"], stride=2))
-        v = relu(p[f + "vec.0.weight"] @ obs["vec"] + p[f + "vec.0.bias"])
+        w = p[f + "vec.0.weight"]
+        v = relu(w @ obs["vec"][:w.shape[1]] + p[f + "vec.0.bias"])      # (a policy from before the vector grew: its part)
         h = relu(p[f + "head.0.weight"] @ np.concatenate([x.reshape(-1), v]) + p[f + "head.0.bias"])
         i = 0
         while f"mlp_extractor.policy_net.{i}.weight" in p:
@@ -45,6 +46,8 @@ class NumpyPolicy:
         """Sampled from the policy's distribution (as in training and eval); argmax with no rng. mask: the legal
         actions (encode.legal), as MaskablePPO saw them."""
         lg = self.logits(obs)
+        if mask is not None and len(mask) > len(lg):                     # (actions added since it was trained: never)
+            lg = np.concatenate([lg, np.full(len(mask) - len(lg), -1e8, lg.dtype)])
         if mask is not None:
             lg = np.where(mask, lg, -1e8)
         if rng is None:

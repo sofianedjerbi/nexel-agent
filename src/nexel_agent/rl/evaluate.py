@@ -10,7 +10,7 @@ import numpy as np
 
 from .vec import EVAL0, PipeVecEnv
 
-EVAL_SEEDS = tuple(range(EVAL0, EVAL0 + 24))
+EVAL_SEEDS = tuple(range(EVAL0, EVAL0 + 48))
 NAMES: list = []                  # the achievements (rl/achieve.py, game side): the workers send the list (spec)
 
 
@@ -63,6 +63,9 @@ def metrics(eps: list) -> dict:
             "nights": round(float(np.mean([e.get("nights", 0) for e in eps])), 2),
             "chunks": round(float(np.mean([e.get("chunks", 0) for e in eps])), 1),
             "fail_pct": round(100 * sum(e["fails"] for e in eps) / max(1, sum(e["acts"] for e in eps)), 1),
+            "visits": "/".join(f"{sum(e.get('visit_' + k, 0) for e in eps)}{k[0].upper()}" for k in ("won", "fled", "endured")),
+            "social": round(float(np.mean([len(e.get("social", [])) for e in eps])), 2),
+            "social_kinds": {k: round(sum(k in e.get("social", []) for e in eps) / n, 2) for k in ("greeted_someone", "answered_someone", "gave_item", "traded", "helped", "worked_near_player")},
             "fights": f"{sum(e['won'] for e in eps)}W/{sum(e['lost'] for e in eps)}L/{sum(e['fled'] for e in eps)}F of {attacked}",
             "hits": sum(e["hits"] for e in eps),
             "top": {a: round(r, 2) for a, r in sorted(rates.items(), key=lambda kv: -kv[1]) if r > 0}}

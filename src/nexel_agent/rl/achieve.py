@@ -8,6 +8,7 @@ import math
 from megastructure.sim.entities import CREATURES
 from megastructure.tiles import ARMOR, BLOCKS, FOOD, RECIPES
 from .actions import PLACE
+from .social import SOCIAL
 
 _MADE = {k for r in RECIPES.values() for k in r.output} - {"stone", "hay"}      # (stone, hay also come from the land)
 COLLECT = tuple(sorted(({"dirt", "stone_block"} | set(FOOD) | {k for b in BLOCKS for k in b.drops}
@@ -20,9 +21,9 @@ MILESTONES = ("till", "plant", "water_crop", "feed_animal", "milk_cow", "sleep_b
               "place_5_kinds", "place_10_kinds", "shelter", "light_shelter", "house", "toolkit",
               "survive_night", "survive_2_nights", "survive_3_nights", "hale_day", "swim_across",
               "chunks_4", "chunks_9", "chunks_16", "enter_cave", "depth_5", "depth_10",
-              "win_hurt", "evade_foe")
+              "win_hurt", "evade_foe", "defeat_player", "survive_attack", "escape_attack")
 ACHIEVEMENTS = tuple([f"collect_{x}" for x in COLLECT] + [f"craft_{x}" for x in CRAFTS] + [f"place_{x}" for x in PLACE]
-                     + [f"eat_{x}" for x in EATS] + [f"defeat_{x}" for x in DEFEATS] + list(MILESTONES))
+                     + [f"eat_{x}" for x in EATS] + [f"defeat_{x}" for x in DEFEATS] + list(MILESTONES) + list(SOCIAL))
 
 
 class Ledger:

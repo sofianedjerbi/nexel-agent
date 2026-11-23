@@ -1,7 +1,8 @@
 """A learned player on the real server: the policy trained in the sim (rl/npolicy.py, numpy) acts on the agent API's
 observation with the same encoding (rl/encode.py) and the same timing as in training: a decision when the last action
-ends (0.2 s at the soonest), at once when hurt or someone comes into view, or after 5 s. No model in the action loop; with --model-url, someone
-talking to it gets a line back from the local model (chat.py's prompt), and nothing else.
+ends (0.2 s at the soonest), at once when hurt or someone comes into view, or after 5 s. No model in the action loop:
+the policy chooses when to speak (say) and what to hand over (give); with --model-url the local model writes the words
+(chat.py's prompt), else a plain short line.
     python -m nexel_agent.rl.live --name Rook --policy rl_runs/r1/policy.npz --game ws://127.0.0.1:7790/agent"""
 
 import argparse
@@ -18,7 +19,8 @@ from megastructure.client import Client
 from ..fastprompt import chat_parse
 from .achieve import HOSTILE
 from .core import split
-from .encode import ACTIONS, action_name, encode, legal, to_command
+from .encode import ACTIONS, ITEMS, action_name, encode, legal, to_command
+from .social import SocialMemory
 
 MIN_S, IDLE_S, WAIT_MAX_S, POLL_S = 0.2, 0.5, 5.0, 0.25
 
@@ -31,6 +33,9 @@ class LiveBody:
         self.stats = {"decisions": 0, "acts": 0, "fails": 0, "interrupted": 0, "idle": 0, "crafted": 0, "placed": 0,
                       "deaths": 0, "hits": 0, "won": 0, "lost": 0, "kills": 0, "chat": 0}
         self.crafts, self.reactions, self.foes, self.fails_by = set(), {}, {}, {}
+        self.social, self.social_done, self.heard, self.http = SocialMemory(a.name, ITEMS), set(), None, None
+        self.stats.update(said=0, gave=0)
+        self.tick, self.me, self.obs_entities = 0, {}, []
         self.log = open(a.log, "a") if a.log else None
 
     def done(self, tool, args, r):
@@ -46,6 +51,11 @@ class LiveBody:
             self.crafts.add(args["recipe"])
         elif tool == "place":
             self.stats["placed"] += 1
+        elif tool in ("say", "give"):
+            self.stats["said" if tool == "say" else "gave"] += 1
+        near = min((math.hypot(b["dx"], b["dy"]) for b in self.obs_entities if b.get("kind") == "agent"), default=99)
+        self.social_done |= set(self.social.achieved(tool, args, bool(r.get("ok")), self.tick, near,
+                                                     (r.get("result") or {}).get("to")))
         elif tool == "attack" and (r.get("result") or {}).get("killed"):
             self.stats["kills"] += 1
             if args.get("target") in self.foes:
@@ -57,6 +67,8 @@ class LiveBody:
         """One action as in the env (core.split): a tool call, or a climb's digs then jump."""
         r = None
         for step in split(cmd):
+            if step[0] == "say":                       # the words: the LLM's (chat.py's prompt), or a plain hello
+                step = ("say", {"text": await self.words()})
             r = await game.act(step[0], **step[1])
             self.done(step[0], step[1], r)
         return r
@@ -80,23 +92,25 @@ class LiveBody:
                 return obs
             await asyncio.sleep(POLL_S)
 
-    async def say_back(self, game, http, speaker, text, me):
-        msgs = chat_messages(self.a.name, self.a.persona, "", speaker, text, me=me)
+    async def words(self) -> str:
+        """The policy chose to speak; what to say is the LLM's: an answer to the last line heard, or a hello."""
+        speaker, text = self.heard or ("someone", "(nobody has said anything yet)")
+        if not self.http:
+            return "hey"
+        msgs = chat_messages(self.a.name, self.a.persona, "", speaker, text, me=self.me)
         try:
-            r = await http.post(self.a.model_url, timeout=30, json={"model": "default_model", "messages": msgs,
-                                                                    "max_tokens": 80, "temperature": 0.8})
+            r = await self.http.post(self.a.model_url, timeout=30, json={"model": "default_model", "messages": msgs,
+                                                                         "max_tokens": 80, "temperature": 0.8})
             line, _ = chat_parse(r.json()["choices"][0]["message"]["content"] or "")
-        except Exception:
-            return
-        if line:
-            await game.act("say", text=line[:120])
             self.stats["chat"] += 1
+        except Exception:
+            line = ""
+        return (line or "hey")[:120]
 
     async def play(self):
-        http = None
         if self.a.model_url:
             import httpx
-            http = httpx.AsyncClient()
+            self.http = httpx.AsyncClient()
         t_end = time.monotonic() + self.a.minutes * 60 if self.a.minutes else math.inf
         async with Client(self.a.game) as game:
             await game.hello(self.a.name, f"rl-{self.a.name}", self.a.persona)
@@ -104,10 +118,12 @@ class LiveBody:
             self.obs_entities = obs.get("entities", [])
             hp, deaths, task, running, t_report = obs["self"]["hp"], obs["self"]["deaths"], None, None, time.monotonic()
             while time.monotonic() < t_end:
-                me = obs["self"]
+                me = self.me = obs["self"]
+                self.tick = obs["tick"]
+                self.social.see(obs)
                 for e in obs.get("events", []):
-                    if http and e.get("type") in ("say", "shout") and e.get("from") != self.a.name:
-                        asyncio.create_task(self.say_back(game, http, e.get("from"), str(e.get("text", ""))[:200], me))
+                    if e.get("type") in ("say", "shout") and e.get("from") != self.a.name:
+                        self.heard = (e.get("from"), str(e.get("text", ""))[:200])
                 self.hurt = max(0.0, hp - me["hp"]) if me["deaths"] == deaths else hp
                 if me["deaths"] > deaths:
                     self.stats["deaths"] += me["deaths"] - deaths
@@ -119,14 +135,15 @@ class LiveBody:
                     if foe:
                         self.foes[foe["id"]] = foe["kind"]
                 hp, deaths = me["hp"], me["deaths"]
-                i = self.pol.act(encode(obs, self.facing, self.last, self.last_ok, self.hurt), self.rng, legal(obs) if self.a.mask else None)
+                enc = encode(obs, self.facing, self.last, self.last_ok, self.hurt, self.social.flags(obs))
+                i = self.pol.act(enc, self.rng, legal(obs) if self.a.mask else None)
                 kind = ACTIONS[i][0]
                 if self.hurt > 0:
                     self.reactions[kind] = self.reactions.get(kind, 0) + 1
                 if kind in ("step", "jump", "dig", "dig_at", "climb") and ACTIONS[i][1]:
                     self.facing = ACTIONS[i][1]
                 self.stats["decisions"] += 1
-                cmd = to_command(i, obs, self.facing)
+                cmd = to_command(i, obs, self.facing, self.social)
                 t0, self.last_ok = time.monotonic(), 0.0        # (as in the env: how the actions that end in this wait went)
                 if cmd is not None and running and running[0] == cmd and not running[1].done():
                     cmd = None                                  # the same action again, still under way: it goes on
@@ -149,13 +166,14 @@ class LiveBody:
             if task is not None and not task.done():
                 task.cancel()
                 await asyncio.gather(task, return_exceptions=True)
-        if http:
-            await http.aclose()
+        if self.http:
+            await self.http.aclose()
         return self.report(obs["self"], "")
 
     def report(self, me, last):
         s = dict(self.stats)
         s["distinct_crafts"] = sorted(self.crafts)
+        s["social"] = sorted(self.social_done)
         s["fail_pct"] = round(100 * s["fails"] / max(1, s["acts"]), 1)
         s["idle_pct"] = round(100 * s["idle"] / max(1, s["decisions"]), 1)
         return {"t": time.time(), **s, "reactions": self.reactions, "fails_by": self.fails_by,

@@ -22,7 +22,7 @@ def test_obs_shape():
 
 
 def rollout(seed, n=300):
-    env, rng, out = SimEnv(ep_ticks=10 ** 6), random.Random(1), []
+    env, rng, out = SimEnv(ep_ticks=10 ** 6, roam=0), random.Random(1), []
     env.reset(seed)
     for _ in range(n):
         o, r, d, t, _ = env.step(rng.randrange(N_ACTIONS))
@@ -46,7 +46,7 @@ def test_truncates_at_episode_end():
 
 
 def test_first_time_only_and_crafts():
-    env = SimEnv(ep_ticks=10 ** 6)
+    env = SimEnv(ep_ticks=10 ** 6, roam=0)
     env.reset(5)
     env.a.inventory.update({"wood": 12})
     rewards = [env.step(idx("craft_plank"))[1] for _ in range(8)]
@@ -68,7 +68,7 @@ def during_next_tick(env, fn):
 
 
 def test_collect_and_hurt_penalty():
-    env = SimEnv(ep_ticks=10 ** 6)
+    env = SimEnv(ep_ticks=10 ** 6, roam=0)
     env.reset(5)
     during_next_tick(env, lambda: env.a.inventory.update(fiber=2))
     _, r, *_ = env.step(0)
@@ -79,7 +79,7 @@ def test_collect_and_hurt_penalty():
 
 
 def test_death_ends_episode():
-    env = SimEnv(ep_ticks=10 ** 6)
+    env = SimEnv(ep_ticks=10 ** 6, roam=0)
     env.reset(5)
     during_next_tick(env, lambda: env.sim.damage(env.a, 100, "test"))
     _, r, d, t, info = env.step(0)
@@ -87,7 +87,7 @@ def test_death_ends_episode():
 
 
 def test_failed_actions_counted():
-    env = SimEnv(ep_ticks=10 ** 6)
+    env = SimEnv(ep_ticks=10 ** 6, roam=0)
     env.reset(5)
     env.step(idx("craft_sword"))
     env.step(0)
@@ -104,7 +104,7 @@ def test_ledger_and_score():
 
 
 def test_the_same_action_again_goes_on():
-    env = SimEnv(ep_ticks=10 ** 6)
+    env = SimEnv(ep_ticks=10 ** 6, roam=0)
     env.reset(5)
     a = env.a
     env.sim.set_tile(a.x + 1, a.y, block="tree")
@@ -116,7 +116,7 @@ def test_the_same_action_again_goes_on():
 
 
 def test_an_action_runs_till_it_ends():
-    env = SimEnv(ep_ticks=10 ** 6)
+    env = SimEnv(ep_ticks=10 ** 6, roam=0)
     env.reset(5)
     a = env.a
     env.sim.set_tile(a.x + 1, a.y, block="tree")
@@ -127,7 +127,7 @@ def test_an_action_runs_till_it_ends():
 
 def test_a_pit_is_not_a_trap():
     """Dug down three layers, the actions can cut steps up out of it (dig the land in front at head height, jump)."""
-    env = SimEnv(ep_ticks=10 ** 6)
+    env = SimEnv(ep_ticks=10 ** 6, roam=0)
     env.reset(1000003)
     sim, a = env.sim, env.a
 
@@ -149,7 +149,7 @@ def test_a_pit_is_not_a_trap():
 
 
 def test_farming_and_depth_milestones():
-    env = SimEnv(ep_ticks=10 ** 6)
+    env = SimEnv(ep_ticks=10 ** 6, roam=0)
     env.reset(5)
     a = env.a
     env.sim.set_tile(a.x + 1, a.y, block="none")
@@ -173,7 +173,7 @@ def test_farming_and_depth_milestones():
 
 def test_climb_out_of_a_deep_pit():
     """Ten layers down, the same action (climb N) asked again and again brings it back up."""
-    env = SimEnv(ep_ticks=10 ** 6)
+    env = SimEnv(ep_ticks=10 ** 6, roam=0)
     env.reset(1000003)
     sim, a = env.sim, env.a
     for _ in range(10):
@@ -188,9 +188,37 @@ def test_climb_out_of_a_deep_pit():
     assert sim.height(a) >= low + 6, (low, sim.height(a))
 
 
+def test_a_sparring_partner_comes_and_can_be_beaten():
+    env = SimEnv(ep_ticks=10 ** 6, roam=0)
+    env.reset(5)
+    env.rival.next = env.sim.tick + 1
+    env.step(0)
+    assert env.rival.on and env.rival.dist() <= 7
+    hp = env.a.hp
+    for _ in range(80):
+        m = env.encoded()["mask"]
+        env.step(idx("attack") if m[idx("attack")] else 0)
+        if "defeat_player" in env.ledger.done:
+            break
+    assert "defeat_player" in env.ledger.done and not env.rival.on
+    assert env.a.hp < hp or env.ledger.counts["hits"] >= 0
+
+
+def test_a_sparring_partner_spares_you():
+    env = SimEnv(ep_ticks=10 ** 6, roam=0)
+    env.reset(5)
+    env.rival.next = env.sim.tick + 1
+    for _ in range(200):
+        _, _, died, _, _ = env.step(0)
+        assert not died
+        if env.ledger.done & {"survive_attack", "escape_attack"}:
+            break
+    assert "survive_attack" in env.ledger.done
+
+
 def test_legal_mask_follows_the_rules():
     from nexel_agent.rl.encode import legal
-    env = SimEnv(ep_ticks=10 ** 6)
+    env = SimEnv(ep_ticks=10 ** 6, roam=0)
     o = env.reset(5)
     assert o["mask"].shape == (N_ACTIONS,) and o["mask"][0]           # noop is always there
     env.a.inventory.update({"wood": 4, "stone": 3, "fiber": 1, "berries": 1})
@@ -200,3 +228,40 @@ def test_legal_mask_follows_the_rules():
     assert not m[idx("dig_N_axe")] and m[idx("dig_N")]
     if not env.sim.observe(env.a).get("heights"):                     # (flat all round: nothing in front that high)
         assert not m[idx("dig_at_N_1")] and not m[idx("dig_at_N_2")]
+
+
+def test_live_seed_share_and_roaming_start():
+    env = SimEnv(ep_ticks=100, live_seed=12, live_pct=100)
+    env.reset(3)
+    assert env.sim.seed == 12 and env.a.online
+    spawn = SimEnv(ep_ticks=100, roam=0, rivals=0)
+    spawn.reset(3)
+    roam = SimEnv(ep_ticks=100, rivals=0)
+    roam.reset(3)
+    assert (spawn.a.x, spawn.a.y) != (roam.a.x, roam.a.y) and roam.rival is None
+
+
+def test_social_once_each_and_helping():
+    from nexel_agent.rl.social import SOCIAL
+    env = SimEnv(ep_ticks=10 ** 6, roam=0, rivals=0)
+    env.reset(5)
+    sim, a, f = env.sim, env.a, env.folk[0]
+    f.next = sim.tick + 1
+    env.step(0)
+    assert f.on
+    f.act = 10 ** 9                                   # (it stands still and does nothing more by itself)
+    f.a.x, f.a.y, f.a.z = a.x + 1, a.y, 99
+    a.inventory["wood"] = 3
+    sim.submit(f.a, "say", {"text": "got any wood to spare?"})
+    o, *_ = env.step(0)
+    assert o["vec"][-3] == 1 and o["vec"][-2] == 1    # (spoken to; asked for something it carries)
+    env.step(idx("give"))
+    env.step(0)
+    assert {"gave_item", "helped"} <= env.ledger.done and f.a.count("wood") >= 1
+    env.step(idx("say"))
+    env.step(0)
+    assert "answered_someone" in env.ledger.done
+    before = set(env.ledger.done) & set(SOCIAL)
+    for _ in range(4):                                # (talking more earns nothing more)
+        env.step(idx("say"))
+    assert set(env.ledger.done) & set(SOCIAL) <= before | {"greeted_someone"} and len(SOCIAL) == 6

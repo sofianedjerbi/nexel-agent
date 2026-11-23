@@ -34,7 +34,8 @@ ITEMS = _items()                     # every thing a pack can hold: what is made
 KINDS = tuple(CREATURES) + ("agent",)
 N_NEAR = 3
 BODY = 16
-VEC = BODY + len(ITEMS) + N_NEAR * (3 + len(KINDS)) + N_ACTIONS
+SOCIAL_FLAGS = 3                     # spoken to just now, asked for something I carry, given something (rl/social.py)
+VEC = BODY + len(ITEMS) + N_NEAR * (3 + len(KINDS)) + N_ACTIONS + SOCIAL_FLAGS     # (social last: older policies grow)
 
 _GRID_LUT = np.zeros(128, np.uint8)
 for _ch, _i in CHAR_ID.items():
@@ -44,7 +45,7 @@ for _ch, _v in LEVEL.items():
     _LEVEL_LUT[ord(_ch)] = _v
 
 
-def encode(obs: dict, facing: str = "S", last_action: int = 0, last_ok: float = 0.0, hurt: float = 0.0) -> dict:
+def encode(obs: dict, facing: str = "S", last_action: int = 0, last_ok: float = 0.0, hurt: float = 0.0, social=(0, 0, 0)) -> dict:
     """grid: (21, 21) char ids; height: (21, 21) the land's height minus yours, in layers / 4, clipped to [-1, 1];
     vec: body, clock, last action and how it went, pack counts (log), the three nearest beings."""
     rows = obs["grid"]
@@ -74,5 +75,6 @@ def encode(obs: dict, facing: str = "S", last_action: int = 0, last_ok: float = 
         if k in KINDS:
             v[o + 3 + KINDS.index(k)] = 1
         o += 3 + len(KINDS)
-    v[VEC - N_ACTIONS + last_action] = 1
+    v[VEC - SOCIAL_FLAGS - N_ACTIONS + last_action] = 1
+    v[VEC - SOCIAL_FLAGS:] = social
     return {"grid": grid, "height": height, "vec": v}

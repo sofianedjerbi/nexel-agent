@@ -39,6 +39,9 @@ class Check(BaseCallback):
         for d, info in zip(self.locals["dones"], self.locals["infos"]):
             if d and "achievements" in info:
                 self.train_eps.append(info)
+        if self.a.ent_end is not None:
+            done = min(1.0, (self.num_timesteps - self.s0) / max(1, self.a.steps))
+            self.model.ent_coef = self.a.ent + (self.a.ent_end - self.a.ent) * done
         if self.num_timesteps < self.next:
             return True
         self.next = self.num_timesteps + self.a.check
@@ -53,9 +56,10 @@ class Check(BaseCallback):
         self.log(f"[check] step={self.num_timesteps} min={(time.time() - self.t0) / 60:.0f} sps={sps:.0f} "
                  f"score={m['score']} r6set={m['score_r6set']} (random {self.base['random']['score']}, legal random {self.base.get('random_legal', {}).get('score')}, noop {self.base['noop']['score']}) "
                  f"ach={m['ach']} ticks={m['ticks']} deaths={m['deaths']}/{m['n']} crafts_distinct={m['crafts_distinct']} "
-                 f"places={m['places']} places_distinct={m['places_distinct']} nights={m['nights']} chunks={m['chunks']} fail%={m['fail_pct']} fights={m['fights']} hits={m['hits']} "
+                 f"places={m['places']} places_distinct={m['places_distinct']} nights={m['nights']} chunks={m['chunks']} fail%={m['fail_pct']} fights={m['fights']} rival={m['visits']} social={m['social']}/6 hits={m['hits']} "
                  f"train_score={tr.get('score')} train_ach={tr.get('ach')}")
         self.log("        top: " + json.dumps(m["top"]))
+        self.log("        social: " + json.dumps(m["social_kinds"]))
         if m["score"] > self.best:
             self.best, self.flat = m["score"], 0
             self.model.save(self.out / "best.zip")
@@ -71,6 +75,29 @@ class Check(BaseCallback):
         return True
 
 
+def init_from(model, path, algo):
+    """An older checkpoint's weights (as ~/minish-rl does): inputs that grew keep the old columns, the new ones start
+    at zero; new actions get zero weights and a bias under every old one (rare at first, but tried)."""
+    old = algo.load(path, device="cpu").policy.state_dict()
+    new = model.policy.state_dict()
+    for k, v in old.items():
+        if k not in new:
+            continue
+        if new[k].shape == v.shape:
+            new[k] = v
+        elif v.dim() == 2 and new[k].shape[0] == v.shape[0] and new[k].shape[1] > v.shape[1]:
+            new[k] = torch.zeros_like(new[k])
+            new[k][:, :v.shape[1]] = v
+        elif k.startswith("action_net.") and new[k].shape[0] > v.shape[0] and new[k].shape[1:] == v.shape[1:]:
+            grown = torch.zeros_like(new[k])
+            grown[:v.shape[0]] = v
+            if v.dim() == 1:
+                grown[v.shape[0]:] = v.min() - 1.0
+            new[k] = grown
+        print(f"init_from: {k} {tuple(v.shape)} -> {tuple(new[k].shape)}")
+    model.policy.load_state_dict(new)
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--run", default="r1")
@@ -81,8 +108,13 @@ def main():
     p.add_argument("--patience", type=int, default=3)
     p.add_argument("--hours", type=float, default=2.0)
     p.add_argument("--resume", default="")
+    p.add_argument("--init", default="", help="start from an older checkpoint whose obs vector or action set was smaller (init_from)")
     p.add_argument("--ent", type=float, default=0.01)
     p.add_argument("--lr", type=float, default=3e-4)
+    p.add_argument("--lr-end", type=float, default=None, help="the learning rate falls linearly to this by --steps")
+    p.add_argument("--ent-end", type=float, default=None, help="the entropy bonus falls linearly to this by --steps")
+    p.add_argument("--live-seed", type=int, default=-1, help="the live world's seed: --live-pct of the train episodes there")
+    p.add_argument("--live-pct", type=int, default=20)
     p.add_argument("--gamma", type=float, default=0.995)
     p.add_argument("--days", type=float, default=0.75, help="episode length in days (from the morning): 0.75 is one night, 2.75 three")
     p.add_argument("--mask", type=int, default=1, help="1: MaskablePPO with the legal-action mask")
@@ -91,7 +123,9 @@ def main():
     out = ROOT / a.run
     out.mkdir(parents=True, exist_ok=True)
     ep = [f"ep_ticks={int(a.days * 12000)}"]
-    env, ev = PipeVecEnv(a.envs, rng_seed=hash(a.run) % 1000, env_args=ep), PipeVecEnv(a.eval_envs, env_args=ep)
+    live = [f"live_seed={a.live_seed}", f"live_pct={a.live_pct}"] if a.live_seed >= 0 else []
+    env = PipeVecEnv(a.envs, rng_seed=hash(a.run) % 1000, env_args=ep + live)        # (eval: held-out seeds only)
+    ev = PipeVecEnv(a.eval_envs, env_args=ep)
     names_from(ev)
     bfile = ROOT / f"baselines_{a.days:g}d.json"
     base = json.loads(bfile.read_text()) if bfile.exists() else {}
@@ -99,12 +133,15 @@ def main():
         base = baselines(ev, ev.spec["n_actions"])
     bfile.write_text(json.dumps(base, indent=1))
     algo = HybridMaskablePPO if a.mask else HybridPPO
+    lr = a.lr if a.lr_end is None else (lambda left: a.lr_end + (a.lr - a.lr_end) * left)   # (left: 1 -> 0)
     if a.resume:
-        model = algo.load(a.resume, env=env, device="cpu", custom_objects={"learning_rate": a.lr, "lr_schedule": lambda _: a.lr, "ent_coef": a.ent})
+        model = algo.load(a.resume, env=env, device="cpu", custom_objects={"learning_rate": lr, "lr_schedule": lr if callable(lr) else (lambda _: lr), "ent_coef": a.ent})
     else:
         model = algo("MultiInputPolicy", env, n_steps=512, batch_size=1024, n_epochs=4, gamma=a.gamma, gae_lambda=0.95,
-                    learning_rate=a.lr, ent_coef=a.ent, clip_range=0.2, device="cpu", verbose=0,
+                    learning_rate=lr, ent_coef=a.ent, clip_range=0.2, device="cpu", verbose=0,
                     policy_kwargs=dict(features_extractor_class=GridVec, net_arch=dict(pi=[256], vf=[256])))
+    if a.init:
+        init_from(model, a.init, algo)
     cb = Check(a, out, ev, base)
     cb.log(f"[start] run={a.run} envs={a.envs} actions={env.spec['n_actions']} random={base['random']['score']} noop={base['noop']['score']}")
     try:

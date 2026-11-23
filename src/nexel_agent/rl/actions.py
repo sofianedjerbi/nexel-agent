@@ -30,6 +30,7 @@ def _actions():
     acts += [("place", None, it) for it in PLACE]
     acts += [("craft", None, r) for r in CRAFT]
     acts += [("eat", None, f) for f in EAT]
+    acts += [("say", None, None), ("give", None, None)]     # (last: a policy trained before them keeps its indices)
     return tuple(acts)
 
 
@@ -46,8 +47,13 @@ def _near(obs, kinds, r=USE_R):
     return [e for e in obs.get("entities", []) if e.get("kind") in kinds and max(abs(e["dx"]), abs(e["dy"])) <= r]
 
 
-def to_command(i: int, obs: dict, facing: str):
-    """The game tool and args for action i (None: keep doing what you do)."""
+def _people(obs, r):
+    return [e for e in obs.get("entities", []) if e.get("kind") == "agent" and max(abs(e["dx"]), abs(e["dy"])) <= r]
+
+
+def to_command(i: int, obs: dict, facing: str, social=None):
+    """The game tool and args for action i (None: keep doing what you do). say's words are a placeholder: on the
+    live server the LLM's chat path writes them; give hands the nearest person what social.gift says."""
     kind, d, arg = ACTIONS[i]
     me = obs["self"]
     inv = me.get("inventory", {})
@@ -80,6 +86,12 @@ def to_command(i: int, obs: dict, facing: str):
         return "wear", {"item": next((w for w in WEAR_ORDER if inv.get(w) and w not in worn), "")}
     if kind == "place":
         return "place", {"dir": facing, "item": arg}
+    if kind == "say":
+        return "say", {"text": "hi"}
+    if kind == "give":
+        near = _people(obs, USE_R)
+        item = social.gift(obs) if social else max(inv, key=inv.get, default=None)
+        return "give", {"target": near[0]["id"] if near else -1, "item": item or "", "n": 1}
     if kind == "craft":
         return "craft", {"recipe": arg}
     return "eat", {"item": arg}
@@ -134,4 +146,8 @@ def legal(obs: dict) -> np.ndarray:
             m[i] = bool(_near(obs, ("cow",)))
         elif kind == "wear":
             m[i] = any(inv.get(w) and w not in worn for w in WEAR)
+        elif kind == "say":
+            m[i] = bool(_people(obs, VIEW_R))
+        elif kind == "give":
+            m[i] = bool(_people(obs, USE_R)) and any(inv.values())
     return m
