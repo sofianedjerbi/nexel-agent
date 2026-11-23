@@ -37,6 +37,8 @@ def test_the_sandbox_refuses_what_is_not_allowed_and_reports_errors():
     body = SimBody(1)
     run = Sandbox(body.do, body.observe).run("f", "def f():\n    return 1 / 0\n")
     assert run["error"].startswith("ZeroDivisionError") and "line 2" in run["error"]
+    spin = Sandbox(body.do, body.observe, max_s=0.5).run("f", "def f():\n    while True:\n        pass\n")
+    assert spin["error"].startswith("budget spent (0 s") or spin["error"].startswith("budget spent (1 s")
 
 
 def test_reference_skills_pass_in_a_simulated_world():

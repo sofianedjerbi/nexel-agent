@@ -13,6 +13,7 @@ decides nothing: what to do is in the skill, which the model wrote.
 
 import builtins
 import math
+import sys
 import time
 import traceback
 
@@ -93,6 +94,16 @@ class Sandbox:
             return {"value": None, "error": err, "trace": [], "seconds": 0.0}
         g = self.env({k: v for k, v in (library or {}).items() if k != name})
         exec(compile(src, f"<{name}>", "exec"), g)
+        deadline = self.t0 + self.max_s
+
+        def tracer(frame, event, arg):                 # (a loop that never acts still meets the time budget)
+            if not frame.f_code.co_filename.startswith("<"):
+                return None                           # (only the skill's own lines are watched)
+            if time.monotonic() > deadline:
+                raise Budget(f"budget spent ({self.max_s:.0f} s, {len(self.trace)} actions)")
+            return tracer
+        old = sys.gettrace()
+        sys.settrace(tracer)
         try:
             value = g[name](*args)
             error = None
@@ -102,4 +113,6 @@ class Sandbox:
             tb = traceback.extract_tb(e.__traceback__)
             where = next((f"line {f.lineno}: {f.line}" for f in reversed(tb) if f.filename.startswith("<")), "")
             value, error = None, f"{type(e).__name__}: {e} ({where})"
+        finally:
+            sys.settrace(old)
         return {"value": value, "error": error, "trace": self.trace, "seconds": round(time.monotonic() - self.t0, 2)}
