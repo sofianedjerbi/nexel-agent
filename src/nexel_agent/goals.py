@@ -1,7 +1,7 @@
 """A goal's own success test, written by the model with its goal (design 3.3), checked by the body after every
 action, no model call: {"have": {"workbench": 1}} | {"placed": "workbench"} | {"near": "workbench"} |
-{"at": [x, y]} | {"hp_at_least": 15} | {"food_at_least": 12}. Several keys: all must hold. It says what is
-missing, as facts.
+{"at": [x, y]} | {"hp_at_least": 15} | {"food_at_least": 12}. Several keys: all must hold ("placed": one stands within
+3 tiles). It says what is missing, as facts.
 """
 
 from .verbs import locate
@@ -28,10 +28,9 @@ def missing(test, obs, record=None, since: dict | None = None) -> list[str]:
     for k, n in (test.get("have") or {}).items():
         if inv.get(k, 0) < n:
             out.append(f"have {n} {k} (you have {inv.get(k, 0)})")
-    if p := test.get("placed"):
-        before = (since or {}).get(str(p), 0)
-        if not record or record.placed.get(str(p), 0) <= before:
-            out.append(f"a {p} placed")
+    if p := test.get("placed"):                       # (a state: one placed within 3 tiles, by anyone, at any time)
+        if not any(max(abs(x - me["x"]), abs(y - me["y"])) <= 3 for x, y in locate(obs, str(p))):
+            out.append(f"a {p} placed within 3 tiles")
     if n := test.get("near"):
         if not any(abs(x - me["x"]) <= 2 and abs(y - me["y"]) <= 2 for x, y in locate(obs, str(n))):
             out.append(f"within 2 tiles of a {n}")

@@ -153,6 +153,10 @@ def test_a_goal_test_says_what_is_missing_and_the_body_sees_it_done(tmp_path):
     obs = fake_obs((0, 0))
     obs["self"]["inventory"] = {"wood": 2}
     assert missing({"have": {"wood": 4}, "hp_at_least": 15}, obs) == ["have 4 wood (you have 2)"]
+    assert missing({"placed": "workbench"}, obs) == ["a workbench placed within 3 tiles"]
+    g = [list(r) for r in obs["grid"]]
+    g[9][10] = "&"
+    assert missing({"placed": "workbench"}, {**obs, "grid": ["".join(r) for r in g]}) == []   # (one stands there: done)
     t, game = thinker(tmp_path), FakeGame()
     game.inv = {"wood": 2}
     plan = '{"goal":"get wood","done_when":{"have":{"wood":2}},"do":["dig N"]}'
