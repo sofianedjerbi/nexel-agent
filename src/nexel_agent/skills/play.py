@@ -22,7 +22,7 @@ class Skills:
         self.skill_stop = False
 
     def skill_lines(self) -> str:
-        return self.lib.lines(6) if self.lib.index else ""
+        return self.lib.lines(12) if self.lib.index else ""
 
     async def run_skill(self, game, item) -> dict:
         w = str(item.args.get("text", "")).split()
