@@ -44,12 +44,16 @@ def fix_hint(tool, args, error, detail, obs) -> str:
             return f"{item} takes {have}; next: {_steps(item, inv, obs)}."
     if tool in ("dig", "dig_down") and error == "need_tool":
         need = next((t for t in ("hoe", "pickaxe", "axe") if t in (detail or "")), "pickaxe")
-        if "tilling" in (detail or "") and not inv.get("hoe"):
-            return ("that is bare ground: digging it tills it, which needs a hoe in hand. To gather, dig toward a tree, "
-                    "rock or bush (\"Near\" lists them); a hoe: " + _steps("hoe", inv, obs, 3) + ".")
+        if "tilling" in (detail or ""):
+            till = f"dig {args.get('dir', 'N')} hoe" if inv.get("hoe") else "a hoe: " + _steps("hoe", inv, obs, 3)
+            return ("that is bare ground: digging it tills it (for seeds). To gather, dig toward a tree, rock or bush "
+                    f"(\"Near\" says where to stand). To till: {till}.")
         if inv.get(need):
             return f"you carry a {need}: say it, e.g. dig {args.get('dir', 'N')} {need}."
         return f"you need a {need}: {_steps(need, inv, obs, 4)}."
+    if tool == "attack" and error in ("no_target", "bad_args"):
+        ids = [f"#{e['id']} {e.get('name') or e['kind']}" for e in obs["entities"][:4]]
+        return "attack takes a being's id (the #number in Beings), e.g. attack 12; in view: " + (", ".join(ids) or "nobody") + "."
     if tool == "pick_up" and error == "nothing_here":
         return "pick_up only takes items lying on your own tile; to harvest a plant or tree: dig D toward it."
     if tool == "eat":
