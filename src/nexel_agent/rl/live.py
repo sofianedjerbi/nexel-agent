@@ -134,9 +134,13 @@ class LiveBody:
                 under_way = running[1] if running and not running[1].done() else None
                 self.last = i
                 obs = await self.wait(game, under_way, me, t0)
-                if self.log and (self.stats["decisions"] % 200 == 0 or time.monotonic() - t_report > 60):
-                    t_report = time.monotonic()
-                    self.log.write(json.dumps(self.report(me, action_name(i))) + "\n")
+                if self.log:                 # (each decision: where, what, how hurt; a full report each minute)
+                    s = obs["self"]
+                    self.log.write(json.dumps({"t": round(time.time(), 2), "pos": [s["x"], s["y"]], "hp": s["hp"],
+                                               "act": action_name(i), "hurt": self.hurt}) + "\n")
+                    if time.monotonic() - t_report > 60:
+                        t_report = time.monotonic()
+                        self.log.write(json.dumps(self.report(s, action_name(i))) + "\n")
                     self.log.flush()
             if task is not None and not task.done():
                 task.cancel()

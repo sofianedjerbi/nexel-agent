@@ -13,7 +13,7 @@ import numpy as np
 import torch
 from stable_baselines3.common.callbacks import BaseCallback
 
-from .evaluate import baselines, metrics, run
+from .evaluate import baselines, metrics, names_from, run
 from .net import GridVec, HybridMaskablePPO, HybridPPO
 from .vec import PipeVecEnv
 
@@ -86,6 +86,7 @@ def main():
     out = ROOT / a.run
     out.mkdir(parents=True, exist_ok=True)
     env, ev = PipeVecEnv(a.envs, rng_seed=hash(a.run) % 1000), PipeVecEnv(a.eval_envs)
+    names_from(ev)
     bfile = ROOT / "baselines.json"
     base = json.loads(bfile.read_text()) if bfile.exists() else {}
     if "random_legal" not in base:

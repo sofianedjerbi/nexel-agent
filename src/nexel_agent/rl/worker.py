@@ -25,12 +25,13 @@ def main():
     inp, out = sys.stdin.buffer, os.fdopen(os.dup(sys.stdout.fileno()), "wb")
     sys.stdout = sys.stderr                    # (anything printed by the game goes to the log, not the pipe)
     from .core import SimEnv
+    from .achieve import ACHIEVEMENTS
     from .encode import N_ACTIONS, N_CHARS, SIDE, VEC, action_name
     env = SimEnv(**{k: int(v) for k, v in (a.split("=") for a in sys.argv[1:])})
     while (msg := read(inp)) is not None:
         if msg[0] == "spec":
             write(out, {"n_actions": N_ACTIONS, "n_chars": N_CHARS, "side": SIDE, "vec": VEC,
-                        "names": [action_name(i) for i in range(N_ACTIONS)]})
+                        "names": [action_name(i) for i in range(N_ACTIONS)], "achievements": list(ACHIEVEMENTS)})
         elif msg[0] == "reset":
             write(out, env.reset(msg[1]))
         elif msg[0] == "step":
