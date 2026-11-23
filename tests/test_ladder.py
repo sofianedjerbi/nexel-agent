@@ -64,7 +64,7 @@ def test_failures_say_what_would_work():
     assert line.startswith("place N wood FAILED not_placeable: wood is a material") and "you can place: fence" in line
     assert "workbench" in line
     assert "first craft workbench > place N workbench" in say("craft", {"recipe": "hoe"}, "need_station")
-    assert "you need a hoe: craft workbench > place N workbench" in say("dig", {"dir": "S"}, "need_tool", "tilling needs a hoe in hand")
+    assert "a hoe: craft workbench > place N workbench" in say("dig", {"dir": "S"}, "need_tool", "tilling needs a hoe in hand")
     assert "2 wood (have 20), 3 stone (have 0), 1 fiber (have 0)" in say("craft", {"recipe": "pickaxe"}, "missing_items")
     assert "free flat sides now: N, E, S, W" in say("place", {"dir": "N", "item": "fence"}, "cliff_edge")
     assert "pick_up only takes items lying on your own tile" in say("pick_up", {}, "nothing_here")
@@ -104,3 +104,12 @@ def test_the_next_plan_reads_the_fix_for_a_failed_place(tmp_path):
     later = [c[1]["messages"][1]["content"] for c in calls if c[1].get("stream")][1:]
     assert any("place N wood FAILED" in u and "Milestones done:" in u for u in later)
     assert (tmp_path / "Vex" / "progress.json").exists()
+
+
+def test_digging_bare_ground_says_so_and_look_far_says_what_is_out_there():
+    from megastructure.fixes import look_far_line
+    o = world({})
+    line = failure_line("dig", {"dir": "S"}, {"ok": False, "error": "need_tool", "detail": "tilling needs a hoe in hand"}, o)
+    assert "that is bare ground: digging it tills it" in line and "dig toward a tree, rock or bush" in line
+    res = {"rows_near_to_far": ["....", "..T.", "M...", "~~~~"], "agents": [{"name": "Ana", "dx": 3, "dy": -20}]}
+    assert look_far_line({"dir": "N"}, res) == "look_far N -> tree ~13 tiles, rock ~15 tiles; water from ~17 tiles; people: Ana (+3,-20) (N of you)"

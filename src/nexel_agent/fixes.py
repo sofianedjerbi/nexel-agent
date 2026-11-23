@@ -4,7 +4,11 @@ argument form, what you carry that can be placed, the next missing step), comput
 
 from .ladder import RECIPES, free_dirs, placeable_carried, station_steps, steps_for
 from .plans import command_text
+from .sim.constants import VIEW_R
+from .sim.specs import LEGEND
 from .tiles import FOOD, PLACEABLE
+
+PLAIN = set("~.,:'=o_ ")
 
 
 def _steps(name, inv, obs, k=3) -> str:
@@ -40,6 +44,9 @@ def fix_hint(tool, args, error, detail, obs) -> str:
             return f"{item} takes {have}; next: {_steps(item, inv, obs)}."
     if tool in ("dig", "dig_down") and error == "need_tool":
         need = next((t for t in ("hoe", "pickaxe", "axe") if t in (detail or "")), "pickaxe")
+        if "tilling" in (detail or "") and not inv.get("hoe"):
+            return ("that is bare ground: digging it tills it, which needs a hoe in hand. To gather, dig toward a tree, "
+                    "rock or bush (\"Near\" lists them); a hoe: " + _steps("hoe", inv, obs, 3) + ".")
         if inv.get(need):
             return f"you carry a {need}: say it, e.g. dig {args.get('dir', 'N')} {need}."
         return f"you need a {need}: {_steps(need, inv, obs, 4)}."
@@ -58,3 +65,18 @@ def failure_line(tool, args, reply, obs) -> str:
     err, detail = reply.get("error"), str(reply.get("detail") or "")
     hint = fix_hint(tool, args, err, detail, obs)
     return f"{command_text(tool, args)} FAILED {err}: {hint or detail[:120]}"[:260]
+
+
+def look_far_line(args, res) -> str:
+    """look_far said as what is out there and how far ('tree ~13 tiles, rock ~21 tiles'), not 24 rows of chars."""
+    rows, d = res.get("rows_near_to_far") or [], args.get("dir", "?")
+    seen: dict = {}
+    for i, row in enumerate(rows):
+        for ch in row:
+            if ch not in PLAIN and ch not in seen:
+                seen[ch] = VIEW_R + 1 + 2 * i
+    things = [f"{LEGEND.get(c, c).split(' (')[0]} ~{n} tiles" for c, n in sorted(seen.items(), key=lambda kv: kv[1])[:6]]
+    water = next((VIEW_R + 1 + 2 * i for i, row in enumerate(rows) if row.count("~") > len(row) // 2), None)
+    people = [f"{x['name']} ({x['dx']:+d},{x['dy']:+d})" for x in res.get("agents") or []]
+    return (f"look_far {d} -> " + (", ".join(things) or "only open ground") + (f"; water from ~{water} tiles" if water else "")
+            + (f"; people: {', '.join(people)}" if people else "") + f" ({d} of you)")

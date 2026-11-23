@@ -14,7 +14,7 @@ import httpx
 from .chat import Chat
 from .escape import stuck, stuck_line
 from .fastprompt import compact_obs
-from .fixes import failure_line
+from .fixes import failure_line, look_far_line
 from .ladder import Record
 from .planwatch import TOLD, did_nothing
 from .plans import LOCAL_SPECS, PlanStream, command_text, parse_command
@@ -77,6 +77,8 @@ class Planner(Chat):
             me = obs["self"]
             self.mem.add("place", f"you placed a {item.args['item']} ({item.args.get('dir')} of where you stood)",
                          None, (me["x"], me["y"]), str(obs.get("time", "")))
+        if ok and item.tool == "look_far":
+            return look_far_line(item.args, reply.get("result") or {})
         if ok or reply.get("error") == "interrupted":
             return summarize_result(item.tool, item.args, reply)
         return failure_line(item.tool, item.args, reply, obs)
