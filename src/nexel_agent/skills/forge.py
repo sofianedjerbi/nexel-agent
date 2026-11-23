@@ -52,7 +52,8 @@ Commands for act (verbs do the walking for you):
   "place_near ITEM": put ITEM down on a free flat tile next to you (or the nearest reachable one).
   "go_next_to TARGET", "move_to X Y", "walk N|E|S|W" (keeps walking that way), "look_far N|E|S|W", "fight TARGET", "eat ITEM".
   A failed act has "ok": False and says why in "error"/"detail"; nothing in view: "error": "not_found".
-  "look_far D" reports what lies up to 58 tiles that way (its "result"]["text"] lists things with their x,y) and
+  "look_far D" reports what lies up to 58 tiles that way: reply["result"]["things"] = [{"name": "tree", "x", "y",
+  "dist"}, ...] nearest first (names: tree, rock, bare bush, berry bush, ore, water...), and
   the player remembers it: after it, "dig_at tree" walks to a tree look_far saw, even one far out of view.
   A start may have no tree or rock in view: the world is large, things are found by looking and walking.
 Facts: {recipes}. A craft marked @workbench needs a placed workbench within 2 tiles of you; craft_here walks there
@@ -108,11 +109,11 @@ def ask(url, msgs, max_tokens=1800) -> tuple[str, float]:
     return r.json()["choices"][0]["message"]["content"] or "", time.monotonic() - t0
 
 
-def forge(url, lib: Library, tries=4, only=None, author="forge", log=print):
+def forge(url, lib: Library, tries=4, only=None, author="forge", log=print, redo=False):
     rows = []
     for name, args, what, test in TASKS:
-        if only and name not in only:
-            continue
+        if (only and name not in only) or (name in lib.index and not redo):
+            continue                                  # (a skill the library has already: kept)
         have = lib.sources()
         listing = "\n".join(f"  {n}{tuple(lib.index[n]['call'].split(',')) if lib.index[n]['call'] else '()'}: "
                             f"{lib.index[n]['doc']}" for n in have) or "  (none yet)"
@@ -141,7 +142,8 @@ def forge(url, lib: Library, tries=4, only=None, author="forge", log=print):
                       f"Test: {json.dumps(test)}. Reason in a ```text block about the cause, then write the fixed function."}]
         row["ok"] = any(int(a["pass"].split("/")[0]) >= PASS for a in row["attempts"])
         rows.append(row)
-        lib.path.joinpath("forge_log.json").write_text(json.dumps(rows, indent=1))
+        old = json.loads(lib.path.joinpath("forge_log.json").read_text()) if lib.path.joinpath("forge_log.json").exists() else []
+        lib.path.joinpath("forge_log.json").write_text(json.dumps([r for r in old if r["skill"] != name] + [row], indent=1))
     return rows
 
 
@@ -156,9 +158,10 @@ def main():
     p.add_argument("--tries", type=int, default=4)
     p.add_argument("--only", help="comma list of skills")
     p.add_argument("--author", default="Qwen3-30B-A3B-Instruct-2507")
+    p.add_argument("--redo", action="store_true", help="write again the skills the library has")
     a = p.parse_args()
     rows = forge(a.model_url, Library(Path(a.lib)), a.tries, a.only.split(",") if a.only else None, a.author,
-                 log=lambda s: print(s, flush=True))
+                 log=lambda s: print(s, flush=True), redo=a.redo)
     print(json.dumps({"passed": [r["skill"] for r in rows if r["ok"]], "failed": [r["skill"] for r in rows if not r["ok"]]}))
 
 

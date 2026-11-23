@@ -32,7 +32,7 @@ def make_workbench():
 
 
 def test_the_sandbox_refuses_what_is_not_allowed_and_reports_errors():
-    assert "not allowed" in check("f", "import os\ndef f(): pass")
+    assert "not allowed: 'import os'" in check("f", "import os\ndef f(): pass")
     assert "must define a function named f" in check("f", "def g(): pass")
     body = SimBody(1)
     run = Sandbox(body.do, body.observe).run("f", "def f():\n    return 1 / 0\n")

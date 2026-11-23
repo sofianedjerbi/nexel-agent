@@ -33,8 +33,11 @@ class Stopped(Exception):
 
 def check(name, src) -> str | None:
     """None when src compiles and defines `name`, else what is wrong."""
-    if any(b in src for b in BANNED):
-        return "not allowed: imports, dunders, open, eval, exec"
+    bad = next((b for b in BANNED if b in src), None)
+    if bad:
+        i = src.find(bad)
+        line = src[src.rfind("\n", 0, i) + 1:src.find("\n", i) if src.find("\n", i) != -1 else None].strip()
+        return f"not allowed: {line[:60]!r} (no imports, dunders, open, eval, exec: use the API and str methods)"
     try:
         g = {"__builtins__": SAFE}
         exec(compile(src, f"<{name}>", "exec"), g)

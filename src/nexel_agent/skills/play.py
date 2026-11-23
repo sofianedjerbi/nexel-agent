@@ -5,6 +5,7 @@ to the game (or a verb) on the player's own loop."""
 
 import asyncio
 
+from ..fixes import look_far_line, look_far_things
 from ..goals import missing
 from ..items import by_id
 from ..plans import LOCAL_SPECS, parse_command
@@ -59,4 +60,9 @@ class Skills:
             return {"ok": False, "error": "not_in_a_skill", "detail": f"{tool} is not for skills"}
         if tool in VERBS:
             return await self.verb(game, tool, args)
-        return await game.act(tool, **args)
+        r = await game.act(tool, **args)
+        if tool == "look_far" and r.get("ok"):           # (as in the forge: what it saw, as data, and remembered)
+            me = (self.obs or {}).get("self", {"x": 0, "y": 0})
+            r["result"]["text"] = look_far_line(args, r["result"], me, self.memory.setdefault("seen", {}))
+            r["result"]["things"] = look_far_things(args, r["result"], me)
+        return r

@@ -10,7 +10,7 @@ from ..items import by_id
 from ..plans import LOCAL_SPECS, parse_command
 from ..sim import Simulation
 from ..sim.constants import DAY_TICKS
-from ..fixes import look_far_line
+from ..fixes import look_far_line, look_far_things
 from ..verbs import VERBS, Verbs, note_seen
 
 
@@ -75,7 +75,9 @@ class SimBody:
             return self.loop.run_until_complete(self.host.verb(self.game, tool, args))
         r = self.loop.run_until_complete(self.game.act(tool, **args))
         if tool == "look_far" and r.get("ok"):            # (what it saw goes to the map memory, as in play)
-            r["result"]["text"] = look_far_line(args, r["result"], self.observe()["self"], self.host.memory["seen"])
+            me = self.observe()["self"]
+            r["result"]["text"] = look_far_line(args, r["result"], me, self.host.memory["seen"])
+            r["result"]["things"] = look_far_things(args, r["result"], me)
         else:
             note_seen(self.observe(), self.host.memory["seen"])
         return r
