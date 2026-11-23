@@ -164,8 +164,9 @@ class Memory:
         prev = self.summary_text()
         msgs = [{"role": "system", "content": f"You are {name}, a player in a survival game, keeping your own diary. "
                  "Write what you want to remember from these events: people (what they did, said, asked, what you "
-                 "promised), places (home, workbench, chests, caves, water, dangers, with coordinates), fights and "
-                 "deaths and their causes, what worked. Plain short sentences, at most 70 words. No preamble."},
+                 "promised), places (with coordinates), fights and deaths and their causes, what worked. ONLY what the "
+                 "events below say: never invent a place, a thing or a coordinate. Plain short sentences, at most 60 "
+                 "words. No preamble."},
                 {"role": "user", "content": (f"Your diary so far: {prev}\n" if prev else "") + "Events:\n"
                  + "\n".join(lines) + "\n/no_think"}]
         return msgs, n

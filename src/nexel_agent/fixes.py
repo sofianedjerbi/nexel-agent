@@ -82,5 +82,6 @@ def look_far_line(args, res) -> str:
     things = [f"{LEGEND.get(c, c).split(' (')[0]} ~{n} tiles" for c, n in sorted(seen.items(), key=lambda kv: kv[1])[:6]]
     water = next((VIEW_R + 1 + 2 * i for i, row in enumerate(rows) if row.count("~") > len(row) // 2), None)
     people = [f"{x['name']} ({x['dx']:+d},{x['dy']:+d})" for x in res.get("agents") or []]
-    return (f"look_far {d} -> " + (", ".join(things) or "only open ground") + (f"; water from ~{water} tiles" if water else "")
+    none = [n for c, n in (("T", "tree"), ("M", "rock")) if c not in seen]
+    return (f"look_far {d} -> " + (", ".join(things) or "only open ground") + (f"; no {' or '.join(none)}" if none else "") + (f"; water from ~{water} tiles" if water else "")
             + (f"; people: {', '.join(people)}" if people else "") + f" ({d} of you)")

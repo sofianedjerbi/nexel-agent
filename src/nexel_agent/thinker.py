@@ -64,7 +64,7 @@ class Thinker(Planner):
         self.goal: str | None = None
         self.obs: dict | None = None
         self.heard: deque[str] = deque(maxlen=4)
-        self.history: deque[str] = deque(maxlen=4)
+        self.history: deque[str] = deque(maxlen=3)
         self.recent: deque[str] = deque(maxlen=20)
         self.new_plan = asyncio.Event()
         self.chat_task: asyncio.Task | None = None
@@ -196,7 +196,7 @@ class Thinker(Planner):
             self.said[str(item.args.get("text", "")).strip().lower()] = t1
         if item.source == "model":
             self.recent.append(command_text(item.tool, item.args))
-        self.history.append(line[:260])
+        self.history.append(line[:200])
         note_outcome(self.memory, obs, item, reply, t1)
         if not ok and reply.get("error") != "interrupted":
             self.abort(f"{command_text(item.tool, item.args)} failed: {reply.get('error')}")

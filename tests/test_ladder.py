@@ -114,3 +114,4 @@ def test_digging_bare_ground_says_so_and_look_far_says_what_is_out_there():
     assert "attack takes a being's id" in failure_line("attack", {"target": 30}, {"ok": False, "error": "no_target"}, o)
     res = {"rows_near_to_far": ["....", "..T.", "M...", "~~~~"], "agents": [{"name": "Ana", "dx": 3, "dy": -20}]}
     assert look_far_line({"dir": "N"}, res) == "look_far N -> tree ~13 tiles, rock ~15 tiles; water from ~17 tiles; people: Ana (+3,-20) (N of you)"
+    assert look_far_line({"dir": "E"}, {"rows_near_to_far": ["..b."]}) == "look_far E -> berry_bush ~11 tiles; no tree or rock (E of you)"
