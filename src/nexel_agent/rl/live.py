@@ -35,7 +35,7 @@ class LiveBody:
         self.crafts, self.reactions, self.foes, self.fails_by = set(), {}, {}, {}
         self.social, self.social_done, self.heard, self.http = SocialMemory(a.name, ITEMS), set(), None, None
         self.stats.update(said=0, gave=0)
-        self.tick, self.me, self.obs_entities = 0, {}, []
+        self.tick, self.me, self.obs_entities, self.fighting = 0, {}, [], False
         self.log = open(a.log, "a") if a.log else None
 
     def done(self, tool, args, r):
@@ -53,24 +53,30 @@ class LiveBody:
             self.stats["placed"] += 1
         elif tool in ("say", "give"):
             self.stats["said" if tool == "say" else "gave"] += 1
+        elif tool == "attack":
+            self.stats["swings"] = self.stats.get("swings", 0) + 1
+            if (r.get("result") or {}).get("killed"):
+                self.stats["kills"] += 1
+                if args.get("target") in self.foes:
+                    self.stats["won"] += 1
+                    self.foes.pop(args["target"])
         near = min((math.hypot(b["dx"], b["dy"]) for b in self.obs_entities if b.get("kind") == "agent"), default=99)
         self.social_done |= set(self.social.achieved(tool, args, bool(r.get("ok")), self.tick, near,
                                                      (r.get("result") or {}).get("to")))
-        elif tool == "attack" and (r.get("result") or {}).get("killed"):
-            self.stats["kills"] += 1
-            if args.get("target") in self.foes:
-                self.stats["won"] += 1
-                self.foes.pop(args["target"])
         self.last_ok = 1.0 if r.get("ok") else -1.0
 
     async def call(self, game, cmd):
         """One action as in the env (core.split): a tool call, or a climb's digs then jump."""
         r = None
+        self.fighting = cmd[0] == "attack"
         for step in split(cmd):
+            if self.fighting and r is not None and not r.get("ok"):
+                break                                  # (the fight is over: the target fell or got away)
             if step[0] == "say":                       # the words: the LLM's (chat.py's prompt), or a plain hello
                 step = ("say", {"text": await self.words()})
             r = await game.act(step[0], **step[1])
             self.done(step[0], step[1], r)
+        self.fighting = False
         return r
 
     async def wait(self, game, task, me, t0):
@@ -85,7 +91,8 @@ class LiveBody:
             events += obs.get("events", [])
             s, dt = obs["self"], time.monotonic() - t0
             new = {b["id"] for b in obs.get("entities", [])} - seen
-            if s["hp"] < me["hp"] or s["deaths"] != me["deaths"] or new or dt >= WAIT_MAX_S \
+            hurt = s["hp"] < me["hp"] and not (self.fighting and task is not None and not task.done())
+            if hurt or s["deaths"] != me["deaths"] or new or dt >= WAIT_MAX_S \
                     or (task.done() if task is not None else dt >= IDLE_S):
                 obs["events"] = events
                 self.obs_entities = obs.get("entities", [])
@@ -131,7 +138,7 @@ class LiveBody:
                     self.foes.clear()
                 if self.hurt > 0:
                     self.stats["hits"] += 1
-                    foe = next((b for b in obs.get("entities", []) if b.get("kind") in HOSTILE and math.hypot(b["dx"], b["dy"]) <= 5), None)
+                    foe = next((b for b in obs.get("entities", []) if b.get("kind") in HOSTILE + ("agent",) and math.hypot(b["dx"], b["dy"]) <= 5), None)
                     if foe:
                         self.foes[foe["id"]] = foe["kind"]
                 hp, deaths = me["hp"], me["deaths"]
@@ -150,6 +157,8 @@ class LiveBody:
                 if cmd is None:
                     self.stats["idle"] += me.get("action") is None
                 else:
+                    if running and not running[1].done():
+                        running[1].cancel()                     # (a new action replaces the one under way)
                     task = asyncio.create_task(self.call(game, cmd))
                     running = (cmd, task)
                 under_way = running[1] if running and not running[1].done() else None

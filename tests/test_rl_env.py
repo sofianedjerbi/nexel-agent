@@ -204,6 +204,20 @@ def test_a_sparring_partner_comes_and_can_be_beaten():
     assert env.a.hp < hp or env.ledger.counts["hits"] >= 0
 
 
+def test_one_attack_is_a_whole_fight():
+    env = SimEnv(ep_ticks=10 ** 6, roam=0)
+    env.reset(5)
+    sim, a, rv = env.sim, env.a, env.rival
+    rv.next = sim.tick + 1
+    env.step(0)
+    rv.a.x, rv.a.y, rv.a.z = a.x + 1, a.y, 99          # (right beside: in reach)
+    env.obs = sim.observe(a)
+    t0 = sim.tick
+    env.step(idx("attack"))                            # one decision: swings till it falls
+    env.step(0)
+    assert "defeat_player" in env.ledger.done and sim.tick - t0 <= 60, sim.tick - t0
+
+
 def test_a_sparring_partner_spares_you():
     env = SimEnv(ep_ticks=10 ** 6, roam=0)
     env.reset(5)
@@ -265,3 +279,8 @@ def test_social_once_each_and_helping():
     for _ in range(4):                                # (talking more earns nothing more)
         env.step(idx("say"))
     assert set(env.ledger.done) & set(SOCIAL) <= before | {"greeted_someone"} and len(SOCIAL) == 6
+
+
+def test_live_body_imports():
+    import nexel_agent.rl.live as live
+    assert live.LiveBody and live.split

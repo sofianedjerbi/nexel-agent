@@ -19,12 +19,18 @@ from .rival import Rival
 from .social import SOCIAL, SocialMemory
 
 
+FIGHT = 12                          # attack: swings at one target, till it falls or gets away (~5 s at most)
+
+
 def split(cmd) -> list:
     """The tool calls of one action: itself; or, climb, the game's own way up a step: the block over your head dug
-    (if any), the land in front at head height (if any), then a jump that way."""
+    (if any), the land in front at head height (if any), then a jump that way; or, attack, a fight: swings at that
+    target one after the other (a swing that misses ends it)."""
     tool, args = cmd
     if tool == "climb":
         return [("dig", {"dir": "up"}), ("dig", {"dir": args["dir"], "z": args["z"]}), ("jump", {"dir": args["dir"]})]
+    if tool == "attack":
+        return [cmd] * FIGHT
     return [cmd]
 
 DECIDE = 5                          # ticks: an idle noop waits this long
@@ -97,9 +103,12 @@ class SimEnv:
                 self.rival.tick()
             for f in self.folk:
                 f.tick()
-            if a.deaths > deaths0 or a.hp < hp0:
-                break                                   # hurt: decide now
+            if a.deaths > deaths0 or (a.hp < hp0 and not self.fighting()):
+                break                                   # hurt: decide now (in a fight, it goes on: timing only)
             busy = a.action is not None or a.aside is not None
+            if self.then and self.running[1].result is not None and self.running[0][0] == "attack" \
+                    and not self.running[1].result.get("ok"):
+                self.then = None                        # (the fight is over: the target fell or got away)
             if self.then and self.running[1].result is not None:
                 act = self.submit(self.running[0], *self.then[0], then=self.then[1:])   # (climb: the next step)
                 continue
@@ -164,6 +173,9 @@ class SimEnv:
         self.then = then
         self.pending.append((act, tool, args, target.kind if target else ""))
         return act
+
+    def fighting(self) -> bool:
+        return bool(self.running) and self.running[0][0] == "attack" and (bool(self.then) or self.running[1].result is None)
 
     def in_view(self) -> set:
         a, R = self.a, VIEW_R

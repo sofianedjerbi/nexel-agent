@@ -16,7 +16,7 @@ from websockets.asyncio.client import connect
 
 from megastructure.client import Client
 
-AT = (1, 2.5, 5, 8, 11, 14, 17, 20)        # minutes
+AT = (2, 5, 8, 11, 14, 17, 20, 24)        # minutes: eight visits in a 30-minute soak
 
 
 async def where(port, name):
