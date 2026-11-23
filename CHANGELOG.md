@@ -5,6 +5,14 @@ Written by [python-semantic-release](https://python-semantic-release.readthedocs
 
 <!-- version list -->
 
+## v0.4.1 (2026-11-23)
+
+### Bug Fixes
+
+- **voice**: One situation text for the words and the planner, one reply per burst
+  ([`c647e2f`](https://github.com/sofianedjerbi/nexel-agent/commit/c647e2f4ea116753d42905036173eb09fccec97a))
+
+
 ## v0.4.0 (2026-11-23)
 
 ### Features
