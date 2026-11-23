@@ -5,6 +5,23 @@ Written by [python-semantic-release](https://python-semantic-release.readthedocs
 
 <!-- version list -->
 
+## v0.5.0 (2026-11-23)
+
+### Features
+
+- **rl**: Ring places what the pack holds, fill and stock ladders, the attack mask uses the server's
+  reach
+  ([`b64c499`](https://github.com/sofianedjerbi/nexel-agent/commit/b64c4999657ceee4a1d5e1e5bc5b8847b82d0c0d))
+
+### Refactoring
+
+- **agent**: Retire the thinker generation, nexel-agent runs the trained player
+  ([`2a21e63`](https://github.com/sofianedjerbi/nexel-agent/commit/2a21e634b7776b8fa6f068908281d7c8d91c572b))
+
+- **rl**: One reader for the game's events and one distance (rl/facts.py)
+  ([`44524cf`](https://github.com/sofianedjerbi/nexel-agent/commit/44524cf31fa044794501a8fa7ffbb420624045e7))
+
+
 ## v0.4.1 (2026-11-23)
 
 ### Bug Fixes
