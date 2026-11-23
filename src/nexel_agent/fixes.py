@@ -2,7 +2,7 @@
 argument form, what you carry that can be placed, the next missing step), computed from the recipe book and the view.
 """
 
-from .ladder import RECIPES, free_dirs, placeable_carried, station_steps, steps_for
+from .ladder import RECIPES, _nearest, _walk, free_dirs, placeable_carried, station_steps, steps_for
 from .plans import command_text
 from .sim.constants import VIEW_R
 from .sim.specs import LEGEND
@@ -13,6 +13,23 @@ PLAIN = set("~.,:'=o_ ")
 
 def _steps(name, inv, obs, k=3) -> str:
     return " > ".join(steps_for(name, dict(inv), obs)[:k])
+
+
+GATHER = "TbMvHQF*"                   # what a dig gathers: tree, bushes, rock, mushroom, fruit tree, ore
+
+
+def gather_hint(obs) -> str:
+    """What is next to you to dig, or the nearest such thing and how to get at it."""
+    g, r = obs["grid"], len(obs["grid"]) // 2
+    side = [f"{LEGEND.get(g[r + dy][r + dx], '?').split(' (')[0]} {d}" for d, (dx, dy) in
+            (("N", (0, -1)), ("E", (1, 0)), ("S", (0, 1)), ("W", (-1, 0))) if g[r + dy][r + dx] in GATHER]
+    if side:
+        return "Next to you to dig: " + ", ".join(side) + "."
+    near = _nearest(obs, GATHER)
+    if not near:
+        return "Nothing to gather in view: explore."
+    way = _walk(obs, near[1], near[2])
+    return f"Nearest to gather: {LEGEND.get(near[3], '?').split(' (')[0]} at ({near[1]},{near[2]})" + (f": {way}." if way else ".")
 
 
 def fix_hint(tool, args, error, detail, obs) -> str:
@@ -46,8 +63,8 @@ def fix_hint(tool, args, error, detail, obs) -> str:
         need = next((t for t in ("hoe", "pickaxe", "axe") if t in (detail or "")), "pickaxe")
         if "tilling" in (detail or ""):
             till = f"dig {args.get('dir', 'N')} hoe" if inv.get("hoe") else "a hoe: " + _steps("hoe", inv, obs, 3)
-            return ("that is bare ground: digging it tills it (for seeds). To gather, dig toward a tree, rock or bush "
-                    f"(\"Near\" says where to stand). To till: {till}.")
+            return (f"{args.get('dir', 'that way')} of you is bare ground: digging it tills it (for seeds). "
+                    f"{gather_hint(obs)} To till: {till}.")
         if inv.get(need):
             return f"you carry a {need}: say it, e.g. dig {args.get('dir', 'N')} {need}."
         return f"you need a {need}: {_steps(need, inv, obs, 4)}."

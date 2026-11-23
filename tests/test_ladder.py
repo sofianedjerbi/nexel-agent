@@ -110,7 +110,8 @@ def test_digging_bare_ground_says_so_and_look_far_says_what_is_out_there():
     from megastructure.fixes import look_far_line
     o = world({})
     line = failure_line("dig", {"dir": "S"}, {"ok": False, "error": "need_tool", "detail": "tilling needs a hoe in hand"}, o)
-    assert "that is bare ground: digging it tills it" in line and "dig toward a tree, rock or bush" in line
+    assert "S of you is bare ground: digging it tills it" in line
+    assert "Nearest to gather: tree at (0,-2): move_to 0 -1, dig N." in line
     assert "attack takes a being's id" in failure_line("attack", {"target": 30}, {"ok": False, "error": "no_target"}, o)
     res = {"rows_near_to_far": ["....", "..T.", "M...", "~~~~"], "agents": [{"name": "Ana", "dx": 3, "dy": -20}]}
     assert look_far_line({"dir": "N"}, res) == "look_far N -> tree ~13 tiles, rock ~15 tiles; water from ~17 tiles; people: Ana (+3,-20) (N of you)"
