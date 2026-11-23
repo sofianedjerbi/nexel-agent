@@ -6,7 +6,7 @@ import httpx
 
 from megastructure.fastprompt import compact_obs, stable_prefix
 from megastructure.fixes import failure_line
-from megastructure.ladder import Record, gather_goal, progress_lines
+from megastructure.ladder import Record, progress_lines
 from megastructure.plans import parse_command
 from test_thinker_realtime import FakeGame, fake_obs, model_transport, thinker
 
@@ -82,12 +82,6 @@ def test_place_forms_the_model_writes_all_parse():
     assert parse_command("place workbench S") == parse_command("place S workbench") == ("place", {"dir": "S", "item": "workbench"})
     assert parse_command("place dir=S item=workbench") == ("place", {"dir": "S", "item": "workbench"})
     assert parse_command("write_sign N go N now") == ("write_sign", {"dir": "N", "text": "go N now"})
-
-
-def test_the_filler_gathers_what_the_goal_lacks():
-    assert gather_goal("craft hoe", {"wood": 50}, world({"wood": 50})) == "get stone"
-    assert gather_goal("craft hoe", {"wood": 50, "stone": 3}, world({})) is None
-    assert gather_goal("explore", {}, world({})) is None
 
 
 def test_prompt_stays_short_with_the_progress_block():

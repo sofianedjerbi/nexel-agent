@@ -1,5 +1,5 @@
 """The real-time thinker: plan parsing and streaming, running a plan and dropping the rest on a failure,
-pipelining (the next model call runs while the plan is still being played; filler meanwhile), chat fast path.
+pipelining (the next model call runs while the plan is still being played; nothing scripted meanwhile), chat fast path.
 No model and no game server: a fake game and an httpx mock transport."""
 
 import asyncio
@@ -116,40 +116,42 @@ def thinker(tmp_path, **kw):
 
 
 # ---------------------------------------------------------------- body
-def test_plan_runs_in_order_and_a_failure_drops_the_rest(tmp_path):
-    t, game = thinker(tmp_path), FakeGame(fail={"dig N"})
-
+def step(t, game, n):
     async def go():
-        t.queue.extend(Item(tool, args, "model", "wood", None, t.epoch) for tool, args in
-                       [("move_to", {"x": 0, "y": -1}), ("dig", {"dir": "N"}), ("craft", {"recipe": "plank"})])
-        for _ in range(3):
+        for _ in range(n):
             obs = await t.observe(game)
             t.new_plan.clear()
-            await t.execute(game, t.next_item(obs), obs)
+            it = t.next_item(obs)
+            if it is None:
+                return
+            await t.execute(game, it, obs)
     asyncio.run(go())
+
+
+def test_plan_runs_in_order_and_a_failure_drops_the_rest(tmp_path):
+    t, game = thinker(tmp_path), FakeGame(fail={"dig N"})
+    t.queue.extend(Item(tool, args, "model", "wood", None, t.epoch) for tool, args in
+                   [("move_to", {"x": 0, "y": -1}), ("dig", {"dir": "N"}), ("craft", {"recipe": "plank"})])
+    step(t, game, 3)
     tools = [a[1] for a in game.acts]
-    assert tools[:2] == ["move_to", "dig"] and "craft" not in tools     # the third was dropped
+    assert tools == ["move_to", "dig"]                                  # the third was dropped, nothing else done
     assert any("plan stopped" in h for h in t.history) and t.stats["aborts"] == 1
+    assert any("dig N FAILED nothing_there" in h for h in t.history)    # the failure, said back as it was
 
 
-def test_relative_command_walks_back_to_where_the_plan_was_made(tmp_path):
+def test_a_relative_command_from_elsewhere_is_not_sent_and_the_model_is_told(tmp_path):
     t, game = thinker(tmp_path), FakeGame()
-    game.pos = [3, 0]                                                    # the filler moved us meanwhile
-
-    async def go():
-        t.queue.append(Item("dig", {"dir": "N"}, "model", "wood", (0, -1), t.epoch))
-        for _ in range(2):
-            obs = await t.observe(game)
-            await t.execute(game, t.next_item(obs), obs)
-    asyncio.run(go())
-    assert [(a[1], a[2]) for a in game.acts] == [("move_to", {"x": 0, "y": -1}), ("dig", {"dir": "N"})]
+    game.pos = [3, 0]                                                    # the body is not where the plan was made
+    t.queue.append(Item("dig", {"dir": "N"}, "model", "wood", (0, -1), t.epoch))
+    step(t, game, 2)
+    assert game.acts == [] and any("was planned from (0, -1)" in h for h in t.history)
 
 
-# ---------------------------------------------------------------- pipelining
-def test_next_call_runs_while_the_plan_plays_and_the_body_never_waits(tmp_path):
+def test_nothing_planned_the_body_waits_for_the_model(tmp_path):
+    """No scripted filler: before the first plan, and between plans, the body does nothing of its own."""
     plan = '{"goal":"get wood","do":["move_to 0 -1","dig N","dig N","dig N"]}'
     transport, calls = model_transport([plan], delay=0.4)
-    t, game = thinker(tmp_path, chat=False), FakeGame(act_s=0.35)   # (actions take time: the rate cap is 3/s)
+    t, game = thinker(tmp_path, chat=False), FakeGame(act_s=0.35)
 
     async def go():
         async with httpx.AsyncClient(transport=transport) as http:
@@ -158,10 +160,10 @@ def test_next_call_runs_while_the_plan_plays_and_the_body_never_waits(tmp_path):
     plan_calls = [c[0] for c in calls if c[1].get("stream")]
     model_acts = [a for a in game.acts if a[1] == "dig"]
     assert len(plan_calls) >= 2
+    assert game.acts[0][0] > plan_calls[0]                               # nothing before the model spoke
+    assert all(k.split(":")[0] in ("model", "chat") for k in t.stats if ":" in k)
     assert any(model_acts[0][0] < c < model_acts[-1][0] for c in plan_calls[1:])   # a call overlapped the plan
-    assert game.acts[0][0] - plan_calls[0] < 0.3          # the body moved before the first plan came (filler)
-    assert t.stats["filler:cut"] + t.stats["filler:ok"] >= 1
-    assert s["idle_pct"] < 25 and s["model_calls"] >= 2
+    assert s["model_calls"] >= 2
     assert calls[0][1]["messages"][0]["content"] == calls[-1][1]["messages"][0]["content"]   # cacheable prefix
 
 
@@ -172,7 +174,26 @@ def test_stale_plan_is_dropped_after_an_abort(tmp_path):
     t.abort("hit")
     assert t.epoch == old + 1 and not t.queue
     t.queue.append(Item("dig", {"dir": "N"}, "model", "", None, old))  # a command from a plan still streaming
-    assert t.next_item(fake_obs((0, 0))).source == "filler"
+    assert t.next_item(fake_obs((0, 0))) is None
+
+
+def test_the_same_failed_command_is_not_resent_within_a_second(tmp_path):
+    t, game = thinker(tmp_path), FakeGame(fail={"dig N"})
+    for _ in range(2):
+        t.queue.append(Item("dig", {"dir": "N"}, "model", "", None, t.epoch))
+        step(t, game, 1)
+    assert len(game.acts) == 1 and t.stats["backoff"] == 1
+
+
+def test_remember_and_forget_are_the_models_own_commands(tmp_path):
+    t, game = thinker(tmp_path), FakeGame()
+    assert parse_command("remember Ana owes me 3 wood") == ("remember", {"text": "Ana owes me 3 wood"})
+    t.queue.append(Item("remember", {"text": "home by the big rock"}, "model", "", None, t.epoch))
+    step(t, game, 1)
+    assert game.acts == [] and "[1] home by the big rock (0,0)" in t.mem.notes_text()
+    t.queue.append(Item("forget", {"n": 1}, "model", "", None, t.epoch))
+    step(t, game, 1)
+    assert t.mem.notes_text() == ""
 
 
 # ---------------------------------------------------------------- chat
@@ -191,43 +212,7 @@ def test_someone_talking_gets_an_answer_fast(tmp_path):
     says = [a for a in game.acts if a[1] == "say"]
     assert says and says[0][2]["text"] == "Sure, take two." and says[0][0] - t0 < 1.0
     chat_call = next(c for c in calls if not c[1].get("stream"))
-    assert chat_call[1]["max_tokens"] <= 60 and "Ana says: hi Vex" in chat_call[1]["messages"][1]["content"]
-
-
-def test_a_planned_dig_at_bare_ground_is_skipped_not_failed(tmp_path):
-    t = thinker(tmp_path)
-    obs = fake_obs((0, -1))                                              # the tree is N of us
-    assert not t.gone(obs, Item("dig", {"dir": "N"}, "model"))
-    assert t.gone(obs, Item("dig", {"dir": "S"}, "model"))               # grass: what the plan saw there is gone
-    assert not t.gone(obs, Item("dig", {"dir": "S", "with": "hoe"}, "model"))   # tilling is meant for bare ground
-    t.queue.extend([Item("dig", {"dir": "S"}, "model", "", None, t.epoch), Item("dig", {"dir": "N"}, "model", "", None, t.epoch)])
-    assert t.next_item(obs).args == {"dir": "N"} and t.stats["skipped"] == 1
-
-
-def test_dig_after_a_move_to_onto_the_thing_digs_the_thing(tmp_path):
-    t = thinker(tmp_path)
-    obs = fake_obs((1, -2))                                              # stopped E of the tree at (0,-2)
-    t.last_goto = (0, -2)                                                # the plan said "move_to 0 -2, dig N"
-    t.queue.append(Item("dig", {"dir": "N"}, "model", "", None, t.epoch))
-    assert t.next_item(obs).args == {"dir": "W"} and t.stats["dig_turned"] == 1
-
-
-def test_a_command_that_failed_twice_on_that_tile_is_not_sent_a_third_time(tmp_path):
-    t, game = thinker(tmp_path), FakeGame(fail={"dig N"})
-    game.pos = [0, -1]
-
-    async def go():
-        for _ in range(3):
-            t.queue.append(Item("dig", {"dir": "N", "with": "pickaxe"}, "model", "", None, t.epoch))
-            obs = await t.observe(game)
-            await t.execute(game, t.next_item(obs), obs)
-    asyncio.run(go())
-    planned = [a for a in game.acts if a[2].get("with") == "pickaxe"]        # (then the filler digs by hand)
-    assert len(planned) == 2 and t.stats["known_fail"] == 1
-    assert t.failed
-    game.inv = {"pickaxe": 1}                                            # forgotten once the pack gains a new kind
-    asyncio.run(t.observe(game))
-    assert not t.failed
+    assert chat_call[1]["max_tokens"] <= 80 and "Ana says: hi Vex" in chat_call[1]["messages"][1]["content"]
 
 
 def test_goal_names_what_its_recipe_still_lacks():

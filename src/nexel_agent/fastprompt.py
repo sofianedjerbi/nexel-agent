@@ -5,10 +5,10 @@ and the fast chat reply's tiny prompt. The plan format and its parser: plans.py.
 import json
 import re
 
-from .filler import NEEDS, goal_absent
-from .ladder import ladder_text, progress_lines
+from .ladder import NEEDS_TOOL as NEEDS, ladder_text, progress_lines
 from .policy import DIRS, reachable
 from .plans import _kind, _optional
+from .senses import rules_text
 from .sim.specs import LEGEND, TOOL_SPECS
 from .tiles import FOOD, RECIPES
 
@@ -34,14 +34,18 @@ TOOL_HINTS = {
     "place": "put down a thing you carry next to you, e.g. place S workbench (things, not wood or stone)", "craft": "make a recipe", "attack": "hit within 3 tiles",
     "say": "talk to people near", "pick_up": "items on your tile", "store": "into a chest", "take": "from a chest",
     "sleep": "in a bed next to you", "jump": "onto a step 1 higher", "walk": "keep going that way",
-    "look_far": "see 48 tiles that way",
+    "look_far": "see 48 tiles that way", "eat": "eat food you carry",
 }
+
+
+RARE = {"milk", "feed", "name", "post", "open_mail", "unroof", "read_sign", "water", "stop", "dig_down"}   # (not listed: tokens)
 
 
 def stable_prefix(name: str, persona: str) -> str:
     """The system message: the same bytes every call (the server caches it), so it is paid for once."""
     tools = "\n".join(f"- {signature(t)}: {TOOL_HINTS[t]}" for t in TOOL_SPECS if t in TOOL_HINTS)
-    tools += "\n- also: " + "; ".join(signature(t) for t in TOOL_SPECS if t not in TOOL_HINTS)   # (rarer: one line)
+    tools += "\n- also: " + "; ".join(signature(t) for t in TOOL_SPECS if t not in TOOL_HINTS and t not in RARE)
+    tools += "; remember TEXT; forget N"
     recipes = " ".join(f"{'By hand' if not st else '@' + st}: " + "; ".join(
         f"{n}=" + "+".join(f"{c} {k}" for k, c in RECIPES[n].inputs.items()) for n in CORE_RECIPES
         if n in RECIPES and RECIPES[n].station == st) + "." for st in (None, "workbench", "campfire"))
@@ -53,8 +57,7 @@ work use food; 0 hurts). Eat: {food}.
 To gather, stand next to a thing and dig toward it: tree -> wood, berry_bush -> berries + seed, bare_bush -> fiber,
 rock -> stone (slow by hand), ore -> ore (pickaxe). Items next to you come to you. Wood and stone are materials,
 not things to place. @workbench crafts need a workbench PLACED within 2 tiles: craft it, place it, stay by it. Seeds go in tilled soil (dig ground with a hoe). Water: you swim. A step one
-higher: jump D. Creatures are rare: tusker charges in a line (step aside), pincer snaps on shores, strawman walks
-at you at night. Never wake Old Mossback (G). Dying drops all you carry. Others may help, trade or rob you.
+higher: jump D. {rules_text()}
 Commands (D is N, E, S or W; [x] optional):
 {tools}
 Recipes: {recipes}
@@ -62,7 +65,7 @@ Recipes: {recipes}
 Answer with ONE JSON object and nothing else:
 {{"goal":"<2-5 words>","do":["<command>", 2 to 5 commands]}}
 Example: {{"goal":"get wood","do":["move_to 4 -2","dig N","move_to 7 -1","dig E"]}} (one dig takes a whole tree, bush or rock)
-To remember a person or a place for later, add "note":"<short>" (rarely).
+Your memory is yours: "remember TEXT" keeps a note (a place, a person, a promise), "forget N" drops note [N].
 Use only what you carry and coordinates you were shown. "Near" gives the exact move_to and dig for each thing."""
 
 
@@ -141,7 +144,8 @@ def needs_for(goal: str | None, inv: dict, grid) -> str:
     return f"{name} needs: " + ", ".join(parts) + "."
 
 
-def compact_obs(obs, goal=None, heard=(), history=(), pending=(), notes="", lessons="", habit="", record=None) -> str:
+def compact_obs(obs, goal=None, heard=(), history=(), pending=(), notes="", lessons="", habit="", record=None,
+                danger=(), recall=()) -> str:
     me, grid = obs["self"], obs["grid"]
     r = len(grid) // 2
     crop = [row[r - VIEW:r + VIEW + 1] for row in grid[r - VIEW:r + VIEW + 1]]
@@ -151,26 +155,16 @@ def compact_obs(obs, goal=None, heard=(), history=(), pending=(), notes="", less
                              ("swimming", me.get("swimming"))) if on]
     lines = [f"Time {obs['time']}. You: ({me['x']},{me['y']}) z{me.get('z', 0)} on {me['standing_on']}"
              + (", " + ", ".join(flags) if flags else "") + f". Health {me['hp']}/20, food {me['hunger']}/20.",
+             *danger,
              "Carry: " + (", ".join(f"{k} {v}" for k, v in inv.items()) or "nothing") + ".",
              "Can craft now: " + (", ".join(craftable(inv, grid)) or "nothing") + ".",
              *progress_lines(obs, goal, record),
-             *([f"No {absent} anywhere in view: to '{goal}', go and find one first (move_to toward the map's edge, "
-                "or look_far)."] if (absent := goal_absent(goal, obs)) else []),
              f"Map (@ = you; rows y{me['y'] - VIEW}..{me['y'] + VIEW}, columns x{me['x'] - VIEW}..{me['x'] + VIEW}):",
              *crop,
              "Key: " + ", ".join(f"{c} {LEGEND.get(c, c).split(' (')[0]}" for c in used if c in LEGEND)]
     near = near_lines(obs)
     if near:
         lines.append("Near: " + "; ".join(near))
-    ents = []
-    for e in obs["entities"][:6]:
-        pos = f"({me['x'] + e['dx']},{me['y'] + e['dy']})"
-        if e["kind"] == "agent":
-            ents.append(f"{e['name']} #{e['id']} {pos} hp {e['hp']}, {e['doing']}")
-        else:
-            ents.append(f"{e['kind']} #{e['id']} {pos}")
-    if ents:
-        lines.append("Beings: " + "; ".join(ents))
     if obs["items"]:
         lines.append("On the ground: " + "; ".join(
             f"({me['x'] + i['dx']},{me['y'] + i['dy']}) " + ", ".join(f"{k} {v}" for k, v in i["items"].items())
@@ -184,8 +178,10 @@ def compact_obs(obs, goal=None, heard=(), history=(), pending=(), notes="", less
         lines.append("Done: " + " | ".join(history))
     if pending:
         lines.append("Already queued (plan what comes AFTER): " + ", ".join(pending))
+    if recall:
+        lines.append("You remember: " + " | ".join(recall))
     if notes:
-        lines.append("Notes: " + notes)
+        lines.append("Your notes: " + notes)
     if lessons:
         lines.append("Learned: " + lessons)
     if habit:

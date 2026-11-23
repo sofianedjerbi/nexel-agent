@@ -1,7 +1,6 @@
 """Plans that change nothing: the model asked the same plan again and the pack is just as it was.
 
-The first repeat is told back to the model; from the second on, a plan starting the same way is not played
-(the body's filler gathers what is really there instead), until the pack changes.
+A repeat is told back to the model (it decides what to do instead): nothing is refused or replaced.
 """
 
 from collections import Counter

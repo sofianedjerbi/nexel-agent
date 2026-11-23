@@ -11,6 +11,8 @@ import re
 from .sim.specs import TOOL_SPECS
 
 DIR_WORDS = {"N", "E", "S", "W", "up"}
+LOCAL_SPECS = {"remember": {"args": {"text": "str"}}, "forget": {"args": {"n": "int"}}}   # the player's own memory
+SPECS = {**TOOL_SPECS, **LOCAL_SPECS}
 FILLER_WORDS = {"with", "the", "a", "to", "at", "using", "x", "y", "dir", "facing"}   # "dig N with pickaxe", "move_to x 3 y 4"
 
 
@@ -33,14 +35,14 @@ def parse_command(item) -> tuple[str, dict] | None:
     if isinstance(item, dict):
         tool = item.get("tool")
         args = item.get("args") if isinstance(item.get("args"), dict) else {k: v for k, v in item.items() if k != "tool"}
-        return (tool, args) if tool in TOOL_SPECS else None
+        return (tool, args) if tool in SPECS else None
     if not isinstance(item, str):
         return None
     words = item.strip().split()
     if not words:
         return None
     tool = words[0].lower()
-    spec = TOOL_SPECS.get(tool)
+    spec = SPECS.get(tool)
     if spec is None:
         return None
     keys = list(spec["args"])

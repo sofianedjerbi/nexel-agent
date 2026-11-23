@@ -1,7 +1,10 @@
 """Read a thinker's decisions.jsonl and report a soak: actions by source and kind, distance travelled, inventory
 gained, stalls the watchdog declared, and every 20 s window with < 3 tiles of net progress and nothing gained.
 
-    python tools/soak_report.py agents/gatsu0/decisions.jsonl
+    python tools/soak_report.py agents/gatsu0/decisions.jsonl [saves/<world>/events.jsonl]
+
+With the world's events.jsonl: the player's deaths and their causes, and who hit it. Chats and diary entries are
+printed from the decisions log.
 """
 
 import json
@@ -13,7 +16,7 @@ sys.path.insert(0, "src")
 from megastructure.ladder import Record  # noqa: E402
 
 
-def main(path):
+def main(path, events=None):
     recs = [json.loads(x) for x in open(path)]
     acts = [r for r in recs if "tool" in r]
     stalls = [r for r in recs if r.get("kind") == "stall"]
@@ -32,6 +35,7 @@ def main(path):
                 got[k] += int(n)
     print("inventory change:", dict(got))
     progress(acts)
+    social(recs, acts, events)
     print(f"hp {acts[0]['hp']} -> {acts[-1]['hp']}, food {acts[0]['hunger']} -> {acts[-1]['hunger']}")
     print("stalls declared:", [(s["routine"], s["at"]) for s in stalls])
     bad, i = [], 0
@@ -65,5 +69,24 @@ def progress(acts):
     print("milestones (minute):", {m: round(v, 1) for m, v in rec.reached.items()})
 
 
+def social(recs, acts, events):
+    """Deaths (cause, minute), hits taken, every chat and diary entry."""
+    t0, name = acts[0]["t"], acts[0]["agent"]
+    if events:
+        evs = [json.loads(x) for x in open(events) if '"death"' in x or '"attack"' in x]
+        deaths = [e for e in evs if e["type"] == "death" and e.get("name") == name]
+        hits = Counter(e.get("attacker") for e in evs if e["type"] == "attack" and e.get("target") == name)
+        print(f"deaths: {len(deaths)}", [(e.get("cause"), e.get("by")) for e in deaths], "| hit by:", dict(hits))
+    for r in recs:
+        if r.get("kind") == "chat":
+            print(f"  chat [{(r['t'] - t0) / 60:.1f} min] {r['to']}: {r['heard']!r} -> {r['said']!r}"
+                  + (f" do={r['do']}" if r.get("do") else "") + (f" promise={r['promise']!r}" if r.get("promise") else ""))
+        elif r.get("kind") == "diary":
+            print(f"  diary [{(r['t'] - t0) / 60:.1f} min] {r['text'][:300]!r}")
+    says = [r["args"].get("text") for r in acts if r["tool"] == "say" and r["source"] == "model"]
+    if says:
+        print("  said in plans:", says[:8])
+
+
 if __name__ == "__main__":
-    main(sys.argv[1])
+    main(*sys.argv[1:3])

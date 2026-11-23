@@ -1,13 +1,23 @@
-"""gatsu0 trapped (2026-11-22): swimming in a river between cliffs 10 layers high, every move_to to the land
-failed with no_path and the filler sent another one 3 times a second. Fake game, fake model."""
+"""Stuck, stalled, looping: the model is TOLD (gatsu0 2026-11-22: in a river under cliffs 10 layers high, every move_to
+failed; 3,586 moves between two tiles in 15 min). Nothing scripted moves the body for it. Fake game, fake model."""
 
 import asyncio
 import time
 
-from megastructure.escape import climb_reach, stuck, way_out
-from megastructure.planner import Item
+import httpx
+
+from megastructure.escape import climb_reach, stuck
+from megastructure.watchdog import Watchdog
 from test_thinker_realtime import FakeGame, model_transport, thinker
-from test_thinker_livelock import play
+
+
+def play(t, game, plans, seconds, delay=0.1):
+    transport, calls = model_transport(plans, delay=delay)
+
+    async def go():
+        async with httpx.AsyncClient(transport=transport) as http:
+            return await t.play(game, http, minutes=seconds / 60)
+    return asyncio.run(go()), calls
 
 
 def canyon(bank=None, pit=False):
@@ -32,45 +42,12 @@ def canyon(bank=None, pit=False):
                      "standing_on": "grass" if pit else "abyss", "swimming": not pit, "sheltered": False}}
 
 
-def test_in_the_river_under_cliffs_it_knows_it_is_stuck_and_swims_on():
-    obs, memory = canyon(), {}
-    assert stuck(obs, memory)
+def test_in_the_river_under_cliffs_it_knows_it_is_stuck():
+    obs = canyon()
+    assert stuck(obs, {})
     assert all(abs(q[0]) <= 1 for q in climb_reach(obs))            # only the water: the cliffs are too high
-    tool, args, why, routine = way_out(obs, memory)
-    assert (tool, routine) == ("move_to", "swim") and abs(args["x"]) <= 1 and abs(args["y"]) >= 8 and "swimming on" in why
-    assert way_out(obs, memory)[1] == args                           # the same target until it gets there
-    obs["self"]["y"] = args["y"]                                     # there (the river looks the same): on, same way
-    again = way_out(obs, memory)[1]
-    assert (again["y"] - args["y"] > 0) == (args["y"] > 0)           # keeps its heading: no back and forth
-
-
-def test_a_low_bank_that_leads_away_is_the_way_out():
-    obs = canyon(bank=(2, -4))                                       # a bank 1 layer up, going on east
-    assert not stuck(obs, {})
-    assert way_out(obs, {})[::3] == ("move_to", "bank") and way_out(obs, {})[1]["y"] == -4
-
-
-def test_in_a_pit_it_cuts_a_step_and_jumps():
-    obs, memory = canyon(pit=True), {"no_path": 3}
-    assert stuck(obs, memory)
-    assert way_out(obs, memory)[:2] == ("dig", {"dir": "up"})        # room over the head (nothing there: fine)
-    tool, args, *_ = way_out(obs, memory)
-    assert tool == "dig" and args["z"] == 2
-    assert way_out(obs, memory)[:3] == ("jump", {"dir": args["dir"]}, "climbing out: onto the step")
-    assert stuck(obs, {"climb_to": 3, **memory}) and memory["climb_to"] == 3   # on up to the wall's top
-
-
-def test_swimming_banned_here_it_cuts_a_stair_out():
-    obs, memory = canyon(), {}
-    assert way_out(obs, memory)[3] == "swim"
-    tool, args, why, _ = way_out(obs, memory, banned={"swim"})       # the watchdog found swimming went nowhere
-    assert (tool, abs(args["x"]), why) == ("move_to", 1, "getting out: to the foot of the wall")
-    obs["self"]["x"] = 1                                             # (the view stays the river's: same picture)
-    shifted = canyon()
-    shifted["grid"] = [(row[1:] + ".").replace("@", "~") for row in shifted["grid"]]
-    shifted["grid"][10] = shifted["grid"][10][:10] + "@" + shifted["grid"][10][11:]
-    shifted["heights"] = [row[1:] + "A" for row in shifted["heights"]]
-    assert way_out(shifted, memory, {"swim"})[:2] == ("dig", {"dir": "up"}) and memory["climb_to"] == 10
+    assert not stuck(canyon(bank=(2, -4)), {})                       # a low bank that leads away
+    assert stuck(canyon(pit=True), {"no_path": 3})
 
 
 def test_the_prompt_says_it_is_stuck(tmp_path):
@@ -79,8 +56,19 @@ def test_the_prompt_says_it_is_stuck(tmp_path):
     assert "You are stuck" not in t.plan_messages(canyon(bank=(2, -4)))[1]["content"]
 
 
+def test_staying_put_with_nothing_gained_is_a_stall_and_moving_or_gaining_is_not():
+    dog, t, stall = Watchdog(), 0.0, None
+    while stall is None and t < 30:
+        stall = dog.record(t, -61 + int(t * 4) % 2, 23, {"dirt": 35})
+        t += 0.25
+    assert stall and 18 <= t <= 21
+    dog = Watchdog()
+    assert not any(dog.record(i * 0.5, i // 4, 0, {}) for i in range(80))                  # 10 tiles in 40 s
+    assert not any(dog.record(i * 0.5, 0, 0, {"stone": i // 10}) for i in range(80))       # digging in place
+
+
 class Cliffs(FakeGame):
-    """Every move_to fails (no_path) except along the river; counts what was sent."""
+    """Every move_to fails (no_path)."""
 
     async def observe(self):
         obs = canyon()
@@ -90,21 +78,26 @@ class Cliffs(FakeGame):
     async def act(self, tool, **args):
         self.acts.append((time.monotonic(), tool, args))
         await asyncio.sleep(0.02)
-        if tool == "move_to" and abs(args["x"] - self.pos[0]) > 1:
-            self.fails.append((time.monotonic(), tool, args))
-            return {"ok": False, "error": "no_path", "detail": "no walkable path"}
         if tool == "move_to":
-            self.pos = [args["x"], args["y"]]
+            return {"ok": False, "error": "no_path", "detail": "no walkable path"}
         return {"ok": True, "result": {"ticks": 1, "changed": {}}}
 
 
-def test_trapped_it_backs_off_then_escapes_instead_of_hammering(tmp_path):
+def test_trapped_the_model_hears_it_and_nothing_moves_on_its_own(tmp_path):
     t, game = thinker(tmp_path, chat=False), Cliffs()
-    game.fails = []
-    plan = '{"goal":"get pickaxe","do":["move_to 9 0","dig E"]}'      # the model wants the cliff top
-    s, _ = play(t, game, [plan], 2.0, delay=0.3)
-    fails = game.fails
-    same = [b[0] - a[0] for a, b in zip(fails, fails[1:]) if a[2] == b[2]]
-    assert all(dt >= 1.0 for dt in same)                             # never the same failing move within a second
-    assert t.stats["escape:ok"] >= 1 and game.pos[1] != 0            # it swam along the river
-    assert len(fails) <= 4                                           # (before: ~3 failing sends a second, forever)
+    t.dog = Watchdog(window=1.0)
+    s, calls = play(t, game, ['{"goal":"get out","do":["move_to 9 0","dig E"]}'], 3.0, delay=0.3)
+    sent = [a for a in game.acts if a[1] == "move_to"]
+    assert all(a[2] == {"x": 9, "y": 0} for a in sent)              # only what the model asked for
+    same = [b[0] - a[0] for a, b in zip(sent, sent[1:])]
+    assert all(dt >= 1.0 for dt in same)                             # the same failing move never within a second
+    prompts = [c[1]["messages"][1]["content"] for c in calls if c[1].get("stream")]
+    assert any("move_to 9 0 FAILED no_path" in p for p in prompts)
+    assert any("You are stuck" in p for p in prompts) and any("gets nowhere here" in p for p in prompts)
+
+
+def test_never_more_than_about_three_actions_a_second(tmp_path):
+    t, game = thinker(tmp_path, chat=False), FakeGame(act_s=0.0)
+    play(t, game, ['{"goal":"x","do":["look_far N","look_far E","look_far S","look_far W"]}'], 3.0, delay=0.05)
+    ts = [a[0] for a in game.acts]
+    assert len(ts) > 3 and (len(ts) - 1) / (ts[-1] - ts[0]) <= 3.2

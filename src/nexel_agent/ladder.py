@@ -249,16 +249,5 @@ def progress_lines(obs, goal, rec: Record | None) -> list[str]:
     return out
 
 
-def gather_goal(goal, inv, obs) -> str | None:
-    """For the filler: the material the goal's recipe still lacks (so it digs rocks for a hoe, not trees), or None."""
-    name = goal_recipe(goal)
-    if not name or name not in RECIPES:
-        return None
-    for s in steps_for(name, dict(inv), obs):
-        if s.startswith("get ") and (k := s.split()[2].rstrip(":")) in SOURCES:
-            return f"get {k}"
-    return None
-
-
 def placeable_carried(inv) -> list[str]:
     return [k for k in inv if k in PLACEABLE or k in FILLERS]
