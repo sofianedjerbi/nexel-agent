@@ -8,6 +8,7 @@ import math
 from megastructure.sim.entities import CREATURES
 from megastructure.tiles import ARMOR, BLOCKS, FOOD, RECIPES
 from .actions import PLACE
+from .facts import HOSTILE  # noqa: F401  (core.py, milestones.py take it from here)
 from .social import SOCIAL
 
 _MADE = {k for r in RECIPES.values() for k in r.output} - {"stone", "hay"}      # (stone, hay also come from the land)
@@ -16,7 +17,6 @@ COLLECT = tuple(sorted(({"dirt", "stone_block"} | set(FOOD) | {k for b in BLOCKS
 CRAFTS = tuple(RECIPES)
 EATS = tuple(FOOD)
 DEFEATS = tuple(k for k in CREATURES if k != "wisp")
-HOSTILE = ("tusker", "pincer", "strawman", "wyrm", "mossback", "sporeling")
 MILESTONES = ("till", "plant", "water_crop", "feed_animal", "milk_cow", "sleep_bed", "wear_any", "wear_armor",
               "place_5_kinds", "place_10_kinds", "shelter", "light_shelter", "house", "toolkit",
               "survive_night", "survive_2_nights", "survive_3_nights", "hale_day", "swim_across",

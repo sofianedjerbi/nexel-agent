@@ -13,6 +13,7 @@ import random
 
 from megastructure.sim.constants import sec
 from megastructure.tiles import DIRS
+from .facts import Attack, Give, Say, events, named
 
 EVERY = (sec(60), sec(200))          # between two visits
 STAY = (sec(120), sec(300))
@@ -70,24 +71,23 @@ class Folk:
             return
         if a.hp <= 0 or sim.tick >= self.until or self.dist() > 30:
             return self.go()
-        for e in a.events:
-            if e.get("type") == "give" and e.get("to") == a.name:
-                self.owed = True
-                self.grudge_until -= GIFT_EASES                           # (a gift softens it)
-            elif e.get("type") == "attack" and e.get("attacker") == self.p.name and e.get("target") == "Rival" \
-                    and self.set_upon:
-                self.grudge = False                                       # (it stood by it against the rival: forgiven)
-            elif e.get("type") == "attack" and e.get("attacker") == self.p.name and e.get("target") in {f.a.name for f in self.town}:
-                if e.get("target") == a.name:
-                    self.angry, self.asked = sim.tick + ANGRY, None      # (hit by the player: it hits back, then goes)
-                self.grudge = True                                        # (hit, or saw it: within earshot of the blow)
-            elif e.get("type") == "say" and e.get("from") == self.p.name:          # asked for something?
-                text = str(e.get("text", "")).replace(" ", "_")
-                it = next((k for k in sorted(a.inventory, key=len, reverse=True) if k in text), None)
-                if it and not self.grudge and self.rng.random() < 0.6:
-                    self.asked = it
-                elif it or "spare" in text:
-                    sim.submit(a, "say", {"text": self.rng.choice(("sorry, need it", "no, can't", "not now"))})
+        for ev in events(a.events):
+            match ev:
+                case Give(to=to) if to == a.name:
+                    self.owed = True
+                    self.grudge_until -= GIFT_EASES                           # (a gift softens it)
+                case Attack(by=by, target="Rival") if by == self.p.name and self.set_upon:
+                    self.grudge = False                                       # (it stood by it against the rival: forgiven)
+                case Attack(by=by, target=tgt) if by == self.p.name and tgt in {f.a.name for f in self.town}:
+                    if tgt == a.name:
+                        self.angry, self.asked = sim.tick + ANGRY, None      # (hit by the player: it hits back, then goes)
+                    self.grudge = True                                        # (hit, or saw it: within earshot of the blow)
+                case Say(src=src, shout=False) if src == self.p.name:      # asked for something?
+                    it = next(iter(named(ev.text, a.inventory)), None)
+                    if it and not self.grudge and self.rng.random() < 0.6:
+                        self.asked = it
+                    elif it or "spare" in ev.text:
+                        sim.submit(a, "say", {"text": self.rng.choice(("sorry, need it", "no, can't", "not now"))})
         a.events = []
         if self.angry:
             if sim.tick >= self.angry:

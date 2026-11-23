@@ -66,7 +66,7 @@ def test_chat_and_events():
     assert e == {"k": "event", "what": "hurt", "text": "sporeling hit Rook (1)", "n": 1}
     assert chat_or_event({"type": "tile"}, "Rook") is None
     assert chat_or_event({"type": "craft", "name": "Mira", "made": {"plank": 2}}, "Rook") is None
-    assert chat_or_event({"type": "craft", "name": "Rook", "made": {"plank": 2}}, "Rook")["text"] == "Rook made plank 2"
+    assert chat_or_event({"type": "craft", "name": "Rook", "made": {"plank": 2}}, "Rook")["text"] == "Rook made 2 plank"
 
 
 class FakeMind:

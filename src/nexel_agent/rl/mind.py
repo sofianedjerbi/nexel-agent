@@ -13,6 +13,7 @@ import time
 from pathlib import Path
 
 from megastructure.tiles import RECIPES
+from .facts import Attack, Give, Say, events, people
 from .goals import KINDS, Goal
 from .voice import CHAT_STYLE, Now
 
@@ -55,10 +56,17 @@ class Mind:
     def see(self, obs: dict):
         """Something that happened to it (spoken to - unless the voice answers -, given, hit, an ally hit) thinks at once."""
         me = self.name
-        for e in obs.get("events", []):
-            t, who = e.get("type"), e.get("from") or e.get("attacker")
-            self.salient |= bool(who and who != me) and (t in ("say", "shout") and self.voice is None or e.get("to") == me
-                                                         or e.get("target") == me or e.get("target") in self.relations)
+        for ev in events(obs):
+            match ev:
+                case Say(src=who):
+                    mine = self.voice is None
+                case Give(src=who, to=to):
+                    mine = to == me
+                case Attack(by=who, target=tgt):
+                    mine = tgt == me or tgt in self.relations
+                case _:
+                    continue
+            self.salient |= mine and bool(who and who != me)
 
     def due(self) -> bool:
         return not self.busy and (self.salient or time.monotonic() - self.last >= THINK_S)
@@ -80,7 +88,7 @@ class Mind:
             lines.append("Things you could make with a little more: " + "; ".join(close) + ".")
         if self.asks:
             lines.append(self.asks + ".")
-        here = {p.get("name") for p in obs.get("entities", []) if p.get("kind") == "agent"}
+        here = {p.get("name") for p in people(obs)}
         self.names = {str(n).lower(): n for n in here | set(self.relations)}
         others = [n for n in self.relations if n not in here]
         if others:

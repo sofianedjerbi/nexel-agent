@@ -15,6 +15,8 @@ import time
 from collections import deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+from .facts import HOSTILE, Attack, Craft, Say, read, told
+
 V = 1
 SIDE = 13                      # the tiles round it: the middle 13 x 13 of the agent API's grid
 FRAME_S = 1.0                  # a frame at most this often
@@ -22,8 +24,6 @@ TOP = 6
 BEINGS = 8
 BACKLOG = 400                  # lines kept for a page that connects late
 PING_S = 15.0
-HOSTILE = ("tusker", "pincer", "strawman", "wyrm", "mossback", "sporeling")
-EVENTS = ("attack", "death", "creature_died", "give", "craft", "join", "boss")
 
 
 def crop(grid: list, side: int = SIDE) -> list:
@@ -84,27 +84,16 @@ def top(logits, mask=None, names=None, n: int = TOP) -> list:
 
 
 def chat_or_event(e: dict, me: str) -> dict | None:
-    """A line of the feed from one game event (or None: not one the page shows)."""
-    t = e.get("type")
-    if t in ("say", "shout"):
-        c = {"k": "chat", "from": e.get("from"), "text": str(e.get("text", ""))[:200]}
-        if e.get("from") == me:
-            c["said"] = True
-        return c
-    if t not in EVENTS:
+    """A line of the feed from one game event (or None: not one the page shows). The words: rl/facts.py told."""
+    ev = read(e)
+    if isinstance(ev, Say):
+        return {"k": "chat", "from": ev.src, "text": ev.text[:200], **({"said": True} if ev.src == me else {})}
+    if ev is None or (isinstance(ev, Craft) and ev.name != me):
         return None
-    if t == "attack":
-        who, tgt, n = e.get("attacker"), e.get("target"), e.get("damage")
-        return {"k": "event", "what": "hurt" if tgt == me else t, "text": f"{who} hit {tgt} ({n})", **({"n": n} if n else {})}
-    text = {"death": lambda: f"{e.get('name')} died" + (f" ({e.get('by')})" if e.get("by") else ""),
-            "creature_died": lambda: f"{e.get('kind')} fell" + (f" to {e.get('by')}" if e.get("by") else ""),
-            "give": lambda: f"{e.get('from')} gave {e.get('to')} " + ", ".join(f"{k} {v}" for k, v in (e.get("items") or {}).items()),
-            "craft": lambda: f"{e.get('name')} made " + ", ".join(f"{k} {v}" for k, v in (e.get("made") or {}).items()),
-            "join": lambda: f"{e.get('name')} came in",
-            "boss": lambda: f"the boss: {e.get('what')}"}[t]()
-    if t == "craft" and e.get("name") != me:
-        return None
-    return {"k": "event", "what": t, "text": text}
+    if isinstance(ev, Attack):
+        return {"k": "event", "what": "hurt" if ev.target == me else "attack", "text": f"{told(ev, str)} ({ev.damage:g})",
+                **({"n": ev.damage} if ev.damage else {})}
+    return {"k": "event", "what": e["type"], "text": told(ev, str)}
 
 
 class Brain:

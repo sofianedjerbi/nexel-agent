@@ -7,13 +7,14 @@ call is timed into latency.jsonl."""
 
 import asyncio
 import json
+import math
 import re
 import time
 from collections import Counter, deque
 from itertools import groupby
 from pathlib import Path
 
-from .achieve import HOSTILE
+from .facts import HOSTILE, Attack, Craft, Give, Say, compass, counted, dist, events, is_creature, named, people, plain, told
 
 # (one style for every line it says: the words here, the planner's line in rl/mind.py)
 CHAT_STYLE = ("Type the way people really type in a game chat: mostly lowercase, capitals only now and then, short "
@@ -32,22 +33,13 @@ WINDOW_S = 30.0                       # "lately": what it saw in the last 30 s; 
 WORDS = {"N": "north", "S": "south", "E": "east", "W": "west", "noop": "wait"}
 
 
-def compass(dx, dy) -> str:
-    d = max(abs(dx), abs(dy))
-    if d <= 1:
-        return "right here"
-    ns = "S" if dy > d / 2.4 else "N" if dy < -d / 2.4 else ""
-    ew = "E" if dx > d / 2.4 else "W" if dx < -d / 2.4 else ""
-    return f"{d} tiles {ns}{ew}"
-
-
 def places(obs: dict, signs: dict) -> str:
     """The real places it knows of: signs it has read (where, what they say), its spawn, what is in sight now."""
     me = obs.get("self") or {}
     x, y = me.get("x", 0), me.get("y", 0)
     out = [f'a sign "{t[:40]}" {compass(sx - x, sy - y)}' for (sx, sy), t in list(signs.items())[-3:]]
     sp = me.get("spawn")
-    if sp and max(abs(sp[0] - x), abs(sp[1] - y)) > 3:
+    if sp and math.hypot(sp[0] - x, sp[1] - y) > 3:
         out.append(f"your spawn point {compass(sp[0] - x, sp[1] - y)}")
     legend = obs.get("legend") or {}
     seen = {legend.get(ch, "") for row in obs.get("grid") or [] for ch in row}
@@ -62,10 +54,6 @@ def places(obs: dict, signs: dict) -> str:
 def runs(words) -> str:
     """'a, a, b' -> 'a x2, b' (in order)."""
     return ", ".join(w + (f" x{n}" if (n := len(list(g))) > 1 else "") for w, g in groupby(words))
-
-
-def counted(d: dict) -> str:
-    return ", ".join(f"{n:g} {k.replace('_', ' ')}" for k, n in d.items())
 
 
 class Now:
@@ -88,9 +76,9 @@ class Now:
         self.obs = obs
         for s in obs.get("signs", []):
             self.signs[(me.get("x", 0) + s["dx"], me.get("y", 0) + s["dy"])] = str(s.get("text", ""))
-        self.past.extend((t, e) for e in obs.get("events", []))
-        for e in obs.get("events", []):
-            self.outcome(e, t)
+        for ev in events(obs):
+            self.past.append((t, ev))
+            self.outcome(ev, t)
         for (asker, whom), (item, t0) in [kv for kv in self.asks.items() if t - kv[1][1] > WINDOW_S]:
             del self.asks[(asker, whom)]
             self.remember(whom, f"did not give you the {item} you asked for") if asker == self.name else \
@@ -101,40 +89,32 @@ class Now:
         while len(self.body) > 1 and t - self.body[1][0] >= WINDOW_S:
             self.body.popleft()
 
-    def named(self, text: str) -> list:
-        """The pack items a line names."""
-        low = text.lower()
-        words = set(re.findall(r"[a-z]+", low))
-        return [k for k in self.items if k.replace("_", " ") in low if " " in k.replace("_", " ") or k in words or k + "s" in words]
-
     def remember(self, who, what: str, n=1):
-        if who and who != self.name and "#" not in who and not who.startswith("a "):     # (people only)
+        if who and who != self.name and not is_creature(who):     # (people only)
             rec = self.relations.setdefault(who, {}).setdefault("record", {})
             rec[what] = rec.get(what, 0) + n
 
-    def outcome(self, e: dict, t: float):
-        kind, me = e.get("type"), self.name
-        if kind == "attack":
-            a, tgt = str(e.get("attacker")), str(e.get("target"))
-            if tgt == me:
+    def outcome(self, ev, t: float):
+        me = self.name
+        match ev:
+            case Attack(by=a, target=tgt) if tgt == me:
                 self.remember(a, "hit you")
-                self.fought = t if a.startswith("a ") else self.fought
-            elif a == me:
+                self.fought = t if is_creature(a) else self.fought
+            case Attack(by=a, target=tgt) if a == me:
                 self.remember(tgt, "you hit them")
-            elif "#" in tgt and t - self.fought <= WINDOW_S:
+            case Attack(by=a, target=tgt) if is_creature(tgt) and t - self.fought <= WINDOW_S:
                 self.remember(a, "fought a creature that was fighting you")
-        elif kind == "give" and me in (e.get("from"), e.get("to")):
-            src, to = e.get("from"), e.get("to")
-            for k, n in (e.get("items") or {}).items():
-                self.remember(src if to == me else to, f"gave you {k}" if to == me else f"you gave them {k}", n)
-                if self.asks.get((to, src), ("",))[0] == k:
-                    del self.asks[(to, src)]
-        elif kind in ("say", "shout") and e.get("from") != me and (item := next(iter(self.named(str(e.get("text", "")))), None)):
-            self.ask(e.get("from"), me, item, t)
+            case Give(src=src, to=to) if me in (src, to):
+                for k, n in ev.items.items():
+                    self.remember(src if to == me else to, f"gave you {k}" if to == me else f"you gave them {k}", n)
+                    if self.asks.get((to, src), ("",))[0] == k:
+                        del self.asks[(to, src)]
+            case Say(src=src) if src != me and (item := next(iter(named(ev.text, self.items)), None)):
+                self.ask(src, me, item, t)
 
     def ask(self, who, whom, item, t=None):
         """`who` asked `whom` for `item` (its own asks: the policy's ask action, rl/live.py)."""
-        whom = whom or next((b.get("name") for b in self.obs.get("entities", []) if b.get("kind") == "agent"), None)
+        whom = whom or next((b.get("name") for b in people(self.obs)), None)
         if who and whom:
             self.asks[(who, whom)] = (item, time.monotonic() if t is None else t)
             self.remember(who if who != self.name else whom, f"asked you for {item}" if who != self.name else f"you asked them for {item}")
@@ -150,18 +130,11 @@ class Now:
         self.acts.append(" ".join(WORDS.get(w, w) for w in action.split("_")))
 
     def who(self, name) -> str:
-        name = str(name or "someone")
-        return "you" if name == self.name else "a " + name.split("#")[0] if "#" in name else name
+        return "you" if name == self.name else plain(name)
 
-    def event(self, e: dict) -> str | None:
-        who, t = self.who, e.get("type")
-        text = {"attack": lambda: f"{who(e.get('attacker'))} hit {who(e.get('target'))}",
-                "creature_died": lambda: f"a {e.get('kind')} fell" + (f" to {who(e.get('by'))}" if e.get("by") else ""),
-                "death": lambda: f"{who(e.get('name'))} died", "boss": lambda: f"the boss: {e.get('what')}",
-                "give": lambda: f"{who(e.get('from'))} gave {who(e.get('to'))} {counted(e.get('items') or {})}",
-                "craft": lambda: "you made " + ", ".join(e.get("made") or {}) if e.get("name") == self.name else None,
-                "join": lambda: f"{e.get('name')} came in"}.get(t)
-        return text() if text else None
+    def event(self, ev) -> str | None:
+        """An event of the window in words (rl/facts.py told); chat has its own line, and of crafts only its own count."""
+        return None if isinstance(ev, Say) or (isinstance(ev, Craft) and ev.name != self.name) else told(ev, self.who)
 
     def text(self) -> str:
         obs, now = self.obs, time.monotonic()
@@ -171,16 +144,15 @@ class Now:
         out = [f"You: health {me.get('hp')}/20" + (f" (was {hp0} {ago})" if hp0 != me.get("hp") else "")
                + f", food {me.get('hunger')}/20" + (f" (was {food0} {ago})" if food0 != me.get("hunger") else "")
                + (f". {obs['time']}." if obs.get("time") else ".")]
-        beings = sorted(obs.get("entities", []), key=lambda b: max(abs(b["dx"]), abs(b["dy"])))
+        beings = sorted(obs.get("entities", []), key=dist)
         near = []
         for kind in dict.fromkeys(b["kind"] for b in beings if b.get("kind") != "agent"):
-            d = [max(abs(b["dx"]), abs(b["dy"])) for b in beings if b["kind"] == kind]
+            d = [round(dist(b)) for b in beings if b["kind"] == kind]
             near.append(f"{len(d)} {kind}{' (foe)' if kind in HOSTILE else ''} {d[0]}" + (f"-{d[-1]}" if d[-1] != d[0] else "")
                         + " tiles away")
-        for b in beings:
-            if b.get("kind") == "agent":
-                near.append(f"{b.get('name')} {compass(b['dx'], b['dy'])}, health {b.get('hp')}, holding {b.get('holding') or 'nothing'}, "
-                            f"doing: {b.get('doing') or 'idle'} (so far: {self.person(b.get('name'))})")
+        for b in people(obs):
+            near.append(f"{b.get('name')} {compass(b['dx'], b['dy'])}, health {b.get('hp')}, holding {b.get('holding') or 'nothing'}, "
+                        f"doing: {b.get('doing') or 'idle'} (so far: {self.person(b.get('name'))})")
         out.append("Near you: " + ("; ".join(near) if near else "nobody, no creature") + ".")
         seen = Counter(p for _, e in self.past if (p := self.event(e)))
         if seen:
@@ -193,7 +165,7 @@ class Now:
         if got or lost:
             out.append(f"Since {ago}: " + "; ".join(p for p in (got and "you got " + counted(got),
                                                                    lost and "you used or lost " + counted(lost)) if p) + ".")
-        chat = [f'{self.who(e.get("from"))}: "{str(e.get("text", ""))[:80]}"' for _, e in self.past if e.get("type") in ("say", "shout")]
+        chat = [told(ev, self.who) for _, ev in self.past if isinstance(ev, Say)]
         if chat:
             out.append("Said near you lately: " + " | ".join(chat[-4:]))
         out.append("Places you know: " + places(obs, self.signs))
@@ -247,9 +219,9 @@ class Voice:
         if doing:
             out.append(f"You are after: {doing}.")
         inv = (self.now.obs.get("self") or {}).get("inventory") or {}
-        named = self.now.named(" ".join(t for _, t, _ in heard))
-        if named:
-            out.append("You carry " + ", ".join(f"{inv.get(k, 0)} {k}" for k in named[:4]) + ".")
+        asked = named(" ".join(t for _, t, _ in heard), self.now.items)
+        if asked:
+            out.append("You carry " + ", ".join(f"{inv.get(k, 0)} {k}" for k in asked[:4]) + ".")
         return "\n".join(out)
 
     async def line(self, heard: list, doing: str = "", kind="reply") -> str:

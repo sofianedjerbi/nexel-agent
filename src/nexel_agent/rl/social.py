@@ -4,6 +4,7 @@ each per episode, a few in two hundred: never per message, nothing for talking m
 from it here."""
 
 from megastructure.sim.constants import SAY_R, sec
+from .facts import Attack, Give, Say, events, named
 
 ADDRESSED_S = sec(6)          # "answered someone": said something this soon after being spoken to
 TALK_GAP = sec(30)            # a chat cooldown, the same for every speaker: a line once spoken to, or 30 s after the last
@@ -15,7 +16,7 @@ NEAR_WORK = 6
 
 class SocialMemory:
     def __init__(self, me: str, items):
-        self.me, self.items = me, tuple(sorted(items, key=len, reverse=True))     # (longest first: "stone_block" before "stone")
+        self.me, self.items = me, tuple(items)
         self.said_to_me = -10 ** 9
         self.asked, self.asked_by, self.asked_at = None, None, -10 ** 9
         self.got_from: set[str] = set()       # who gave me something
@@ -30,27 +31,25 @@ class SocialMemory:
     def see(self, obs: dict):
         tick = obs["tick"]
         self.got_now, self.got_by = {}, {}
-        for e in obs.get("events", []):
-            who = e.get("from")
-            if e.get("type") in ("say", "shout") and who and who != self.me:
-                self.said_to_me = e.get("tick", tick)
-                text = str(e.get("text", "")).lower().replace(" ", "_")
-                it = next((i for i in self.items if i in text), None)
-                if it:
-                    self.asked, self.asked_by, self.asked_at = it, who, e.get("tick", tick)
-            elif e.get("type") in ("say", "shout") and who == self.me:
-                self.my_last = e.get("tick", tick)
-            elif e.get("type") == "attack":
-                if e.get("target") == self.me and e.get("attacker"):
-                    self.hit_me[e["attacker"]] = e.get("tick", tick)
-                    self.last_hit = (e["attacker"], e.get("id"), e.get("tick", tick))      # (a creature's blow says its id)
-                elif e.get("attacker") == self.me and e.get("target"):
-                    self.i_hit[e["target"]] = e.get("tick", tick)
-            elif e.get("type") == "give" and e.get("to") == self.me and who:
-                self.got_from.add(who)
-                for k, n in (e.get("items") or {}).items():
-                    self.got_now[k] = self.got_now.get(k, 0) + n
-                    self.got_by.setdefault(who, {})[k] = self.got_by.get(who, {}).get(k, 0) + n
+        for ev in events(obs):
+            t = tick if ev.tick is None else ev.tick
+            match ev:
+                case Say(src=who) if who == self.me:
+                    self.my_last = t
+                case Say(src=who) if who:
+                    self.said_to_me = t
+                    if it := next(iter(named(ev.text, self.items)), None):
+                        self.asked, self.asked_by, self.asked_at = it, who, t
+                case Attack(by=by, target=tgt) if tgt == self.me and by:
+                    self.hit_me[by] = t
+                    self.last_hit = (by, ev.id, t)                  # (a creature's blow says its id)
+                case Attack(by=by, target=tgt) if by == self.me and tgt:
+                    self.i_hit[tgt] = t
+                case Give(src=who, to=to) if to == self.me and who:
+                    self.got_from.add(who)
+                    for k, n in ev.items.items():
+                        self.got_now[k] = self.got_now.get(k, 0) + n
+                        self.got_by.setdefault(who, {})[k] = self.got_by.get(who, {}).get(k, 0) + n
 
     def can_talk(self, tick) -> bool:
         """The chat cooldown (an interface limit, the same for anyone who talks): spoken to since my last line, or my

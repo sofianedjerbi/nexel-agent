@@ -70,7 +70,7 @@ def test_places_are_only_real_ones():
     from nexel_agent.rl.voice import places
     obs = {"self": {"x": 0, "y": 0, "spawn": [0, 20], "in_cave": False}, "grid": ["~T.", ".@."],
            "legend": {"~": "water", "T": "tree", ".": "grass", "@": "you"}}
-    assert places(obs, {(5, -5): "mira's camp"}) == 'a sign "mira\'s camp" 5 tiles NE; your spawn point 20 tiles S; in sight: water, tree'
+    assert places(obs, {(5, -5): "mira's camp"}) == 'a sign "mira\'s camp" 7 tiles NE; your spawn point 20 tiles S; in sight: water, tree'
     assert places({"self": {"x": 0, "y": 0}, "grid": ["."], "legend": {".": "grass"}}, {}) == "none"
 
 

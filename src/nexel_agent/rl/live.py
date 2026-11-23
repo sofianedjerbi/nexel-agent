@@ -18,10 +18,10 @@ from pathlib import Path
 import numpy as np
 
 from megastructure.client import Client
-from .achieve import HOSTILE
 from .brain import Brain
 from .core import split
 from .encode import ACTIONS, ITEMS, N_NEAR, action_name, encode, legal, to_command
+from .facts import HOSTILE, Say, dist, events
 from .social import SocialMemory
 from .mind import goal_text
 from .voice import Now, Voice
@@ -70,7 +70,7 @@ class LiveBody:
                 if args.get("target") in self.foes:
                     self.stats["won"] += 1
                     self.foes.pop(args["target"])
-        near = min((math.hypot(b["dx"], b["dy"]) for b in self.obs_entities if b.get("kind") == "agent"), default=99)
+        near = min((dist(b) for b in self.obs_entities if b.get("kind") == "agent"), default=99)
         self.social_done |= set(self.social.achieved(tool, args, bool(r.get("ok")), self.tick, near,
                                                      (r.get("result") or {}).get("to")))
         self.last_ok = 1.0 if r.get("ok") else -1.0
@@ -116,9 +116,9 @@ class LiveBody:
         """Each observation: into what is happening now; someone spoke: a salient event, straight to the voice
         (rl/voice.py: a burst of lines gets one answer), whose reply, if any, is said."""
         self.now.see(obs)
-        for e in obs.get("events", []):
-            if self.voice and e.get("type") in ("say", "shout") and e.get("from") != self.a.name:
-                self.voice.hear(e.get("from"), str(e.get("text", ""))[:200], self.say, self.doing)
+        for ev in events(obs) if self.voice else ():
+            if isinstance(ev, Say) and ev.src != self.a.name:
+                self.voice.hear(ev.src, ev.text[:200], self.say, self.doing)
 
     async def say(self, line):
         await self.game.act("say", text=line)
@@ -182,7 +182,7 @@ class LiveBody:
                     self.foes.clear()
                 if self.hurt > 0:
                     self.stats["hits"] += 1
-                    foe = next((b for b in obs.get("entities", []) if b.get("kind") in HOSTILE + ("agent",) and math.hypot(b["dx"], b["dy"]) <= 5), None)
+                    foe = next((b for b in obs.get("entities", []) if b.get("kind") in HOSTILE + ("agent",) and dist(b) <= 5), None)
                     if foe:
                         self.foes[foe["id"]] = foe["kind"]
                 hp, deaths = me["hp"], me["deaths"]
