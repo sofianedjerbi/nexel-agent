@@ -5,6 +5,14 @@ Written by [python-semantic-release](https://python-semantic-release.readthedocs
 
 <!-- version list -->
 
+## v0.4.0 (2026-11-23)
+
+### Features
+
+- **rl**: Ship Rook's trained body in models/rook.npz, the default policy
+  ([`b4df5fd`](https://github.com/sofianedjerbi/nexel-agent/commit/b4df5fd635979e9d60c2c3abc586f7d5dfa98645))
+
+
 ## v0.3.0 (2026-11-23)
 
 ### Features

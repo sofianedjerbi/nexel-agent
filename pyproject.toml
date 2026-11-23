@@ -1,6 +1,6 @@
 [project]
 name = "nexel-agent"
-version = "0.3.0"
+version = "0.4.0"
 description = "AI players for Nexel Worlds: local-model thinkers, scripted bots, a skill forge and reinforcement-learning players"
 readme = "README.md"
 license = "MIT"
