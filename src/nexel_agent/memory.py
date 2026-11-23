@@ -39,12 +39,13 @@ class Memory:
         self.summaries: list = d.get("summaries", [])
         self.next_id: int = d.get("next_id", 1)
         self.last_summary: float = d.get("last_summary", self.now())
+        self.places: dict = {k: tuple(v) for k, v in d.get("places", {}).items()}   # kind -> where last seen
 
     def save(self):
         if self.path:
             self.path.write_text(json.dumps({"episodes": self.episodes, "notes": self.notes, "people": self.people,
                                              "summaries": self.summaries, "next_id": self.next_id,
-                                             "last_summary": self.last_summary}))
+                                             "last_summary": self.last_summary, "places": self.places}))
 
     # ------------------------------------------------------------ writing
     def add(self, kind: str, text: str, who: str | None = None, at=None, when: str = ""):

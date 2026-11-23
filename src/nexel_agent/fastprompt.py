@@ -65,7 +65,8 @@ Answer with ONE JSON object and nothing else:
 {{"goal":"<2-5 words>","done_when":{{<test>}},"do":["<command>", 2 to 6 commands]}}
 done_when is your goal's own test, checked after every action: "have": {{"wood": 8}} | "placed": "workbench" |
 "near": "workbench" | "at": [x, y] | "hp_at_least": 15 | "food_at_least": 12 (several keys: all must hold).
-The plan runs to its end, to its first failure, or until one of your cards fires.
+The plan runs to its end, to its first failure, or until one of your cards fires; "repeat": N plays it again up to
+N times while done_when does not hold (a failure ends it).
 Example: {{"goal":"get wood","done_when":{{"have":{{"wood":6}}}},"do":["dig_at tree","dig_at tree"]}} (a dig takes a whole tree)
 Your memory is yours: "remember TEXT" keeps a note (a place, a person, a promise), "forget N" drops note [N].
 "Near" says for each thing where you can stand next to it and which way it is from there."""

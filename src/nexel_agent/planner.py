@@ -25,6 +25,10 @@ from .sim.specs import LEGEND
 
 log = logging.getLogger("thinker")
 MAX_PLAN = 6                                     # commands taken from one answer
+KNOWN = {"tree", "rock", "berry bush", "bare bush", "thicket", "fruit tree", "ore", "mushroom", "workbench", "campfire",
+         "water", "chest", "bed"}
+AHEAD = 3                                        # the next call is always in flight unless this many commands wait
+FAIL_WINDOW_S = 60.0
 LOCAL = set(LOCAL_SPECS)                         # remember / forget: the harness keeps them, the game never sees them
 
 
@@ -57,6 +61,7 @@ class Item:
     why: str = ""
     at: tuple | None = None     # where the plan expected to stand for a relative (dir) command
     epoch: int = 0
+    plan: int = 0               # which answer it came from (repeats, failures of the same plan)
 
 
 class Planner(Chat):
@@ -67,28 +72,38 @@ class Planner(Chat):
         me = obs["self"]
         self.record.seen(me["inventory"], time.time())
         obs = {**obs, "_seen": self.look_around(obs)}
+        self.mem.save()
         names = [e["name"] for e in obs["entities"] if e["kind"] == "agent"]
         recall = self.mem.relevant(self.goal or "", (me["x"], me["y"]), names, k=3)
         people = [self.mem.person_text(n) for n in names[:2] if n in self.mem.people]
         if diary := self.mem.summary_text():
             recall = [f"diary: {diary[:220]}"] + recall
+        if known := self.known_places(obs):
+            recall = [known] + recall
         user = compact_obs(obs, goal=self.goal, record=self.record, heard=list(self.heard)[-3:], history=list(self.history),
                            pending=list(pending), notes=" ".join(filter(None, [self.mem.notes_text(),
                            (f"Your cards: {cards}" if (cards := self.cards.text(3)) else "")])), lessons=" | ".join(f[:110] for f in fails),
                            danger=danger_lines(obs, self.body), recall=people + recall, goal_line=self.goal_line(obs),
-                           habit=" ".join(filter(None, [stuck(obs, self.memory) and stuck_line(obs),
+                           habit=" ".join(filter(None, [stuck(obs, self.memory) and stuck_line(obs), self.fail_facts(),
                                                         f"Of your last 20 commands: {', '.join(habit)}." if habit else ""])))
         return [{"role": "system", "content": self.prefix}, {"role": "user", "content": user}]
 
     def look_around(self, obs) -> dict:
         """Where each kind of thing was last seen (from every view and look_far): the player's own map memory."""
-        seen = self.memory.setdefault("seen", {})
+        seen = self.memory["seen"] = self.mem.places         # (kept in memory.json: it survives a restart)
         g, r, me = obs["grid"], len(obs["grid"]) // 2, obs["self"]
         for j, row in enumerate(g):
             for i, ch in enumerate(row):
                 if ch in "TMbvHQF*&^~":
                     seen[LEGEND.get(ch, ch).split(" (")[0].replace("_", " ")] = (me["x"] - r + i, me["y"] - r + j)
         return seen
+
+    def known_places(self, obs) -> str:
+        """Things not in view now and where they were last seen (the view, look_far), nearest first."""
+        me, view = obs["self"], {LEGEND.get(c, c).split(" (")[0].replace("_", " ") for row in obs["grid"] for c in row}
+        far = sorted((abs(p[0] - me["x"]) + abs(p[1] - me["y"]), k, p) for k, p in self.mem.places.items()
+                     if k not in view and k in KNOWN)
+        return ("seen before, out of view: " + ", ".join(f"{k} ({p[0]},{p[1]}) {d} tiles" for d, k, p in far[:5])) if far else ""
 
     def item(self, tool, args, source, why="") -> Item:
         return Item(tool, args, source, why, None, self.epoch)
@@ -144,20 +159,28 @@ class Planner(Chat):
             self.stats["goals_done"] += 1
             self.goal_test = None
 
-    def local(self, item, obs) -> dict:
-        """remember / forget / drop_card: the model's own memory and cards, kept by the harness (no game action)."""
-        me = obs["self"]
-        if item.tool == "remember":
-            n = self.mem.remember(str(item.args.get("text", "")), (me["x"], me["y"]), str(obs.get("time", "")))
-            return {"ok": True, "result": {"ticks": 0, "changed": {}, "text": f"noted [{n}]"}}
-        n = item.args.get("n")
-        if item.tool == "drop_card":
-            ok = self.cards.drop(n)
-            return {"ok": True, "result": {"ticks": 0, "changed": {}, "text": f"card [{n}] dropped"}} if ok else \
-                {"ok": False, "error": "no_card", "detail": f"no card [{n}]"}
-        if isinstance(n, int) and self.mem.forget(n):
-            return {"ok": True, "result": {"ticks": 0, "changed": {}, "text": f"forgot [{n}]"}}
-        return {"ok": False, "error": "no_note", "detail": f"no note [{n}]; your notes: {self.mem.notes_text() or 'none'}"}
+    def replay(self) -> bool:
+        """The plan said "repeat": with nothing else queued and its goal's test not yet holding, play it again."""
+        rep = getattr(self, "repeat", None)
+        test = getattr(self, "goal_test", None)
+        if not rep or rep["left"] <= 0 or not test or not self.obs or not missing(test, self.obs, self.record, self.goal_since):
+            return False
+        rep["left"] -= 1
+        self.queue.extend(Item(t, a, "model", f"repeat ({rep['left']} left)", None, self.epoch, rep["pid"]) for t, a in rep["cmds"])
+        self.stats["repeats"] += 1
+        return True
+
+    def plan_failed(self, item, error):
+        """A command of plan N failed: kept for the fact 'this plan failed k times in the last minute'; its repeat ends."""
+        self.plan_fails = [f for f in getattr(self, "plan_fails", []) if time.time() - f[0] < FAIL_WINDOW_S]
+        self.plan_fails.append((time.time(), tuple(getattr(self, "plans", {}).get(item.plan, ())), f"{command_text(item.tool, item.args)}: {error}"))
+        if getattr(self, "repeat", None) and self.repeat["pid"] == item.plan:
+            self.repeat = None
+
+    def fail_facts(self) -> str:
+        c = Counter(p for t, p, _ in getattr(self, "plan_fails", []) if p and time.time() - t < FAIL_WINDOW_S)
+        last = {p: e for _, p, e in getattr(self, "plan_fails", [])}
+        return " ".join(f"The plan '{', '.join(p)}' failed {n} times in the last minute (last: {last[p]})." for p, n in c.most_common(2) if n >= 2)
 
     def tell(self, line: str):
         """A line for the model's 'Done' list, once (not the same warning four times over)."""
@@ -174,7 +197,7 @@ class Planner(Chat):
     # ------------------------------------------------------------ planner
     async def plan_loop(self, http):
         while True:
-            while self.obs is None or sum(i.source == "model" for i in self.queue) > self.refill_at:
+            while self.obs is None or sum(i.source == "model" for i in self.queue) >= AHEAD:
                 await asyncio.sleep(0.05)
             try:
                 self.planning = True
@@ -191,7 +214,9 @@ class Planner(Chat):
                 log.warning("%s: diary %r", self.name, e)
 
     async def plan_once(self, http):
-        snap, epoch = self.obs, self.epoch
+        snap, epoch, hard = self.obs, self.epoch, getattr(self, "hard_aborts", 0)
+        self.plan_id = pid = getattr(self, "plan_id", 0) + 1
+        self.plans = getattr(self, "plans", {})
         mine = [i for i in self.queue if i.source == "model"]
         at = (snap["self"]["x"], snap["self"]["y"])       # where the plan was made: its first relative command is meant from here
         if any(i.tool in ("move_to", "step", "walk", "jump", "dig_down") for i in mine):
@@ -202,6 +227,8 @@ class Planner(Chat):
         n_ok = n_bad = 0
         stale = False
         plan: list[str] = []                     # this answer's commands, as written
+        self.plans[pid] = plan
+        parsed: list = []
         ahead = [command_text(i.tool, i.args) for i in ([self.current] if self.current else []) + mine]
 
         def take(raw):
@@ -213,6 +240,7 @@ class Planner(Chat):
             tool, args = c
             text = command_text(tool, args)
             plan.append(text)
+            parsed.append(c)
             if plan == ahead[:len(plan)]:       # the plan already running, asked again: it goes on, not from the start
                 self.stats["dup_dropped"] += 1
                 n_ok += 1
@@ -222,7 +250,7 @@ class Planner(Chat):
                 self.stats["noop_dropped"] += 1  # already standing there
                 n_ok += 1
                 return
-            self.queue.append(Item(tool, args, "model", ps.goal or "", at if "dir" in args else None, epoch))
+            self.queue.append(Item(tool, args, "model", ps.goal or "", at if "dir" in args else None, self.epoch, pid))
             n_ok += 1
             first_cmd = first_cmd or time.monotonic() - t0
             if tool in ("move_to", "step", "walk", "jump", "dig_down"):
@@ -241,8 +269,8 @@ class Planner(Chat):
                     piece = (ch.get("delta") or {}).get("content") or ""
                     if piece:
                         ttft = ttft or time.monotonic() - t0
-                    if self.epoch != epoch:
-                        stale = True
+                    if getattr(self, "hard_aborts", 0) != hard:   # (a hit, a card, a chat: made before it, dropped;
+                        stale = True                                 # a failed command: the plan streaming goes on)
                         break
                     for raw in ps.feed(piece):
                         if not stale:
@@ -256,6 +284,7 @@ class Planner(Chat):
                 self.set_goal(ps.goal, ps.done_when)
             if ps.note:
                 self.add_note(ps.note)
+            self.repeat = {"pid": pid, "cmds": parsed, "left": min(int(ps.repeat), 20)} if ps.repeat and parsed else None
             n = self.watch.arrived(tuple(plan), self.obs["self"]["inventory"]) if plan else 0
             if n >= TOLD:                        # asked again, and the pack is as it was when it came last time
                 self.tell(did_nothing(tuple(plan), self.last_skip))

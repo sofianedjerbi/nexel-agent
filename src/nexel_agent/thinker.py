@@ -89,7 +89,11 @@ class Thinker(Planner, React, Verbs):
                           str((self.obs or {}).get("time", "")))
 
     # --------------------------------------------------------------- body
-    def abort(self, why: str, tell: bool = True):
+    def abort(self, why: str, tell: bool = True, soft: bool = False):
+        """Drop the queued plan. A hard abort (a hit, a card, a chat, a death) also drops the plan still streaming; a
+        soft one (a command failed) lets it come in."""
+        if not soft:
+            self.hard_aborts = getattr(self, "hard_aborts", 0) + 1
         if any(i.source == "model" for i in self.queue) or self.planning:
             self.stats["aborts"] += 1
             if tell:
@@ -153,6 +157,8 @@ class Thinker(Planner, React, Verbs):
                 self.abort(f"'{command_text(it.tool, it.args)}' failed a moment ago")
                 return None
             return it
+        if self.replay():                                 # (the model's own "repeat")
+            return self.next_item(obs)
         return None
 
     async def body_loop(self, game):
@@ -222,7 +228,9 @@ class Thinker(Planner, React, Verbs):
         self.history.append(line[:170])
         note_outcome(self.memory, obs, item, reply, t1)
         if not ok and reply.get("error") != "interrupted":
-            self.abort(f"{command_text(item.tool, item.args)} failed: {reply.get('error')}", tell=False)   # (its line says so)
+            self.abort(f"{command_text(item.tool, item.args)} failed: {reply.get('error')}", tell=False, soft=True)
+            if item.source == "model":
+                self.plan_failed(item, reply.get("error"))
         self._log(item, obs, reply, line, t0)
         if not ok and t1 - t0 < 0.15:
             await asyncio.sleep(0.25)                    # a refusal takes no time: do not hammer the server

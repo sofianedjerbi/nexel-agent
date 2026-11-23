@@ -111,6 +111,7 @@ class PlanStream:
         self.goal = None
         self.note = None
         self.done_when = None
+        self.repeat = 0
 
     def feed(self, piece: str) -> list:
         self.text += piece
@@ -152,6 +153,8 @@ class PlanStream:
             self.goal = self.goal or (d.get("goal") if isinstance(d.get("goal"), str) else None)
             self.note = d.get("note") if isinstance(d.get("note"), str) else None
             self.done_when = d.get("done_when") if isinstance(d.get("done_when"), dict) else None
+            r = d.get("repeat")
+            self.repeat = (5 if r is True else int(r) if isinstance(r, (int, float)) and not isinstance(r, bool) else 0)
             todo = d.get("do") if isinstance(d.get("do"), list) else ([d] if "tool" in d else [])
             new = todo[self.sent:]
             self.sent = max(self.sent, len(todo))

@@ -148,3 +148,6 @@ def test_what_was_seen_before_is_remembered_where_it_was(tmp_path):
     t.goal = "craft workbench"
     user = t.plan_messages(fake_obs((30, 0), tree=False))[1]["content"]
     assert "wood comes from tree or stump or bare fruit tree: none in view; last seen: tree at (0,-2)" in user
+    assert "seen before, out of view: tree (0,-2) 32 tiles, rock (4,2) 28 tiles" in user.replace("rock (4,2) 28 tiles, tree (0,-2) 32 tiles", "tree (0,-2) 32 tiles, rock (4,2) 28 tiles")
+    from megastructure.memory import Memory
+    assert Memory(tmp_path / "Vex" / "memory.json").places["tree"] == (0, -2)            # (kept across a restart)
