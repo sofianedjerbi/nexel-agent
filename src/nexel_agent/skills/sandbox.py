@@ -64,6 +64,7 @@ class Sandbox:
             raise Budget(f"budget spent ({len(self.trace)} actions, {time.monotonic() - self.t0:.0f} s)")
         cmd = " ".join(str(x) for x in (command, *more))
         r = self.do(cmd)
+        self.last_reply = r
         short = r.get("error") and f"FAILED {r.get('error')}: {str(r.get('detail'))[:90]}" or "ok " + str(
             ((r.get("result") or {}).get("changed") or {}).get("inventory") or (r.get("result") or {}).get("text") or "")[:90]
         self.trace.append(f"{cmd} -> {short}")
@@ -88,7 +89,7 @@ class Sandbox:
 
     def run(self, name, src, args=(), library=None) -> dict:
         """Run skill `name` (src, plus the library). {value, error, trace, seconds}."""
-        self.trace, self.t0 = [], time.monotonic()
+        self.trace, self.t0, self.last_reply = [], time.monotonic(), None
         err = check(name, src)
         if err:
             return {"value": None, "error": err, "trace": [], "seconds": 0.0}
@@ -115,4 +116,5 @@ class Sandbox:
             value, error = None, f"{type(e).__name__}: {e} ({where})"
         finally:
             sys.settrace(old)
-        return {"value": value, "error": error, "trace": self.trace, "seconds": round(time.monotonic() - self.t0, 2)}
+        return {"value": value, "error": error, "trace": self.trace, "seconds": round(time.monotonic() - self.t0, 2),
+                "last_reply": self.last_reply}

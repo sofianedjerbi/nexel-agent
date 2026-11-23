@@ -141,7 +141,9 @@ def forge(url, lib: Library, tries=4, only=None, author="forge", log=print, redo
             msgs = msgs[:2] + [{"role": "assistant", "content": f"```python\n{src}\n```"},   # (only the last try: a short context)
                      {"role": "user", "content": f"It passed in {ok} of {len(res)} worlds. In world {bad[0]}: "
                       + (f"error: {bad[2]['error']}. " if bad[2]["error"] else f"it returned {bad[2]['value']!r}. ")
-                      + "Last actions:\n" + "\n".join(bad[2]["trace"][-12:]) + f"\nAt the end: {state_from(bad)}. "
+                      + "Last actions:\n" + "\n".join(bad[2]["trace"][-12:])
+                      + f"\nThe last reply, as your code got it: {json.dumps(bad[2].get('last_reply'), default=str)[:600]}"
+                      + f"\nAt the end: {state_from(bad)}. "
                       f"Test: {json.dumps(test)}. Reason in a ```text block about the cause, then write the fixed function."}]
         row["ok"] = any(int(a["pass"].split("/")[0]) >= PASS for a in row["attempts"])
         rows.append(row)
