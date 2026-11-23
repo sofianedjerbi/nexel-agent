@@ -18,7 +18,7 @@ import time
 from pathlib import Path
 
 from .sim.specs import LEGEND
-from .plans import _first_object
+from .plans import _first_object, parse_command
 
 KEYS = {"being", "within", "hit_by", "hp_below", "food_below", "night", "in_water"}
 COOLDOWN_S = 3.0
@@ -43,7 +43,10 @@ def valid(card) -> dict | None:
     for k in ("being", "hit_by"):
         if k in when:
             when[k] = str(when[k]).lower().removeprefix("a ").strip()
-    return {"when": when, "do": [d.strip()[:80] for d in do[:3]], "why": str(card.get("why", ""))[:120]}
+    do = [d.strip()[:80] for d in do[:3] if runs(fill(d.strip(), {"id": 1, "name": "x", "x": 0, "y": 0}, {"x": 0, "y": 0}))]
+    if not do:
+        return None                                   # (no command in it that runs)
+    return {"when": when, "do": do, "why": str(card.get("why", ""))[:120]}
 
 
 class Cards:
@@ -141,9 +144,10 @@ def card_request(name, persona, kinds, situation, rules) -> list[dict]:
     seen = "\n".join(f"- {k}: {LEGEND.get(c, k)}" for k, c in kinds)
     sys_ = (f"You are {name}. Who you are: {persona}\n{rules}\nYou react in real time through reaction cards you write "
             "yourself: when the situation in `when` holds, the commands in `do` run at once, before you think.\n"
-            'A card: {"when": {...}, "do": ["<command>", ...], "why": "<short>"}. `when` keys (all must hold): being '
-            "(a kind or a name or \"any\"), within (tiles), hit_by (a name, a kind or \"any\"), hp_below, food_below, "
-            "night (true/false), in_water (true/false). In `do`, {id} {name} {x} {y} are the being that set it off. "
+            'A card: {"when": {...}, "do": ["<command>", ...], "why": "<short>"}. `when` has only the keys the card '
+            "needs, and all of them must hold: being (a kind or a name or \"any\"), within (tiles), hit_by (a name, a "
+            "kind or \"any\"), hp_below, food_below, night (true/false), in_water (true/false). Each `do` item is one "
+            "whole command, e.g. \"attack {id}\"; {id} {name} {x} {y} are the being that set it off. "
             "Commands: attack ID [with WEAPON], move_away TARGET [N], go_next_to TARGET, eat ITEM, say TEXT, "
             "move_to X Y, place_near ITEM.\nAnswer with a JSON list of 1 to 4 cards, nothing else.")
     return [{"role": "system", "content": sys_},
@@ -161,3 +165,10 @@ def parse_cards(text: str) -> list:
             pass
     o = _first_object(text)
     return [o] if o else []
+
+
+def runs(cmd) -> bool:
+    """A whole command: it parses, and a tool that takes arguments got some ("say" alone is not one)."""
+    from .plans import SPECS
+    c = parse_command(cmd)
+    return bool(c) and (bool(c[1]) or not SPECS[c[0]]["args"])

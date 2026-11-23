@@ -77,6 +77,7 @@ def test_a_card_is_data_with_perception_facts_only():
     assert valid({"when": {"hit_by": "a tusker"}, "do": "move_away {id} 10"})["when"] == {"hit_by": "tusker"}
     assert valid({"when": {"mood": "angry"}, "do": ["attack {id}"]}) is None           # not a perception fact
     assert valid({"when": {"within": 3}, "do": []}) is None
+    assert valid({"when": {"within": 3}, "do": ["say", "I will not starve."]}) is None                # no whole command
 
 
 def test_a_card_answers_a_hit_in_a_fraction_of_a_second(tmp_path):
