@@ -74,15 +74,15 @@ class Planner(Chat):
         obs = {**obs, "_seen": self.look_around(obs)}
         self.mem.save()
         names = [e["name"] for e in obs["entities"] if e["kind"] == "agent"]
-        recall = self.mem.relevant(self.goal or "", (me["x"], me["y"]), names, k=3)
+        recall = self.mem.relevant(self.goal or "", (me["x"], me["y"]), names, k=2)
         people = [self.mem.person_text(n) for n in names[:2] if n in self.mem.people]
         if diary := self.mem.summary_text():
-            recall = [f"diary: {diary[:220]}"] + recall
+            recall = [f"diary: {diary[:160]}"] + recall
         if known := self.known_places(obs):
             recall = [known] + recall
         user = compact_obs(obs, goal=self.goal, record=self.record, heard=list(self.heard)[-3:], history=list(self.history),
                            pending=list(pending), notes=" ".join(filter(None, [self.mem.notes_text(),
-                           (f"Your cards: {cards}" if (cards := self.cards.text(3)) else "")])), lessons=" | ".join(f[:110] for f in fails),
+                           (f"Your cards: {cards}" if (cards := self.cards.text(2)) else "")])), lessons=" | ".join(f[:90] for f in fails[-2:]),
                            danger=danger_lines(obs, self.body), recall=people + recall, goal_line=self.goal_line(obs),
                            habit=" ".join(filter(None, [stuck(obs, self.memory) and stuck_line(obs), self.fail_facts(),
                                                         f"Of your last 20 commands: {', '.join(habit)}." if habit else ""])))

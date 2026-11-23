@@ -37,7 +37,8 @@ TOOL_HINTS = {
 }
 
 
-RARE = {"milk", "feed", "name", "post", "open_mail", "unroof", "read_sign", "water", "stop", "dig_down"}   # (not listed: tokens)
+RARE = {"milk", "feed", "name", "post", "open_mail", "unroof", "read_sign", "water", "stop", "dig_down", "leap", "unwear",
+        "write_sign", "shout", "ignite"}   # (not listed: tokens)
 
 
 def stable_prefix(name: str, persona: str) -> str:
