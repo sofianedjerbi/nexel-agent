@@ -5,12 +5,11 @@ swings the strongest weapon you carry at the nearest being, feed gives the first
 wear puts on the first piece you carry (armor first), give hands over what the goal or that person's ask names, ask
 names what the goal needs - the "how" of one action. Only numpy (it runs in the game's Python)."""
 
-import math
-
 import numpy as np
 
 from megastructure.sim.constants import FOOD_MAX, LAYER, VIEW_R
 from . import ring
+from .facts import within
 from megastructure.tiles import ARMOR, BLOCKS, FEED, FILLERS, FOOD, GROUNDS, PLACEABLE, RECIPES, REACH, USE_R, WEAPONS, WEAR
 
 DIRS = ("N", "E", "S", "W")
@@ -47,6 +46,7 @@ def _actions():
 
 ACTIONS = _actions()
 N_ACTIONS = len(ACTIONS)
+RING_I = next(i for i, a in enumerate(ACTIONS) if a[0] == "ring")
 
 
 def action_name(i: int) -> str:
@@ -128,7 +128,7 @@ def to_command(i: int, obs: dict, facing: str, social=None, goal=None):
     if kind == "place":
         return "place", {"dir": facing, "item": arg}
     if kind == "ring":
-        p = ring.plan(obs, GROUND_CH, BLOCK_NAME) or []
+        p = ring.plan(obs, GROUND_CH) or []
         return "ring", {"pieces": [(me["x"] + dx, me["y"] + dy, it) for dx, dy, it in p]}
     if kind == "say":
         return "say", {"text": "hi"}
@@ -204,13 +204,13 @@ def legal(obs: dict, facing: str = "S", social=None, goal=None) -> np.ndarray:
             e = (social.hitter(obs) if social else None) if arg == "back" else (ents[arg or 0] if len(ents) > (arg or 0) else None)
             if e is not None and e.get("kind") != "wisp":
                 dz = (LEVEL.get(hs[VIEW_R + e["dy"]][VIEW_R + e["dx"]], 0) - LEVEL.get(hs[VIEW_R][VIEW_R], 0)) if hs and abs(e["dx"]) <= VIEW_R and abs(e["dy"]) <= VIEW_R else 0
-                m[i] = math.hypot(e["dx"], e["dy"], dz * LAYER) <= REACH.get(weapon, REACH[None])
+                m[i] = within(e, REACH.get(weapon, REACH[None]) + (e.get("kind") == "mossback"), dz * LAYER)   # (the server's reach)
             else:
                 m[i] = False
         elif kind == "pick_up":
             m[i] = any(it["dx"] == 0 and it["dy"] == 0 for it in obs.get("items", []))
         elif kind == "ring":
-            m[i] = ring.plan(obs, GROUND_CH, BLOCK_NAME) is not None
+            m[i] = ring.plan(obs, GROUND_CH) is not None
         elif kind == "place":
             m[i] = bool(inv.get(arg)) and not frim and (fch in GROUND_CH or BLOCK_NAME.get(fch) == "flower")
             if arg in ("stairs", "ladder"):

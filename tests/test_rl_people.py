@@ -175,6 +175,17 @@ def test_a_room_it_built():
     assert "roofed_room" not in env.ledger.done
 
 
+def test_the_attack_mask_is_the_servers_reach():
+    env = SimEnv(ep_ticks=10 ** 6, roam=0, rivals=0, shadow_pct=0)
+    env.reset(5)
+    f = neighbour_beside(env)
+    for (dx, dy), can in (((1, 3), True), ((2, 3), False)):      # (3 tiles and the half tile to the far tile's edge)
+        f.a.x, f.a.y, f.a.z = env.a.x + dx, env.a.y + dy, env.sim.height(env.a)
+        env.obs = env.sim.observe(env.a)
+        assert bool(env.encoded()["mask"][idx("attack")]) is can
+        assert env.sim.near(env.a, f.a.x, f.a.y, 3, env.sim.height(f.a)) is can
+
+
 def test_attack_picks_a_slot():
     from nexel_agent.rl.actions import to_command
     obs = {"tick": 0, "self": {"inventory": {}, "z": 0},

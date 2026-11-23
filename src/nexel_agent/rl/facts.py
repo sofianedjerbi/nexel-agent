@@ -24,9 +24,10 @@ def dist(b: dict) -> float:
     return math.hypot(b["dx"], b["dy"])
 
 
-def within(b: dict, r: float) -> bool:
-    """The server's reach test (sim/bodies.py near), on the map: r tiles and the half tile to the far tile's edge."""
-    return b["dx"] ** 2 + b["dy"] ** 2 <= (r + .5) ** 2
+def within(b: dict, r: float, rise: float = 0.0) -> bool:
+    """The server's reach test (sim/bodies.py near): r tiles and the half tile to the far tile's edge; `rise`, the
+    height between you in tiles, is distance too."""
+    return b["dx"] ** 2 + b["dy"] ** 2 + rise ** 2 <= (r + .5) ** 2
 
 
 def compass(dx, dy) -> str:
@@ -96,6 +97,15 @@ class Death(NamedTuple):
     name: str | None
     cause: str | None = None           # the game's own words ("killed by Bob", "starved"): never added to
     tick: int | None = None
+    at: tuple | None = None            # (the sim's own events only: where, and the pack that fell there)
+    dropped: dict | None = None
+
+
+class Took(NamedTuple):                # (pick_up, the sim's own events: what was taken from the ground, where)
+    name: str | None
+    items: dict
+    tick: int | None = None
+    at: tuple | None = None
 
 
 class Fell(NamedTuple):                # (creature_died)
@@ -125,11 +135,16 @@ def _say(e):
     return Say(e.get("from"), str(e.get("text", "")), e.get("type") == "shout", e.get("tick"))
 
 
+def _at(e):
+    return (e["x"], e["y"]) if "x" in e and "y" in e else None
+
+
 PARSERS = {
     "say": _say, "shout": _say,
     "attack": lambda e: Attack(e.get("attacker"), e.get("target"), e.get("damage") or 0, e.get("weapon"), e.get("id"), e.get("tick")),
     "give": lambda e: Give(e.get("from"), e.get("to"), dict(e.get("items") or {}), e.get("tick")),
-    "death": lambda e: Death(e.get("name"), e.get("cause"), e.get("tick")),
+    "death": lambda e: Death(e.get("name"), e.get("cause"), e.get("tick"), _at(e), e.get("dropped")),
+    "pick_up": lambda e: Took(e.get("name"), dict(e.get("items") or {}), e.get("tick"), _at(e)),
     "creature_died": lambda e: Fell(e.get("kind"), e.get("by"), e.get("id"), e.get("tick")),
     "craft": lambda e: Craft(e.get("name"), dict(e.get("made") or {}), e.get("tick")),
     "join": lambda e: Join(e.get("name"), e.get("tick")),
@@ -168,4 +183,6 @@ def told(ev, who=plain) -> str:
             return f"{who(ev.name)} came in"
         case Boss():
             return f"the boss: {ev.what}"
+        case Took():
+            return f"{who(ev.name)} picked up {counted(ev.items)}"
     raise TypeError(ev)

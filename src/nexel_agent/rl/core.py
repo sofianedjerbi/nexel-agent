@@ -11,32 +11,18 @@ from pathlib import Path
 
 from megastructure.sim import Simulation
 from megastructure.sim.constants import DAY_TICKS, VIEW_R
+from . import facts
 from .achieve import HOSTILE, Ledger
-from .encode import ACTIONS, ITEMS, N_NEAR, encode, legal, to_command
+from megastructure.tiles import DIRS
+from .actions import RING_I
+from .encode import ACTIONS, ITEMS, N_ACTIONS, N_NEAR, VEC, encode, legal, to_command
 from .milestones import Milestones
 from .folk import Folk
 from .goals import Goals
 from .rival import Rival
 from .social import HIT_S, SOCIAL, SocialMemory
+from .verbs import FIGHT, split  # noqa: F401 (rl/live.py imports split from here)
 
-
-FIGHT = 12                          # attack: swings at one target, till it falls or gets away (~5 s at most)
-
-
-def split(cmd) -> list:
-    """The tool calls of one action: itself; or, climb, the game's own way up a step: the block over your head dug
-    (if any), the land in front at head height (if any), then a jump that way; or, attack, a fight: swings at that
-    target one after the other (a swing that misses ends it) - at whoever hit it lately; at anyone else, one swing."""
-    tool, args = cmd
-    if tool == "climb":
-        return [("dig", {"dir": "up"}), ("dig", {"dir": args["dir"], "z": args["z"]}), ("jump", {"dir": args["dir"]})]
-    if tool == "ring":                   # (walls round it: one place after another, rl/ring.py)
-        return [("place", {"x": x, "y": y, "item": it}) for x, y, it in args["pieces"]] or [("noop", {})]
-    if tool == "attack" and args.get("fight"):
-        return [cmd] * FIGHT
-    if tool == "attack":                 # (at someone who has not hit it: a single swing; the fight is attack_back's)
-        return [cmd]
-    return [cmd]
 
 DECIDE = 5                          # ticks: an idle noop waits this long
 MIN_TICKS = 2                       # the shortest a decision waits (0.2 s: a step), unless hurt
@@ -50,7 +36,7 @@ OUTCOME = {"won": "defeat_player", "fled": "escape_attack", "endured": "survive_
 class SimEnv:
     def __init__(self, ep_ticks: int = EP_TICKS, decide: int = DECIDE, rivals: int = 1, roam: int = 1,
                  live_seed: int = -1, live_pct: int = 0, folk: int = 2, goals: int = 1, death_ends: int = 1,
-                 shadow_pct: int = 30, thin_pct: int = 0):
+                 shadow_pct: int = 30, thin_pct: int = 0, actions: int = 0, no_ring: int = 0):
         """rivals: a sparring partner (rl/rival.py); roam: start anywhere on the land within 400 tiles, not at the
         world's spawn; live_seed/live_pct: that share of the episodes in the live world's seed (its land, unaltered)."""
         self.ep_ticks, self.decide, self.rivals, self.roam = ep_ticks, decide, rivals, roam
@@ -58,6 +44,8 @@ class SimEnv:
         self.death_ends = death_ends      # 0: as live, a death drops the pack and you wake at your spawn; the episode goes on
         self.shadow_pct = shadow_pct      # the share of episodes a neighbour stays right beside the player all along
         self.thin_pct = thin_pct          # the share of starts laid out like the live save near its players (thin_land)
+        self.actions = actions or N_ACTIONS   # (an older action set: the first `actions`, the obs as it saw them)
+        self.no_ring = no_ring            # (ring never legal: a control run)
         self.sim = None
 
     def reset(self, seed: int):
@@ -94,9 +82,14 @@ class SimEnv:
 
     def encoded(self):
         goal = self.goals.goal if self.goals else None
-        return {**encode(self.obs, self.facing, self.last, self.last_ok, self.hurt, self.social.flags(self.obs), goal,
-                         self.social.people_flags(self.obs, N_NEAR)),
-                "mask": legal(self.obs, self.facing, self.social, goal)}
+        o = {**encode(self.obs, self.facing, self.last, self.last_ok, self.hurt, self.social.flags(self.obs), goal,
+                      self.social.people_flags(self.obs, N_NEAR)),
+             "mask": legal(self.obs, self.facing, self.social, goal)}
+        if self.no_ring:
+            o["mask"][RING_I] = False
+        if self.actions < N_ACTIONS:              # (the late actions' last-action slots are the vector's tail)
+            o["vec"], o["mask"] = o["vec"][:VEC - (N_ACTIONS - self.actions)], o["mask"][:self.actions]
+        return o
 
     def step(self, i: int):
         sim, a, L = self.sim, self.a, self.ledger
@@ -156,7 +149,7 @@ class SimEnv:
             made[k] = made.get(k, 0) + n
         self.taken = {}
         near = min((math.dist((o.x, o.y), (a.x, a.y)) for o in sim.agents.values() if o is not a and o.online), default=99)
-        results = []
+        results, L.counts["own_now"] = [], 0
         for p in [p for p in self.pending if p[0].result is not None]:
             self.pending.remove(p)
             res = p[0].result
@@ -169,6 +162,10 @@ class SimEnv:
                     if sim.tick - self.struck.get(hit.a.name, -10 ** 9) > HIT_S:             # (a new incident: a first strike)
                         L.counts["first_strikes"] = L.counts.get("first_strikes", 0) + 1
                 self.struck[hit.a.name] = sim.tick
+            if p[1] == "place" and res.get("ok") and p[2].get("item") in self.sim.ENCLOSE:
+                self.marks.mine.add(p[2].get("_at"))
+                own = L.counts["own_now"] = L.counts.get("own_now", 0) + 1
+                L.counts["multi_place"] = L.counts.get("multi_place", 0) or int(own >= 2)    # (2+ in one decision)
             if p[1] == "say" and res.get("ok"):
                 L.counts["said"] = L.counts.get("said", 0) + 1
             r += L.result(p[1], p[2], res, p[3], a.hp)
@@ -223,7 +220,11 @@ class SimEnv:
 
     def submit(self, cmd, tool, args, then=None):
         target = self.sim.creatures.get(args.get("target")) if tool == "attack" else None      # (a creature: its kind, for defeat_*)
+        d = DIRS.get(str(args.get("dir", "")).upper())
+        at = None if tool != "place" else (args["x"], args["y"]) if "x" in args else (self.a.x + d[0], self.a.y + d[1]) if d else None
         act = self.sim.submit(self.a, tool, args)
+        if tool == "place":                                 # (where its own piece went: the fill steps count only those)
+            args = {**args, "_at": at}
         self.running = (cmd, act)
         self.then = then
         self.pending.append((act, tool, args, target.kind if target else ""))
@@ -231,13 +232,14 @@ class SimEnv:
 
     def on_event(self, ev):
         """The sim's own events (absolute places): a person's pack falling where they died, and the player picking it up."""
-        if ev.get("type") == "death" and ev.get("name") != self.a.name and ev.get("dropped"):
-            pile = self.piles.setdefault((ev["x"], ev["y"]), {})
-            for k, n in ev["dropped"].items():
+        ev = facts.read(ev)
+        if isinstance(ev, facts.Death) and ev.name != self.a.name and ev.dropped:
+            pile = self.piles.setdefault(ev.at, {})
+            for k, n in ev.dropped.items():
                 pile[k] = pile.get(k, 0) + n
-        elif ev.get("type") == "pick_up" and ev.get("name") == self.a.name and (ev["x"], ev["y"]) in self.piles:
-            pile = self.piles[(ev["x"], ev["y"])]
-            for k, n in (ev.get("items") or {}).items():
+        elif isinstance(ev, facts.Took) and ev.name == self.a.name and ev.at in self.piles:
+            pile = self.piles[ev.at]
+            for k, n in ev.items.items():
                 t = min(n, pile.get(k, 0))
                 if t:
                     pile[k] -= t

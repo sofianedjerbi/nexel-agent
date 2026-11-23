@@ -11,6 +11,9 @@ from .achieve import HOSTILE
 
 ROOM_PIECES = ("wood_wall", "stone_wall", "door", "gate", "fence")
 
+# Steps toward a room, paid once an episode each, less than a room all told (shaping, not achievements): the 8 tiles
+# round it closed by its own pieces, and the wall pieces it holds at once.
+LADDERS = {"fill": {4: 0.2, 6: 0.2, 8: 0.2}, "stock": {4: 0.1, 8: 0.1}}
 EVADE_TICKS = 100          # a foe within 2 tiles, and 10 s later no blow taken since
 
 
@@ -23,6 +26,7 @@ class Milestones:
         self.swim_from = None
         self.near_since, self.last_hit = None, -10 ** 9
         self.been = set()          # cave, depth_5, depth_10: been there, not yet back up in the open
+        self.mine, self.paid = set(), set()        # tiles it put a wall, door or gate on; ladder steps paid
 
     def room(self, most=60):
         """The space round the player closed off by walls, doors and gates (the game's ENCLOSE), small and compact
@@ -45,6 +49,13 @@ class Milestones:
                     seen.add(n)
                     stack.append(n)
         return seen, edge
+
+    def ladder(self, L, name: str, have: int) -> float:
+        """The steps of ladder `name` reached at `have`, each paid once an episode (broken and redone: not again)."""
+        new = [n for n in LADDERS[name] if have >= n and (name, n) not in self.paid]
+        self.paid |= {(name, n) for n in new}
+        L.counts.update({f"{name}_{n}": 1 for n in new})
+        return sum(LADDERS[name][n] for n in new)
 
     def update(self, L, hurt: bool, died: bool) -> float:
         sim, a = self.sim, self.a
@@ -74,6 +85,9 @@ class Milestones:
                 r += u("roofed_room") if sim.world.roof(a.x, a.y) else 0
                 r += u("room_with_door") if any(sim.world.block(*p) in ("door", "gate") for p in edge) else 0
                 r += u("bed_in_room") if any(sim.world.block(*p) == "bed" for p in inside) else 0
+        r += self.ladder(L, "fill", sum((a.x + dx, a.y + dy) in self.mine and sim.world.block(a.x + dx, a.y + dy) in
+                                        sim.ENCLOSE for dx in (-1, 0, 1) for dy in (-1, 0, 1) if dx or dy))
+        r += self.ladder(L, "stock", sum(a.count(w) for w in ("stone_wall", "wood_wall")))
         if a.count("axe") and a.count("pickaxe") and a.count("hoe") and (a.count("spear") or a.count("sword")):
             r += u("toolkit")
         if sim.swimming(a):

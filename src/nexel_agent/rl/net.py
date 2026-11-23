@@ -32,6 +32,15 @@ class GridVec(BaseFeaturesExtractor):
         return self.head(torch.cat([self.cnn(x), self.vec(obs["vec"])], 1))
 
 
+POLICY_KW = dict(features_extractor_class=GridVec, net_arch=dict(pi=[256], vf=[256]))
+
+
+def load(algo, path, custom_objects=None, **kw):
+    """A checkpoint, whatever package it was saved from: its policy kwargs are given here, not unpickled (a run from
+    before the move to nexel_agent names megastructure.rl.net's extractor, which is gone)."""
+    return algo.load(path, device="cpu", custom_objects={"policy_kwargs": POLICY_KW, **(custom_objects or {})}, **kw)
+
+
 def _move_optimizer(optimizer, device):
     for state in optimizer.state.values():
         for k, v in state.items():

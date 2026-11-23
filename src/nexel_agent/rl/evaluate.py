@@ -75,6 +75,9 @@ def metrics(eps: list) -> dict:
             "hits": sum(e["hits"] for e in eps), "hit_neighbour": sum(e.get("hit_neighbour", 0) for e in eps),
             "hit_neighbour_unprovoked": sum(e.get("hit_neighbour_unprovoked", 0) for e in eps),
             "first_strikes": sum(e.get("first_strikes", 0) for e in eps),
+            "fills": "/".join(str(round(sum(e.get(f"fill_{n}", 0) for e in eps) / max(1, len(eps)), 2)) for n in (4, 6, 8)),
+            "stock": "/".join(str(round(sum(e.get(f"stock_{n}", 0) for e in eps) / max(1, len(eps)), 2)) for n in (4, 8)),
+            "multi": round(sum(e.get("multi_place", 0) for e in eps) / max(1, len(eps)), 2),
             "near_min": round(sum(e.get("near_ticks", 0) for e in eps) / TICK_HZ / 60, 1),       # (all episodes)
             "fs_per_near_min": round(sum(e.get("first_strikes", 0) for e in eps)
                                      / max(1e-9, sum(e.get("near_ticks", 0) for e in eps) / TICK_HZ / 60), 3),

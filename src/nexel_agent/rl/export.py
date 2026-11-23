@@ -7,16 +7,16 @@ import sys
 import numpy as np
 import torch
 
-from .net import HybridMaskablePPO, HybridPPO
+from .net import HybridMaskablePPO, HybridPPO, load
 from .npolicy import NumpyPolicy
 from .vec import PipeVecEnv
 
 
 def export(src: str, dst: str):
     try:
-        model = HybridMaskablePPO.load(src, device="cpu")
+        model = load(HybridMaskablePPO, src)
     except Exception:
-        model = HybridPPO.load(src, device="cpu")
+        model = load(HybridPPO, src)
     sd = {k: v.detach().cpu().numpy() for k, v in model.policy.state_dict().items()
           if k.startswith(("features_extractor.", "mlp_extractor.policy_net", "action_net"))}
     np.savez(dst, **sd)

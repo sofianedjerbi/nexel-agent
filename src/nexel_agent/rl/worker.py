@@ -30,8 +30,9 @@ def main():
     env = SimEnv(**{k: int(v) for k, v in (a.split("=") for a in sys.argv[1:])})
     while (msg := read(inp)) is not None:
         if msg[0] == "spec":
-            write(out, {"n_actions": N_ACTIONS, "n_chars": N_CHARS, "side": SIDE, "vec": VEC,
-                        "names": [action_name(i) for i in range(N_ACTIONS)], "achievements": list(ACHIEVEMENTS)})
+            n = env.actions
+            write(out, {"n_actions": n, "n_chars": N_CHARS, "side": SIDE, "vec": VEC - (N_ACTIONS - n),
+                        "names": [action_name(i) for i in range(n)], "achievements": list(ACHIEVEMENTS)})
         elif msg[0] == "reset":
             write(out, env.reset(msg[1]))
         elif msg[0] == "step":
