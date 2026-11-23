@@ -102,10 +102,10 @@ class Planner(Chat):
             self.mem.add("place", f"you placed a {item.args['item']} ({item.args.get('dir')} of where you stood)",
                          None, (me["x"], me["y"]), str(obs.get("time", "")))
         if ok and item.tool == "look_far":
-            return look_far_line(item.args, reply.get("result") or {})
+            return look_far_line(item.args, reply.get("result") or {}, obs["self"], self.memory.setdefault("seen", {}))
         if ok or reply.get("error") == "interrupted":
             return summarize_result(item.tool, item.args, reply)
-        return failure_line(item.tool, item.args, reply, obs)
+        return failure_line(item.tool, item.args, reply, {**obs, "_seen": self.memory.get("seen", {})})
 
     def set_goal(self, goal, test):
         """A new goal and its own success test (goals.py), checked after every action."""

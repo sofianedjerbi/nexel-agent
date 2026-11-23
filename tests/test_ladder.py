@@ -122,6 +122,13 @@ def test_the_next_plan_reads_what_failed(tmp_path):
 def test_look_far_says_what_is_out_there():
     res = {"rows_near_to_far": ["....", "..T.", "M...", "~~~~"], "agents": [{"name": "Ana", "dx": 3, "dy": -20}]}
     assert look_far_line({"dir": "N"}, res) == "look_far N -> tree ~13 tiles, rock ~15 tiles; water from ~17 tiles; people: Ana (+3,-20) (N of you)"
+    seen = {}
+    line = look_far_line({"dir": "N"}, res, {"x": 0, "y": 0}, seen)
+    assert "tree ~13 tiles at (-4,-13)" in line and seen["tree"] == (-4, -13)
+    o = world({})
+    o["_seen"] = seen
+    far = failure_line("dig_at", {"text": "tree"}, {"ok": False, "error": "not_found", "detail": "no 'tree' in view"}, o)
+    assert "you saw one far off with look_far at (-4,-13)" in far
     assert look_far_line({"dir": "E"}, {"rows_near_to_far": ["..b."]}) == "look_far E -> berry_bush ~11 tiles; no tree or rock (E of you)"
 
 
