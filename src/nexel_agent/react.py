@@ -46,6 +46,8 @@ class React:
             self.fire(*m, obs, t_seen, hits)
         elif hits:
             who = ", ".join(sorted({h[0] for h in hits}))
+            mine = self.cards.text(4)
+            self.tell(f"(a hit by {who} came and no card of yours matched" + (f"; your cards: {mine})" if mine else "; you have no cards)"))
             self.ask_cards(f"{who} just hit you; you have {obs['self']['hp']}/20 health. No card of yours answered.",
                            sorted({(h[1] or {}).get("kind", "agent") for h in hits}), "hit")
 
@@ -106,7 +108,13 @@ class React:
         """remember / forget / drop_card: the model's own memory and cards, kept by the harness (no game action)."""
         me = obs["self"]
         if item.tool == "remember":
-            n = self.mem.remember(str(item.args.get("text", "")), (me["x"], me["y"]), str(obs.get("time", "")))
+            text = str(item.args.get("text", "")).strip()
+            if not text:
+                return {"ok": False, "error": "empty_note", "detail": "remember takes the text to keep: remember TEXT"}
+            old = next((x["id"] for x in self.mem.notes if x["text"] == text[:140]), None)
+            if old is not None:
+                return {"ok": False, "error": "already_noted", "detail": f"that is your note [{old}] already"}
+            n = self.mem.remember(text, (me["x"], me["y"]), str(obs.get("time", "")))
             return {"ok": True, "result": {"ticks": 0, "changed": {}, "text": f"noted [{n}]"}}
         n = item.args.get("n")
         if item.tool == "drop_card":

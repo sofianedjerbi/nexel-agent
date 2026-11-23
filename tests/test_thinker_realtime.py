@@ -195,6 +195,12 @@ def test_remember_and_forget_are_the_models_own_commands(tmp_path):
     t.queue.append(Item("remember", {"text": "home by the big rock"}, "model", "", None, t.epoch))
     step(t, game, 1)
     assert game.acts == [] and "[1] home by the big rock (0,0)" in t.mem.notes_text()
+    t.queue.append(Item("remember", {"text": "home by the big rock"}, "model", "", None, t.epoch))
+    step(t, game, 1)
+    assert "that is your note [1] already" in t.history[-1]
+    t.queue.append(Item("remember", {"text": " "}, "model", "", None, t.epoch))
+    step(t, game, 1)
+    assert "empty_note" in t.history[-1]
     t.queue.append(Item("forget", {"n": 1}, "model", "", None, t.epoch))
     step(t, game, 1)
     assert t.mem.notes_text() == ""

@@ -73,7 +73,7 @@ def test_the_forge_keeps_a_skill_that_passes_and_retries_one_that_fails(tmp_path
     assert "It passed in 0 of 2 worlds" in asked[1][-1]["content"]
     again = Library(tmp_path / "_skills")
     assert "get_wood" in again.sources() and again.index["get_wood"]["sim"] == "2/2"
-    assert again.lines() == "get_wood N"
+    assert again.lines() == "get_wood N [done: wood N]"
     json.loads((tmp_path / "_skills" / "forge_log.json").read_text())
 
 

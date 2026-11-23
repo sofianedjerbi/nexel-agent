@@ -55,7 +55,10 @@ class Library:
             m = self.index[n]
             args = " ".join(a.upper() for a in m.get("call", "").split(",") if a.strip())
             runs = m["wins"] + m["losses"]
-            return f"{n}{' ' + args if args else ''}" + (f" (won {m['wins']}/{runs})" if runs else "")
+            test = m.get("done_when") or {}
+            done = (f"{next(iter(test['have']))} N" if args and len(test.get("have", {})) == 1 else
+                    json.dumps(test, separators=(",", ":")))
+            return f"{n}{' ' + args if args else ''} [done: {done}]" + (f" (won {m['wins']}/{runs})" if runs else "")
         return ", ".join(one(n) for n in self.offered()[:k])
 
     def outcome(self, name, won: bool):
