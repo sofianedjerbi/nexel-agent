@@ -22,7 +22,8 @@ from .brain import Brain
 from .core import split
 from .encode import ACTIONS, ITEMS, N_NEAR, action_name, encode, legal, to_command
 from .social import SocialMemory
-from .voice import Voice, places
+from .mind import goal_text
+from .voice import Now, Voice
 
 POLICY = Path(__file__).resolve().parents[3] / "models/rook.npz"     # (the shipped body: models/README.md)
 MODEL_URL = "http://127.0.0.1:8080/v1/chat/completions"             # (the shared local model server, as players.py starts it)
@@ -38,13 +39,11 @@ class LiveBody:
         self.stats = {"decisions": 0, "acts": 0, "fails": 0, "interrupted": 0, "idle": 0, "crafted": 0, "placed": 0,
                       "deaths": 0, "hits": 0, "won": 0, "lost": 0, "kills": 0, "chat": 0}
         self.crafts, self.reactions, self.foes, self.fails_by = set(), {}, {}, {}
-        self.social, self.social_done, self.heard, self.http = SocialMemory(a.name, ITEMS), set(), None, None
+        self.social, self.social_done, self.http, self.game = SocialMemory(a.name, ITEMS), set(), None, None
         self.stats.update(said=0, gave=0)
         self.tick, self.me, self.obs_entities, self.fighting = 0, {}, [], False
         self.mind = self.voice = None                       # (the LLM planner that sets goals: rl/mind.py; words: voice.py)
-        self.replied = set()
-        self.signs, self.where = {}, ""                     # (signs it has seen: where, what they say; the places line)
-        self.given = []
+        self.now = Now(a.name, ITEMS)                            # (what is happening to it, for every prompt: rl/voice.py)
         self.log = open(a.log, "a") if a.log else None
         self.brain = Brain(a.brain, a.log and Path(a.log).with_name("brain.jsonl"), a.name, a.persona) if getattr(a, "brain", 0) else None
 
@@ -63,8 +62,6 @@ class LiveBody:
             self.stats["placed"] += 1
         elif tool in ("say", "give"):
             self.stats["said" if tool == "say" else "gave"] += 1
-            if tool == "give":
-                self.given.append(((r.get("result") or {}).get("to"), args.get("item"), args.get("n", 1)))
         elif tool == "attack":
             self.stats["swings"] = self.stats.get("swings", 0) + 1
             if (r.get("result") or {}).get("killed"):
@@ -86,6 +83,8 @@ class LiveBody:
                 break                                  # (the fight is over: the target fell or got away)
             if step[0] == "say":                       # the words: the LLM's (chat.py's prompt), or the plain line
                 step = ("say", {"text": await self.words(step[1].get("ask"), step[1]["text"])})
+                if not step[1]["text"]:
+                    continue                           # (it chose to say nothing)
             r = await game.act(step[0], **step[1])
             self.done(step[0], step[1], r)
         self.fighting = False
@@ -113,59 +112,32 @@ class LiveBody:
             await asyncio.sleep(POLL_S)
 
     def listen(self, game, obs):
-        """Someone spoke: a salient event, straight to the model (rl/voice.py); its reply, if any, is said."""
-        me = obs.get("self") or {}
-        for s in obs.get("signs", []):
-            self.signs[(me.get("x", 0) + s["dx"], me.get("y", 0) + s["dy"])] = str(s.get("text", ""))
-        self.where = places(obs, self.signs)
+        """Each observation: into what is happening now; someone spoke: a salient event, straight to the voice
+        (rl/voice.py: a burst of lines gets one answer), whose reply, if any, is said."""
+        self.now.see(obs)
         for e in obs.get("events", []):
-            if e.get("type") in ("say", "shout") and e.get("from") != self.a.name:
-                key = (e.get("tick"), e.get("from"))
-                if key in self.replied:
-                    continue
-                self.replied.add(key)
-                self.heard = (e.get("from"), str(e.get("text", ""))[:200])
-                if self.voice:
-                    asyncio.create_task(self.answer(game, *self.heard, time.monotonic()))
+            if self.voice and e.get("type") in ("say", "shout") and e.get("from") != self.a.name:
+                self.voice.hear(e.get("from"), str(e.get("text", ""))[:200], self.say, self.doing)
 
-    async def answer(self, game, speaker, text, heard_at):
-        line = await self.voice.line(speaker, text, self.me, self.doing(), heard_at, note=self.note_on(speaker),
-                                     acting=self.acting(), where=self.where)
-        if line:
-            await game.act("say", text=line)
-            self.social.my_last = self.tick
-            self.stats["chat"] += 1
-            self.voice.write({"kind": "sent", "to": speaker, "said": line, "total_s": round(time.monotonic() - heard_at, 2)})
-
-    def note_on(self, who) -> str:
-        rel = (self.mind.relations.get(who) if self.mind else None) or {}
-        return "; ".join(p for p in (rel.get("ally") is True and "an ally", rel.get("ally") is False and "not an ally",
-                                     rel.get("notes")) if p)
-
-    def acting(self) -> str:
-        return action_name(self.last).replace("_", " ") if self.last else ""
+    async def say(self, line):
+        await self.game.act("say", text=line)
+        self.social.my_last = self.tick
+        self.stats["chat"] += 1
 
     def doing(self, ask=None) -> str:
-        return "; ".join(p for p in (f"you want some {ask}" if ask else self.goal_text(), self.given and self.deeds()) if p)
+        return f"some {ask}" if ask else goal_text(self.mind.goal) if self.mind else ""
 
     async def words(self, ask=None, plain="hey") -> str:
-        """The policy chose to speak (or to ask for something); the words are the LLM's, from facts."""
+        """The policy chose to speak (or to ask for something); the words are the LLM's, from the same facts - or none
+        (it may stay silent; an answer under way is its turn already)."""
         if not self.voice:
             return plain if ask else "hey"
-        speaker = (self.heard or ("someone", ""))[0]
-        line = await self.voice.line(speaker, "", self.me, self.doing(ask), kind="start", note=self.note_on(speaker),
-                                     acting=self.acting(), where=self.where)
+        if ask:
+            self.now.ask(self.a.name, None, ask)
+        if self.voice.answering:
+            return ""
         self.stats["chat"] += 1
-        return line or (plain if ask else "hey")
-
-    def deeds(self) -> str:
-        """What it actually did lately, for the words to go by (facts)."""
-        gave = [f"{n} {k} to {to}" for to, k, n in self.given[-3:]]
-        return ("you gave " + ", ".join(gave)) if gave else "you have not given anything to anyone"
-
-    def goal_text(self) -> str:
-        g = self.mind.goal if self.mind else None
-        return "" if g is None or g.kind == "free" else " ".join(str(p) for p in (g.kind, g.item, g.person and f"with {g.person}") if p)
+        return await self.voice.line([], self.doing(ask), kind="start")
 
     async def play(self):
         if self.a.model_url:
@@ -173,17 +145,19 @@ class LiveBody:
             from .mind import Mind
             self.http = httpx.AsyncClient()
             self.mind = Mind(self.a.name, self.a.persona, self.a.model_url, self.http,
-                             Path(self.a.memory or f"agents/{self.a.name}/memory.json"))
+                             Path(self.a.memory or f"agents/{self.a.name}/memory.json"), self.now)
             self.voice = self.mind.voice = Voice(self.a.name, self.a.persona, self.a.model_url, self.http,
-                                                 self.mind.path.with_name("latency.jsonl"), ITEMS)
+                                                 self.mind.path.with_name("latency.jsonl"), self.now)
         t_end = time.monotonic() + self.a.minutes * 60 if self.a.minutes else math.inf
         async with Client(self.a.game) as game:
+            self.game = game
             await game.hello(self.a.name, f"rl-{self.a.name}", self.a.persona)
             if self.a.teleport:                       # (a --dev server: put it somewhere first, for a demo or a test)
                 x, y, z = (int(v) for v in self.a.teleport.split(","))
                 await game.request("dev_teleport", x=x, y=y, z=z)
             obs = await game.observe()
             self.obs_entities = obs.get("entities", [])
+            self.listen(game, obs)                    # (later ones: each poll of wait)
             hp, deaths, task, running, t_report = obs["self"]["hp"], obs["self"]["deaths"], None, None, time.monotonic()
             while time.monotonic() < t_end:
                 me = self.me = obs["self"]
@@ -192,7 +166,6 @@ class LiveBody:
                 if self.mind:
                     self.mind.see(obs)
                     if self.mind.due():
-                        self.mind.deeds = self.deeds()
                         ask = self.social.ask_open(obs["tick"])
                         self.mind.asks = (f"{self.social.asked_by} asked you for {ask}; you carry "
                                           f"{me.get('inventory', {}).get(ask, 0)} {ask}") if ask else ""
@@ -201,7 +174,6 @@ class LiveBody:
                         line, self.mind.to_say = self.mind.to_say, None
                         asyncio.create_task(game.act("say", text=line))
                         self.stats["said"] += 1
-                self.listen(game, obs)
                 self.hurt = max(0.0, hp - me["hp"]) if me["deaths"] == deaths else hp
                 if me["deaths"] > deaths:
                     self.stats["deaths"] += me["deaths"] - deaths
@@ -224,6 +196,7 @@ class LiveBody:
                 if kind in ("step", "jump", "dig", "dig_at", "climb") and ACTIONS[i][1]:
                     self.facing = ACTIONS[i][1]
                 self.stats["decisions"] += 1
+                self.now.did(action_name(i))
                 if self.brain:
                     self.brain.see(obs, self, enc, mask, i)
                 cmd = to_command(i, obs, self.facing, self.social, goal)
@@ -263,7 +236,7 @@ class LiveBody:
         s["social"] = sorted(self.social_done)
         if self.mind:
             s["mind"] = dict(self.mind.stats, goal=[self.mind.goal.kind, self.mind.goal.item, self.mind.goal.person],
-                             allies=sorted(n for n, r in self.mind.relations.items() if r.get("ally")))
+                             allies=sorted(n for n, r in self.mind.relations.items() if r.get("ally")), aims=self.mind.aims)
         s["fail_pct"] = round(100 * s["fails"] / max(1, s["acts"]), 1)
         s["idle_pct"] = round(100 * s["idle"] / max(1, s["decisions"]), 1)
         return {"t": time.time(), **s, "reactions": self.reactions, "fails_by": self.fails_by,
@@ -273,7 +246,8 @@ class LiveBody:
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--name", default="Rook")
-    p.add_argument("--persona", default="a quiet player who learned the world by living in it")
+    p.add_argument("--persona", default="a quiet player who learned the world by living in it; wants a house of its own with "
+                   "a bed and a door, and good tools, and gets what it lacks from other players by asking or trading")
     p.add_argument("--policy", default=str(POLICY), help="the learned body (default: the shipped models/rook.npz)")
     p.add_argument("--game", default="ws://127.0.0.1:7777/agent")
     p.add_argument("--model-url", default=MODEL_URL, help="a local model server for the words and the planner (none: it does not "
