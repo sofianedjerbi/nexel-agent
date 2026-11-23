@@ -187,3 +187,8 @@ def test_place_near_finds_a_free_tile_when_every_side_is_taken(tmp_path):
     r = asyncio.run(t.verb(game, "place_near", {"text": "workbench"}))
     assert r.get("ok"), r
     assert a.inventory.get("workbench", 0) == 0
+
+
+def test_a_target_named_with_its_place_is_that_place():
+    from megastructure.verbs import locate
+    assert locate(fake_obs((0, 0)), "berry_bush at 3 -4") == [(3, -4)] == locate(fake_obs((0, 0)), "tree (3,-4)")

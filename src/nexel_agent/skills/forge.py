@@ -53,7 +53,7 @@ Commands for act (verbs do the walking for you):
   "go_next_to TARGET", "move_to X Y", "walk N|E|S|W" (keeps walking that way), "look_far N|E|S|W", "fight TARGET", "eat ITEM".
   A failed act has "ok": False and says why in "error"/"detail"; nothing in view: "error": "not_found".
   "look_far D" reports what lies up to 58 tiles that way: reply["result"]["things"] = [{"name": "tree", "x", "y",
-  "dist"}, ...] nearest first (names: tree, rock, bare bush, berry bush, ore, water...), and
+  "dist"}, ...] nearest first (names: tree, rock, bare_bush, berry_bush, ore, mid_water...), and
   the player remembers it: after it, "dig_at tree" walks to a tree look_far saw, even one far out of view.
   A start may have no tree or rock in view: the world is large, things are found by looking and walking.
 Facts: {recipes}. A craft marked @workbench needs a placed workbench within 2 tiles of you; craft_here walks there

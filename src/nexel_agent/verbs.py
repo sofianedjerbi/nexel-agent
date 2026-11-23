@@ -27,9 +27,11 @@ TOOLS = {"axe", "pickaxe", "hoe", "spear", "sword", "watering_can", TILL_TOOL}
 def locate(obs, target: str) -> list[tuple]:
     """Absolute (x, y) of what `target` names, nearest first: "x y", "#id", a being's name or kind, a tile's name."""
     me = obs["self"]
-    w = target.replace(",", " ").split()
+    w = target.replace(",", " ").replace("(", " ").replace(")", " ").split()
     if len(w) >= 2 and all(p.lstrip("-").isdigit() for p in w[:2]):
         return [(int(w[0]), int(w[1]))]
+    if len(w) >= 3 and all(p.lstrip("-").isdigit() for p in w[-2:]):
+        return [(int(w[-2]), int(w[-1]))]                  # ("berry_bush at 3 -4": the place it names)
     name = " ".join(w).lstrip("#").lower()
     out = []
     for e in obs["entities"]:

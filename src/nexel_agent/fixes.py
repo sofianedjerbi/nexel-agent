@@ -87,7 +87,7 @@ def look_far_things(args, res, me) -> list[dict]:
     """What look_far saw, as data: [{"name", "x", "y", "dist"}], nearest first (for skills)."""
     seen: dict = {}
     look_far_line(args, res, me, seen)
-    return sorted(({"name": k, "x": p[0], "y": p[1], "dist": abs(p[0] - me["x"]) + abs(p[1] - me["y"])}
+    return sorted(({"name": k.replace(" ", "_"), "x": p[0], "y": p[1], "dist": abs(p[0] - me["x"]) + abs(p[1] - me["y"])}
                    for k, p in seen.items()), key=lambda t: t["dist"])
 
 
