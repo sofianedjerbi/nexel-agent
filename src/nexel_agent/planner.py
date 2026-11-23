@@ -293,7 +293,7 @@ class Planner(Chat):
             self.history.append("(your last answer had no command I could run: use the command forms shown)")
         rec = {"kind": "call", "t": time.time(), "latency_s": round(time.monotonic() - t0, 2),
                "ttft_s": round(ttft or 0, 2), "first_cmd_s": round(first_cmd or 0, 2), "n_cmds": n_ok, "bad": n_bad,
-               "stale": stale, "goal": ps.goal, "usage": usage, "raw": ps.text[:400]}
+               "stale": stale, "goal": ps.goal, "usage": usage, "raw": ps.text[:400], **({"prompt": msgs[1]["content"]} if pid % 25 == 1 else {})}
         self.calls.append(rec)
         self.decision_log.write(json.dumps(rec) + "\n")
         log.info("%s [plan %.1fs] %s | %d cmds%s", self.name, rec["latency_s"], ps.goal or "-", n_ok,
