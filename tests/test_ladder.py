@@ -140,3 +140,11 @@ def test_stone_only_from_ore_says_the_ore_needs_a_pickaxe():
     o["self"]["inventory"] = {"wood": 10, "fiber": 2}
     line = " ".join(progress_lines(o, "craft pickaxe", None))
     assert "nearest: ore at (1,0) (needs a pickaxe in hand: you carry none): next to you, E" in line
+
+
+def test_what_was_seen_before_is_remembered_where_it_was(tmp_path):
+    t = thinker(tmp_path)
+    t.plan_messages(world({}))                                           # a tree at (0,-2), a rock at (4,2)
+    t.goal = "craft workbench"
+    user = t.plan_messages(fake_obs((30, 0), tree=False))[1]["content"]
+    assert "wood comes from tree or stump or bare fruit tree: none in view; last seen: tree at (0,-2)" in user

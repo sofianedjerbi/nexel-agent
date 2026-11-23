@@ -168,7 +168,8 @@ def source_fact(item, obs, inv) -> str:
     names = " or ".join(n for _, n in srcs)
     near = _nearest(obs, "".join(c for c, _ in srcs))
     if not near:
-        return f"{item} comes from {names}: none in view"
+        last = [f"{n} at ({p[0]},{p[1]})" for _, n in srcs if (p := (obs.get("_seen") or {}).get(n))]
+        return f"{item} comes from {names}: none in view" + (f"; last seen: {', '.join(last[:2])}" if last else "")
     name = dict(srcs)[near[3]]
     tool = NEEDS_TOOL.get(near[3])
     need = f" (needs a {tool} in hand: you carry {'one' if inv.get(tool) else 'none'})" if tool else ""

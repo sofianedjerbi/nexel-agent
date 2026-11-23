@@ -100,7 +100,7 @@ def look_far_line(args, res, me=None, seen=None) -> str:
     for c, (n, at) in sorted(found.items(), key=lambda kv: kv[1][0])[:6]:
         things.append(f"{name_of(c)} ~{n} tiles" + (f" at ({at[0]},{at[1]})" if at else ""))
         if seen is not None and at:
-            seen[name_of(c)] = at
+            seen[name_of(c).replace("_", " ")] = at
     water = next((VIEW_R + 1 + 2 * i for i, row in enumerate(rows) if row.count("~") > len(row) // 2), None)
     people = [f"{x['name']} ({x['dx']:+d},{x['dy']:+d})" for x in res.get("agents") or []]
     none = [n for c, n in (("T", "tree"), ("M", "rock")) if c not in found]

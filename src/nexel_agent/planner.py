@@ -21,6 +21,7 @@ from .planwatch import TOLD, did_nothing
 from .plans import LOCAL_SPECS, PlanStream, command_text, parse_command
 from .prompts import summarize_result
 from .senses import danger_lines
+from .sim.specs import LEGEND
 
 log = logging.getLogger("thinker")
 MAX_PLAN = 6                                     # commands taken from one answer
@@ -65,6 +66,7 @@ class Planner(Chat):
         fails = [v for k, v in self.lessons.items.items() if k.startswith("fail:")][-3:]
         me = obs["self"]
         self.record.seen(me["inventory"], time.time())
+        obs = {**obs, "_seen": self.look_around(obs)}
         names = [e["name"] for e in obs["entities"] if e["kind"] == "agent"]
         recall = self.mem.relevant(self.goal or "", (me["x"], me["y"]), names, k=3)
         people = [self.mem.person_text(n) for n in names[:2] if n in self.mem.people]
@@ -77,6 +79,16 @@ class Planner(Chat):
                            habit=" ".join(filter(None, [stuck(obs, self.memory) and stuck_line(obs),
                                                         f"Of your last 20 commands: {', '.join(habit)}." if habit else ""])))
         return [{"role": "system", "content": self.prefix}, {"role": "user", "content": user}]
+
+    def look_around(self, obs) -> dict:
+        """Where each kind of thing was last seen (from every view and look_far): the player's own map memory."""
+        seen = self.memory.setdefault("seen", {})
+        g, r, me = obs["grid"], len(obs["grid"]) // 2, obs["self"]
+        for j, row in enumerate(g):
+            for i, ch in enumerate(row):
+                if ch in "TMbvHQF*&^~":
+                    seen[LEGEND.get(ch, ch).split(" (")[0].replace("_", " ")] = (me["x"] - r + i, me["y"] - r + j)
+        return seen
 
     def item(self, tool, args, source, why="") -> Item:
         return Item(tool, args, source, why, None, self.epoch)
