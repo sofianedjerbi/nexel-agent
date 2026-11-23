@@ -1,6 +1,6 @@
 """One held-out episode with the exported policy, told as a timeline: when each achievement came, what it did
 most, how it ended (game Python, numpy only):
-    PYTHONPATH=src ~/megastructure/.venv/bin/python -m megastructure.rl.watch rl_runs/r2/policy.npz 1000003"""
+    PYTHONPATH=src .venv/bin/python -m nexel_agent.rl.watch rl_runs/r2/policy.npz 1000003"""
 
 import sys
 from collections import Counter

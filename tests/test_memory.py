@@ -6,8 +6,8 @@ import json
 
 import httpx
 
-from megastructure.memory import MAX_EPISODES, Memory
-from megastructure.senses import Body, danger_lines
+from nexel_agent.memory import MAX_EPISODES, Memory
+from nexel_agent.senses import Body, danger_lines
 from test_thinker_realtime import FakeGame, fake_obs, model_transport, thinker
 
 

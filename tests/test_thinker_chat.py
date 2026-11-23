@@ -6,8 +6,8 @@ import asyncio
 import httpx
 from test_thinker_realtime import FakeGame, model_transport, thinker
 
-from megastructure.chat import chat_messages
-from megastructure.fastprompt import chat_parse
+from nexel_agent.chat import chat_messages
+from nexel_agent.fastprompt import chat_parse
 
 
 def test_the_reply_and_its_deed_are_read_apart():

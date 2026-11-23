@@ -9,8 +9,8 @@ from .ladder import NEEDS_TOOL as NEEDS, ladder_text, progress_lines
 from .policy import DIRS, reachable
 from .plans import _kind, _optional
 from .senses import rules_text
-from .sim.specs import LEGEND, TOOL_SPECS
-from .tiles import RECIPES
+from megastructure.sim.specs import LEGEND, TOOL_SPECS
+from megastructure.tiles import RECIPES
 
 CORE_RECIPES = ("workbench", "plank", "campfire", "torch", "rope", "axe", "pickaxe", "hoe", "spear", "chest", "bed",
                 "fence", "door", "wood_wall", "stone_wall", "roof", "path", "cooked_meat", "bread", "ingot", "sword", "boat")

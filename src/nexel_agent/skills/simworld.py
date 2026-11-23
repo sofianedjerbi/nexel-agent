@@ -8,8 +8,8 @@ from pathlib import Path
 
 from ..items import by_id
 from ..plans import LOCAL_SPECS, parse_command
-from ..sim import Simulation
-from ..sim.constants import DAY_TICKS
+from megastructure.sim import Simulation
+from megastructure.sim.constants import DAY_TICKS
 from ..fixes import look_far_line, look_far_things
 from ..verbs import VERBS, Verbs, note_seen
 

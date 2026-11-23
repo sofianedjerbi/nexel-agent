@@ -1,9 +1,9 @@
 """One command for AI players: the shared local model server plus N thinkers, each with a persona.
 
-    python -m megastructure.players                      # 2 players, Qwen3-4B, the local game at :7777
-    python -m megastructure.players --n 8 --model 30b
-    python -m megastructure.players --pick gatsu0,senku0 --minutes 30
-    python -m megastructure.players --list               # the roster
+    python -m nexel_agent.players                      # 2 players, Qwen3-4B, the local game at :7777
+    python -m nexel_agent.players --n 8 --model 30b
+    python -m nexel_agent.players --pick gatsu0,senku0 --minutes 30
+    python -m nexel_agent.players --list               # the roster
 
 Starts mlx_lm.server on --port (or reuses one already answering there), waits until it answers, then
 starts the thinkers a few seconds apart, each logging to <data>/<name>.log. Prints one line per player
@@ -73,7 +73,7 @@ def model_name(m: str, free=None) -> str:
 
 
 def parse_args(argv=None) -> argparse.Namespace:
-    p = argparse.ArgumentParser(prog="python -m megastructure.players", description=__doc__.split("\n")[0])
+    p = argparse.ArgumentParser(prog="python -m nexel_agent.players", description=__doc__.split("\n")[0])
     p.add_argument("--n", type=int, default=2, help="how many players (ignored with --pick); each one is a Python process and the one model server serves them in turn: more than ~4 loads this Mac hard")
     p.add_argument("--pick", help="comma-separated roster names, e.g. gatsu0,senku0")
     p.add_argument("--game", default="ws://127.0.0.1:7777/agent", help="the game's agent websocket")
@@ -166,11 +166,11 @@ class Launcher:
 
     def thinker_cmd(self, p: dict) -> list[str]:
         if getattr(self.a, "body", "llm") == "rl":
-            cmd = [sys.executable, "-m", "megastructure.rl.live", "--name", p["name"], "--persona", p["persona"],
+            cmd = [sys.executable, "-m", "nexel_agent.rl.live", "--name", p["name"], "--persona", p["persona"],
                    "--game", self.a.game, "--model-url", f"http://127.0.0.1:{self.a.port}/v1/chat/completions",
                    "--log", str(self.data / f"{p['name']}.rl.jsonl"), *(["--policy", self.a.policy] if self.a.policy else [])]
             return cmd + (["--minutes", str(self.a.minutes)] if self.a.minutes else [])
-        cmd = [sys.executable, "-m", "megastructure.thinker", "--name", p["name"], "--persona", p["persona"],
+        cmd = [sys.executable, "-m", "nexel_agent.thinker", "--name", p["name"], "--persona", p["persona"],
                "--game", self.a.game, "--model-url", f"http://127.0.0.1:{self.a.port}/v1/chat/completions",
                "--model", "default_model", "--data", str(self.data)]
         if self.a.minutes:

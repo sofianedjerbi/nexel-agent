@@ -4,9 +4,9 @@ import random
 
 import numpy as np
 
-from megastructure.rl.achieve import ACHIEVEMENTS, Ledger, crafter_score
-from megastructure.rl.core import HURT, SimEnv
-from megastructure.rl.encode import ACTIONS, N_ACTIONS, N_CHARS, SIDE, VEC, action_name
+from nexel_agent.rl.achieve import ACHIEVEMENTS, Ledger, crafter_score
+from nexel_agent.rl.core import HURT, SimEnv
+from nexel_agent.rl.encode import ACTIONS, N_ACTIONS, N_CHARS, SIDE, VEC, action_name
 
 
 def idx(name):
@@ -189,7 +189,7 @@ def test_climb_out_of_a_deep_pit():
 
 
 def test_legal_mask_follows_the_rules():
-    from megastructure.rl.encode import legal
+    from nexel_agent.rl.encode import legal
     env = SimEnv(ep_ticks=10 ** 6)
     o = env.reset(5)
     assert o["mask"].shape == (N_ACTIONS,) and o["mask"][0]           # noop is always there

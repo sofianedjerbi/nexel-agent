@@ -2,7 +2,7 @@
 observation with the same encoding (rl/encode.py) and the same timing as in training: a decision when the last action
 ends (0.2 s at the soonest), at once when hurt or someone comes into view, or after 5 s. No model in the action loop; with --model-url, someone
 talking to it gets a line back from the local model (chat.py's prompt), and nothing else.
-    python -m megastructure.rl.live --name Rook --policy rl_runs/r1/policy.npz --game ws://127.0.0.1:7790/agent"""
+    python -m nexel_agent.rl.live --name Rook --policy rl_runs/r1/policy.npz --game ws://127.0.0.1:7790/agent"""
 
 import argparse
 import asyncio
@@ -14,7 +14,7 @@ from pathlib import Path
 import numpy as np
 
 from ..chat import chat_messages
-from ..client import Client
+from megastructure.client import Client
 from ..fastprompt import chat_parse
 from .achieve import HOSTILE
 from .core import split

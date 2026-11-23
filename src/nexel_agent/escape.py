@@ -4,7 +4,7 @@ low bank, or cut a step and jump); what to do is its own choice: nothing here mo
 """
 
 from .policy import WALK_CHARS
-from .tiles import DIRS
+from megastructure.tiles import DIRS
 
 WATER = set("~(=)")
 STUCK_AFTER = 3                                  # no_path in a row before the body calls itself stuck

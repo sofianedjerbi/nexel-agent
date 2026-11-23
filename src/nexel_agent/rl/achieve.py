@@ -5,8 +5,8 @@ The ones that need a look at the world each step are in rl/milestones.py."""
 
 import math
 
-from ..sim.entities import CREATURES
-from ..tiles import ARMOR, BLOCKS, FOOD, RECIPES
+from megastructure.sim.entities import CREATURES
+from megastructure.tiles import ARMOR, BLOCKS, FOOD, RECIPES
 from .actions import PLACE
 
 _MADE = {k for r in RECIPES.values() for k in r.output} - {"stone", "hay"}      # (stone, hay also come from the land)

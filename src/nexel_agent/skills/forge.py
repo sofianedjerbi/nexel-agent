@@ -4,7 +4,7 @@ own done_when test says pass or fail, a failure goes back with the error, the la
 skill that passes in at least PASS of the worlds joins the shared library (library.py). The goals and their tests
 are the game's curriculum (facts); every line of a skill is the model's.
 
-    python -m megastructure.skills.forge --model-url http://127.0.0.1:8091/v1/chat/completions --lib agents/_skills
+    python -m nexel_agent.skills.forge --model-url http://127.0.0.1:8091/v1/chat/completions --lib agents/_skills
 """
 
 import argparse
@@ -16,7 +16,7 @@ from pathlib import Path
 import httpx
 
 from ..goals import missing
-from ..tiles import RECIPES
+from megastructure.tiles import RECIPES
 from .library import Library
 from .live import lessons
 from .sandbox import Sandbox, check

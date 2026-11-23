@@ -15,7 +15,7 @@ from .cards import Cards, card_request, parse_cards
 from .planner import by_id
 from .plans import parse_command
 from .senses import rules_text
-from .sim.entities import CREATURES
+from megastructure.sim.entities import CREATURES
 from .watchdog import stall_line
 
 log = logging.getLogger("thinker")

@@ -21,7 +21,7 @@ from .planwatch import TOLD, did_nothing
 from .plans import LOCAL_SPECS, PlanStream, command_text, parse_command
 from .prompts import summarize_result
 from .senses import danger_lines
-from .sim.specs import LEGEND
+from megastructure.sim.specs import LEGEND
 from .verbs import note_seen
 
 log = logging.getLogger("thinker")

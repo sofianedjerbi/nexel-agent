@@ -7,7 +7,7 @@ tools, farming next to home, persona extras, then gathering what is still missin
 
 import random
 
-from .tiles import BLOCKS, DIRS, FOOD, GROUNDS
+from megastructure.tiles import BLOCKS, DIRS, FOOD, GROUNDS
 
 WALK_CHARS = {g.char for g in GROUNDS if g.walkable} | {b.char for b in BLOCKS if not b.solid and b.name != "none"}
 OPEN_GROUND = {"grass": ".", "dirt": ","}

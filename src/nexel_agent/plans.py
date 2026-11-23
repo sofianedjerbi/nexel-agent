@@ -8,7 +8,7 @@ first action starts while the model is still writing the rest.
 import json
 import re
 
-from .sim.specs import TOOL_SPECS
+from megastructure.sim.specs import TOOL_SPECS
 
 DIR_WORDS = {"N", "E", "S", "W", "up"}
 LOCAL_SPECS = {"remember": {"args": {"text": "str"}}, "forget": {"args": {"n": "int"}}, "drop_card": {"args": {"n": "int"}},

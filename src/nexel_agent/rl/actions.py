@@ -6,8 +6,8 @@ Only numpy (it runs in the game's Python)."""
 
 import numpy as np
 
-from ..sim.constants import VIEW_R
-from ..tiles import ARMOR, BLOCKS, FEED, FILLERS, FOOD, PLACEABLE, RECIPES, USE_R, WEAPONS, WEAR
+from megastructure.sim.constants import VIEW_R
+from megastructure.tiles import ARMOR, BLOCKS, FEED, FILLERS, FOOD, PLACEABLE, RECIPES, USE_R, WEAPONS, WEAR
 
 DIRS = ("N", "E", "S", "W")
 STEP = {"N": (0, -1), "E": (1, 0), "S": (0, 1), "W": (-1, 0)}

@@ -1,6 +1,6 @@
 """Run N scripted bots against a live server.
 
-    uv run python -m megastructure.bots --n 4 --minutes 5
+    uv run python -m nexel_agent.bots --n 4 --minutes 5
 """
 
 import argparse
@@ -12,7 +12,7 @@ import time
 
 from websockets.exceptions import ConnectionClosed
 
-from .client import ApiError, Client
+from megastructure.client import ApiError, Client
 from .policy import feedback, scripted
 
 PERSONAS = ["builder", "scavenger", "explorer", "hoarder"]

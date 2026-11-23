@@ -16,8 +16,8 @@ import math
 
 from .ladder import free_dirs
 from .policy import reachable
-from .sim.specs import LEGEND
-from .tiles import DIRS, RECIPES, TILL_TOOL
+from megastructure.sim.specs import LEGEND
+from megastructure.tiles import DIRS, RECIPES, TILL_TOOL
 
 VERB_SPECS = {v: {"args": {"text": "str"}} for v in ("go_next_to", "dig_at", "move_away", "place_near", "craft_here",
                                                      "where", "find", "fight")}

@@ -10,7 +10,7 @@ import json
 from pathlib import Path
 
 from .policy import DIRS, reachable
-from .tiles import BLOCKS, FILLERS, FOOD, PLACEABLE, RECIPES
+from megastructure.tiles import BLOCKS, FILLERS, FOOD, PLACEABLE, RECIPES
 
 STATION_CH = {"workbench": "&", "campfire": "^"}
 FREE = set(".,_'n-:")                     # dry, flat-ish ground a thing can be put on

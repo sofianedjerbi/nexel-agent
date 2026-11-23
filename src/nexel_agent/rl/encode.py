@@ -7,10 +7,10 @@ import math
 
 import numpy as np
 
-from ..sim.constants import DAY_TICKS, VIEW_R
-from ..sim.entities import CREATURES
-from ..sim.specs import LEGEND
-from ..tiles import BLOCKS, FOOD, RECIPES
+from megastructure.sim.constants import DAY_TICKS, VIEW_R
+from megastructure.sim.entities import CREATURES
+from megastructure.sim.specs import LEGEND
+from megastructure.tiles import BLOCKS, FOOD, RECIPES
 from .actions import ACTIONS, DIRS, LEVEL, N_ACTIONS, action_name, legal, to_command  # noqa: F401 (one place to import from)
 
 SIDE = 2 * VIEW_R + 1

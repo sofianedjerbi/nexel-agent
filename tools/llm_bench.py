@@ -16,9 +16,9 @@ from pathlib import Path
 import httpx
 
 from megastructure.client import Client
-from megastructure.fastprompt import chat_messages
-from megastructure.plans import parse_plan
-from megastructure.thinker import Thinker
+from nexel_agent.fastprompt import chat_messages
+from nexel_agent.plans import parse_plan
+from nexel_agent.thinker import Thinker
 
 
 async def timed(http, url, messages, max_tokens, temperature):

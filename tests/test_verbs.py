@@ -9,8 +9,8 @@ import time
 import httpx
 
 from helpers import clear, make
-from megastructure.cards import Cards, valid
-from megastructure.goals import missing
+from nexel_agent.cards import Cards, valid
+from nexel_agent.goals import missing
 from megastructure.sim.entities import Creature
 from test_thinker_realtime import FakeGame, fake_obs, model_transport, thinker
 
@@ -194,7 +194,7 @@ def test_place_near_finds_a_free_tile_when_every_side_is_taken(tmp_path):
 
 
 def test_a_target_named_with_its_place_is_that_place():
-    from megastructure.verbs import locate
+    from nexel_agent.verbs import locate
     assert locate(fake_obs((0, 0)), "berry_bush at 3 -4") == [(3, -4)] == locate(fake_obs((0, 0)), "tree (3,-4)")
 
 

@@ -6,9 +6,9 @@ your last death and its cause. Information only: nothing here picks an action.
 import time
 from collections import deque
 
-from .sim.entities import CREATURES
-from .sim.specs import LEGEND
-from .tiles import FIST_DAMAGE, FOOD, WEAPONS
+from megastructure.sim.entities import CREATURES
+from megastructure.sim.specs import LEGEND
+from megastructure.tiles import FIST_DAMAGE, FOOD, WEAPONS
 
 CH = {v["char"]: k for k, v in CREATURES.items()}
 WHAT = {k: LEGEND.get(v["char"], k).split(" (", 1)[1].rstrip(")") if " (" in LEGEND.get(v["char"], "") else ""

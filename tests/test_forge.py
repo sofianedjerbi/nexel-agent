@@ -5,10 +5,10 @@ import json
 
 import httpx
 
-from megastructure.skills import forge as F
-from megastructure.skills.library import Library
-from megastructure.skills.sandbox import Sandbox, check
-from megastructure.skills.simworld import SimBody
+from nexel_agent.skills import forge as F
+from nexel_agent.skills.library import Library
+from nexel_agent.skills.sandbox import Sandbox, check
+from nexel_agent.skills.simworld import SimBody
 
 GET_WOOD = '''
 def get_wood(n):
@@ -126,7 +126,7 @@ def test_a_plan_runs_a_library_skill_to_its_end_and_its_test_says_won(tmp_path):
 
 
 def test_failures_in_play_pick_the_skill_to_write_again_and_are_quoted(tmp_path, monkeypatch):
-    from megastructure.skills.live import lessons
+    from nexel_agent.skills.live import lessons
     log = tmp_path / "agents" / "gatsu0" / "decisions.jsonl"
     log.parent.mkdir(parents=True)
     rec = {"tool": "dig_at", "args": {"text": "bare_bush"}, "ok": False, "error": "not_found", "goal": "get fiber", "source": "model"}

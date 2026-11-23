@@ -5,7 +5,7 @@ a foe that came close and did no harm. What happened, never how."""
 
 import math
 
-from ..gen import CHUNK
+from megastructure.gen import CHUNK
 from .achieve import HOSTILE
 
 EVADE_TICKS = 100          # a foe within 2 tiles, and 10 s later no blow taken since

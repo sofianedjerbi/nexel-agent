@@ -5,10 +5,10 @@ import asyncio
 
 import httpx
 
-from megastructure.fastprompt import compact_obs, stable_prefix
-from megastructure.fixes import failure_line, look_far_line
-from megastructure.ladder import Record, free_dirs, progress_lines
-from megastructure.plans import parse_command
+from nexel_agent.fastprompt import compact_obs, stable_prefix
+from nexel_agent.fixes import failure_line, look_far_line
+from nexel_agent.ladder import Record, free_dirs, progress_lines
+from nexel_agent.plans import parse_command
 from test_thinker_realtime import FakeGame, fake_obs, model_transport, thinker
 
 ORDERS = ("first ", "then ", "next ", "stop ", "should", "try ", "make something", "explore")
@@ -150,7 +150,7 @@ def test_what_was_seen_before_is_remembered_where_it_was(tmp_path):
     user = t.plan_messages(fake_obs((30, 0), tree=False))[1]["content"]
     assert "wood comes from tree or stump or bare fruit tree: none in view; last seen: tree at (0,-2)" in user
     assert "seen before, out of view: tree (0,-2) 32 tiles, rock (4,2) 28 tiles" in user.replace("rock (4,2) 28 tiles, tree (0,-2) 32 tiles", "tree (0,-2) 32 tiles, rock (4,2) 28 tiles")
-    from megastructure.memory import Memory
+    from nexel_agent.memory import Memory
     assert Memory(tmp_path / "Vex" / "memory.json").places["tree"] == (0, -2)            # (kept across a restart)
 
 

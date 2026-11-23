@@ -5,9 +5,9 @@ the model plans that.
 
 from .ladder import RECIPES, _nearest, free_dirs, placeable_carried, recipe_facts, where_to_stand
 from .plans import command_text
-from .sim.constants import VIEW_R
-from .sim.specs import LEGEND
-from .tiles import FOOD, PLACEABLE
+from megastructure.sim.constants import VIEW_R
+from megastructure.sim.specs import LEGEND
+from megastructure.tiles import FOOD, PLACEABLE
 
 PLAIN = set("~.,:'=o_ ")
 GATHER = "TbMvHQF*"                   # what a dig gathers: tree, bushes, rock, mushroom, fruit tree, ore

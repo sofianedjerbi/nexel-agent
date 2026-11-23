@@ -1,7 +1,7 @@
 """PPO in the sim, never blind: every --check steps, one episode on each held-out world, a [check] line with the
 KPI (Crafter score) beside the random and do-nothing players; stop when the score has not beaten its best for
 --patience checks, or at --hours. Trainer side:
-    PYTHONPATH=src ~/minish-rl/.venv/bin/python -m megastructure.rl.train --run r1"""
+    PYTHONPATH=src ~/minish-rl/.venv/bin/python -m nexel_agent.rl.train --run r1"""
 
 import argparse
 import json

@@ -1,6 +1,6 @@
 """A checkpoint (SB3 .zip, trainer side) to the numpy weights the live body loads (.npz), checked against torch on
 a few real observations from the sim:
-    PYTHONPATH=src ~/minish-rl/.venv/bin/python -m megastructure.rl.export rl_runs/r1/best.zip rl_runs/r1/policy.npz"""
+    PYTHONPATH=src ~/minish-rl/.venv/bin/python -m nexel_agent.rl.export rl_runs/r1/best.zip rl_runs/r1/policy.npz"""
 
 import sys
 

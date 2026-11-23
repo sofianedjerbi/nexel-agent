@@ -2,8 +2,8 @@
 
 import json
 
-from .sim import TOOL_SPECS
-from .tiles import RECIPES
+from megastructure.sim import TOOL_SPECS
+from megastructure.tiles import RECIPES
 
 RULES = """You are a person living on an endless archipelago of wild green islands.
 Nobody rules here. There are no laws and no safe zones: anything can be built, dug, claimed, traded,

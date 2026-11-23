@@ -8,7 +8,7 @@ next plan is made knowing it. With nothing queued the body waits for the model: 
 escape acts in its place. Someone talking nearby gets a small separate model call (chat.py). The player's memory
 (memory.py) is its own: it writes notes with `remember`, drops them with `forget`, and summarises its days.
 
-    python -m megastructure.thinker --name Vex --persona "scavenger who trades" --model-url http://127.0.0.1:8080/v1/chat/completions
+    python -m nexel_agent.thinker --name Vex --persona "scavenger who trades" --model-url http://127.0.0.1:8080/v1/chat/completions
 """
 
 import argparse
@@ -23,7 +23,7 @@ from pathlib import Path
 import httpx
 
 from .aim import just_failed, note_outcome
-from .client import ApiError, Client
+from megastructure.client import ApiError, Client
 from .fastprompt import stable_prefix
 from .lessons import Lessons
 from .memory import Memory

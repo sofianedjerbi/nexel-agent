@@ -3,7 +3,7 @@
 # the forge writes again what play found at fault (agents/*/decisions.jsonl) and any curriculum skill the library
 # lacks. It never starts or stops a model server. A memory guard stops the forge (not the server).
 #
-#   tools/forge_night.sh                 # from the repo root; cron: 0 3 * * * cd ~/megastructure && tools/forge_night.sh
+#   tools/forge_night.sh                 # from the repo root; cron: 0 3 * * * cd ~/nexel-agent && tools/forge_night.sh
 #
 # Guard (owner's rule): stop if free memory < 12%, swap > 6 GB, or swap grows > 500 MB over the run.
 set -u
@@ -22,7 +22,7 @@ if ! curl -s -m 5 "${MODEL_URL%/chat/completions}/models" >/dev/null; then
 fi
 S0=$(swap)
 echo "$(date) forge on $MODEL_URL, free $(free)%, swap ${S0}M" >> $LOG
-PYTHONPATH=src $PY -m megastructure.skills.forge --model-url $MODEL_URL --lib $LIB --from-play $DATA --tries 6 >> $LOG 2>&1 &
+PYTHONPATH=src $PY -m nexel_agent.skills.forge --model-url $MODEL_URL --lib $LIB --from-play $DATA --tries 6 >> $LOG 2>&1 &
 FP=$!
 trap 'kill $FP 2>/dev/null' EXIT
 while kill -0 $FP 2>/dev/null; do

@@ -13,7 +13,7 @@ import sys
 from collections import Counter
 
 sys.path.insert(0, "src")
-from megastructure.ladder import Record  # noqa: E402
+from nexel_agent.ladder import Record  # noqa: E402
 
 
 def main(path, events=None):

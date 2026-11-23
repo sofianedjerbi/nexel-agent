@@ -5,7 +5,7 @@ import asyncio
 
 import httpx
 
-from megastructure.planner import Item
+from nexel_agent.planner import Item
 from test_thinker_realtime import FakeGame, model_transport, thinker
 
 

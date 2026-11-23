@@ -17,7 +17,7 @@ import re
 import time
 from pathlib import Path
 
-from .sim.specs import LEGEND
+from megastructure.sim.specs import LEGEND
 from .plans import _first_object, parse_command
 
 KEYS = {"being", "within", "hit_by", "hp_below", "food_below", "night", "in_water"}

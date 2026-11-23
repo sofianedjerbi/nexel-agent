@@ -5,7 +5,7 @@ import subprocess
 
 import pytest
 
-from megastructure import players
+from nexel_agent import players
 
 
 class FakeProc:
@@ -123,4 +123,4 @@ def test_reused_model_server_is_left_alone(tmp_path, monkeypatch):
     ln = players.Launcher(a, popen=lambda cmd, **kw: made.append(FakeProc(cmd)) or made[-1], out=lambda s: None)
     ln._sleep_watching = lambda s: [p.terminate() for p in made]      # the player finishes
     assert ln.run(players.choose(players.load_roster(), 1, "luffy0")) == 0
-    assert len(made) == 1 and "megastructure.thinker" in made[0].cmd
+    assert len(made) == 1 and "nexel_agent.thinker" in made[0].cmd

@@ -6,8 +6,8 @@ import time
 
 import httpx
 
-from megastructure.escape import climb_reach, stuck
-from megastructure.watchdog import Watchdog
+from nexel_agent.escape import climb_reach, stuck
+from nexel_agent.watchdog import Watchdog
 from test_thinker_realtime import FakeGame, model_transport, thinker
 
 

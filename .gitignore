@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+.venv*/
+.DS_Store
+dist/
+.cache/
+# runtime data: never commit
+agents/
+saves/
+logs/
+models/
+rl_runs/
+*.gguf
+*.safetensors
+*.npz
+*.zip

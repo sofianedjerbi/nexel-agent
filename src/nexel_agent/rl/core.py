@@ -8,8 +8,8 @@ it was doing go on, or, idle, waits 0.5 s."""
 import math
 from pathlib import Path
 
-from ..sim import Simulation
-from ..sim.constants import DAY_TICKS, VIEW_R
+from megastructure.sim import Simulation
+from megastructure.sim.constants import DAY_TICKS, VIEW_R
 from .achieve import HOSTILE, Ledger
 from .encode import ACTIONS, encode, legal, to_command
 from .milestones import Milestones

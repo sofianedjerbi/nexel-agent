@@ -8,10 +8,10 @@ import time
 
 import httpx
 
-from megastructure.fastprompt import compact_obs, stable_prefix
-from megastructure.planner import Item
-from megastructure.plans import PlanStream, command_text, parse_command, parse_plan
-from megastructure.thinker import Thinker
+from nexel_agent.fastprompt import compact_obs, stable_prefix
+from nexel_agent.planner import Item
+from nexel_agent.plans import PlanStream, command_text, parse_command, parse_plan
+from nexel_agent.thinker import Thinker
 
 
 # ------------------------------------------------------------------ parsing
@@ -226,7 +226,7 @@ def test_someone_talking_gets_an_answer_fast(tmp_path):
 
 
 def test_goal_names_what_its_recipe_still_lacks():
-    from megastructure.fastprompt import needs_for
+    from nexel_agent.fastprompt import needs_for
     grid = ["." * 5] * 5
     line = needs_for("get pickaxe", {"wood": 14}, grid)
     assert "2 wood (have 14)" in line and "3 stone (have 0)" in line and "workbench within 2 tiles (none)" in line
@@ -234,7 +234,7 @@ def test_goal_names_what_its_recipe_still_lacks():
 
 
 def test_attack_by_a_name_or_kind_in_view_means_its_id():
-    from megastructure.planner import by_id
+    from nexel_agent.planner import by_id
     obs = fake_obs((0, 0))
     obs["entities"] = [{"id": 12, "kind": "agent", "name": "Mira", "dx": 1, "dy": 0}, {"id": 30, "kind": "tusker", "dx": 3, "dy": 0}]
     assert parse_command(by_id("attack Mira with fists", obs)) == ("attack", {"target": 12, "with": "fists"})

@@ -13,7 +13,7 @@ from stable_baselines3.common.vec_env import VecEnv
 
 from .worker import read, write
 
-GAME_PY = os.environ.get("GAME_PY", str(Path.home() / "megastructure/.venv/bin/python"))
+GAME_PY = os.environ.get("GAME_PY", str(Path(__file__).resolve().parents[3] / ".venv/bin/python"))     # a Python with nexel-worlds installed
 SRC = str(Path(__file__).resolve().parents[2])
 EVAL0 = 1_000_000
 
@@ -21,7 +21,7 @@ EVAL0 = 1_000_000
 class Worker:
     def __init__(self, args=()):
         env = dict(os.environ, PYTHONPATH=SRC, OMP_NUM_THREADS="1")
-        self.p = subprocess.Popen([GAME_PY, "-m", "megastructure.rl.worker", *args], stdin=subprocess.PIPE,
+        self.p = subprocess.Popen([GAME_PY, "-m", "nexel_agent.rl.worker", *args], stdin=subprocess.PIPE,
                                   stdout=subprocess.PIPE, env=env)
 
     def send(self, *msg):
