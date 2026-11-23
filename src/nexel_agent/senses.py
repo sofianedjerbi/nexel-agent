@@ -103,5 +103,5 @@ def rules_text() -> str:
     """For the stable prefix: what kills, what heals, how fights go."""
     weapons = ", ".join(f"{k} {v}" for k, v in WEAPONS.items())
     return (f"Survival: at health 0 you die and drop your pack. You heal while food is 9+; food 0 hurts; eat ITEM. "
-            f"Fight: attack ID [with WEAPON], within 3 tiles (fists {FIST_DAMAGE}; {weapons}). Run: move_to 8+ tiles "
-            "away from the danger. People can be friends or enemies: you choose.")
+            f"Fight: attack ID [with WEAPON], within 3 tiles (fists {FIST_DAMAGE}; {weapons}). Beings only reach "
+            "you up close; distance and walls keep them off.")

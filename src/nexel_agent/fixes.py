@@ -1,81 +1,72 @@
-"""A failed command, said back so it can be put right: the command, the error, and what would work instead (the right
-argument form, what you carry that can be placed, the next missing step), computed from the recipe book and the view.
+"""A failed command, said back as facts: what happened and the game's rule behind it (what can be placed, what a recipe
+takes and where its parts are, what is next to you), computed from the recipe book and the view. Never what to do:
+the model plans that.
 """
 
-from .ladder import RECIPES, _nearest, _walk, free_dirs, placeable_carried, station_steps, steps_for
+from .ladder import RECIPES, _nearest, free_dirs, placeable_carried, recipe_facts, where_to_stand
 from .plans import command_text
 from .sim.constants import VIEW_R
 from .sim.specs import LEGEND
 from .tiles import FOOD, PLACEABLE
 
 PLAIN = set("~.,:'=o_ ")
-
-
-def _steps(name, inv, obs, k=3) -> str:
-    return " > ".join(steps_for(name, dict(inv), obs)[:k])
-
-
 GATHER = "TbMvHQF*"                   # what a dig gathers: tree, bushes, rock, mushroom, fruit tree, ore
 
 
-def gather_hint(obs) -> str:
-    """What is next to you to dig, or the nearest such thing and how to get at it."""
+def name_of(ch) -> str:
+    return LEGEND.get(ch, "?").split(" (")[0]
+
+
+def around(obs) -> str:
+    """What is next to you that a dig gathers, or the nearest such thing and where to stand for it."""
     g, r = obs["grid"], len(obs["grid"]) // 2
-    side = [f"{LEGEND.get(g[r + dy][r + dx], '?').split(' (')[0]} {d}" for d, (dx, dy) in
+    side = [f"{name_of(g[r + dy][r + dx])} {d}" for d, (dx, dy) in
             (("N", (0, -1)), ("E", (1, 0)), ("S", (0, 1)), ("W", (-1, 0))) if g[r + dy][r + dx] in GATHER]
     if side:
-        return "Next to you to dig: " + ", ".join(side) + "."
+        return "Next to you: " + ", ".join(side) + "."
     near = _nearest(obs, GATHER)
     if not near:
-        return "Nothing to gather in view: explore."
-    way = _walk(obs, near[1], near[2])
-    return f"Nearest to gather: {LEGEND.get(near[3], '?').split(' (')[0]} at ({near[1]},{near[2]})" + (f": {way}." if way else ".")
+        return "Nothing a dig gathers is in view."
+    return f"Nearest thing a dig gathers: {name_of(near[3])} at ({near[1]},{near[2]}): {where_to_stand(obs, near[1], near[2])}."
 
 
 def fix_hint(tool, args, error, detail, obs) -> str:
-    """What to do about it, or '' (then the server's own words stand)."""
+    """The facts behind the failure, or '' (then the server's own words stand)."""
     inv = obs["self"]["inventory"]
     item = str(args.get("item") or args.get("recipe") or "")
     dirs = free_dirs(obs)
-    if tool == "place":
+    if tool in ("place", "place_near"):
         can = placeable_carried(inv)
-        carried = f"you can place: {', '.join(can)}" if can else "you carry nothing placeable"
+        carried = f"placeable things you carry: {', '.join(can)}" if can else "you carry nothing placeable"
         if error == "not_placeable":
             made = [n for n, r in RECIPES.items() if item in r.inputs and n in PLACEABLE][:5]
-            return (f"{item} is a material, not a thing to put down; {carried}"
-                    + (f"; make something of it first: {', '.join(made)}" if made else "") + ".")
+            return (f"{item} is a material and cannot be placed; {carried}"
+                    + (f"; placeable things made from {item}: {', '.join(made)}" if made else "") + ".")
         if error == "missing_item":
-            return f"you carry no {item}; {carried}" + (f"; to make one: {_steps(item, inv, obs)}" if item in RECIPES else "") + "."
-        if error in ("cliff_edge", "occupied", "bad_target"):
-            return (f"free flat sides now: {', '.join(dirs)} (e.g. place {dirs[0]} {item})" if dirs
-                    else "no free flat side here: move_to open flat ground first") + "."
-    if tool == "craft":
-        rec = RECIPES.get(item)
+            return f"you carry no {item}; {carried}" + ("; " + "; ".join(recipe_facts(item, inv, obs)) if item in RECIPES else "") + "."
+        if error in ("cliff_edge", "occupied", "bad_target", "no_room"):
+            return f"{detail[:80]}; free flat sides next to you now: {', '.join(dirs) or 'none'}."
+    if tool in ("craft", "craft_here"):
+        rec = RECIPES.get(item.split()[0] if item else "")
         if error == "unknown_recipe" or rec is None:
-            return f"no recipe '{item}'; the recipe names are in the list you were given (e.g. craft workbench)."
-        if error == "need_station":
-            st = station_steps(rec.station, dict(inv), obs)
-            return f"{item} is made within 2 tiles of a placed {rec.station}: first " + " > ".join(st[:3]) + "."
-        if error == "missing_items":
-            have = ", ".join(f"{n} {k} (have {inv.get(k, 0)})" for k, n in rec.inputs.items())
-            return f"{item} takes {have}; next: {_steps(item, inv, obs)}."
-    if tool in ("dig", "dig_down") and error == "need_tool":
+            return f"there is no recipe '{item}'."
+        if error in ("need_station", "missing_items"):
+            return "; ".join(recipe_facts(rec.name, inv, obs)) + "."
+    if tool in ("dig", "dig_down", "dig_at") and error == "need_tool":
         need = next((t for t in ("hoe", "pickaxe", "axe") if t in (detail or "")), "pickaxe")
+        carry = f"you carry a {need}" if inv.get(need) else f"you carry no {need}"
         if "tilling" in (detail or ""):
-            till = f"dig {args.get('dir', 'N')} hoe" if inv.get("hoe") else "a hoe: " + _steps("hoe", inv, obs, 3)
-            return (f"{args.get('dir', 'that way')} of you is bare ground: digging it tills it (for seeds). "
-                    f"{gather_hint(obs)} To till: {till}.")
-        if inv.get(need):
-            return f"you carry a {need}: say it, e.g. dig {args.get('dir', 'N')} {need}."
-        return f"you need a {need}: {_steps(need, inv, obs, 4)}."
+            return (f"{args.get('dir', 'there')} of you is bare ground; digging bare ground tills it, which takes a hoe in "
+                    f"hand (with hoe); {carry}. {around(obs)}")
+        return f"{detail[:80]}; {carry}" + ("" if inv.get(need) else "; " + "; ".join(recipe_facts(need, inv, obs))) + "."
     if tool == "attack" and error in ("no_target", "bad_args"):
         ids = [f"#{e['id']} {e.get('name') or e['kind']}" for e in obs["entities"][:4]]
-        return "attack takes a being's id (the #number in Beings), e.g. attack 12; in view: " + (", ".join(ids) or "nobody") + "."
+        return "attack takes a being's id (the #number in Beings); in view: " + (", ".join(ids) or "nobody") + "."
     if tool == "pick_up" and error == "nothing_here":
-        return "pick_up only takes items lying on your own tile; to harvest a plant or tree: dig D toward it."
+        return f"pick_up takes items lying on your own tile; none lie there. {around(obs)}"
     if tool == "eat":
         if error == "full":
-            return "you are full: eat later, do something else."
+            return f"you are full (food {obs['self']['hunger']}/20)."
         food = [k for k in inv if k in FOOD]
         return f"food you carry: {', '.join(food) or 'none'}."
     return ""

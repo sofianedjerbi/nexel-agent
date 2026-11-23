@@ -126,8 +126,15 @@ def _nearest(obs, chars):
     return best
 
 
-def _walk(obs, tx, ty, act="dig"):
-    """'move_to a b, dig D' (or 'dig D' when next to it) for the thing at (tx, ty), or ''."""
+def station_near(obs, station) -> bool:
+    g, r = obs["grid"], len(obs["grid"]) // 2
+    return any(g[r + dy][r + dx] == STATION_CH.get(station) for dy in range(-2, 3) for dx in range(-2, 3)
+               if 0 <= r + dy < len(g) and 0 <= r + dx < len(g))
+
+
+# ---------------------------------------------------------------- facts (never steps: the model plans)
+def where_to_stand(obs, tx, ty) -> str:
+    """'stand at (a,b), it is E of there' (or 'next to you, E') for the thing at (tx, ty), or 'no side reachable'."""
     me, reach = obs["self"], reachable(obs)
     best = None
     for d, (dx, dy) in DIRS.items():
@@ -135,79 +142,48 @@ def _walk(obs, tx, ty, act="dig"):
         if q in reach and (best is None or reach[q] < best[0]):
             best = (reach[q], tx - dx, ty - dy, d)
     if not best:
-        return ""
-    return f"{act} {best[3]}" if best[0] == 0 else f"move_to {best[1]} {best[2]}, {act} {best[3]}"
+        return "no side of it reachable in view"
+    return f"next to you, {best[3]}" if best[0] == 0 else f"stand at ({best[1]},{best[2]}), it is {best[3]} of there"
 
 
-def station_near(obs, station) -> bool:
-    g, r = obs["grid"], len(obs["grid"]) // 2
-    return any(g[r + dy][r + dx] == STATION_CH.get(station) for dy in range(-2, 3) for dx in range(-2, 3)
-               if 0 <= r + dy < len(g) and 0 <= r + dx < len(g))
-
-
-# ---------------------------------------------------------------- the steps
-def place_step(item, obs) -> str:
-    d = free_dirs(obs)
-    return f"place {d[0]} {item}" if d else f"walk to open flat ground, then place D {item}"
-
-
-def station_steps(station, have, obs, depth=0) -> list[str]:
+def station_fact(station, inv, obs) -> str:
     if station_near(obs, station):
-        return []
+        return f"a placed {station} within 2 tiles: yes"
     far = _nearest(obs, STATION_CH.get(station, "?"))
     if far:
-        way = _walk(obs, far[1], far[2], "craft")
-        return [f"go within 2 tiles of the {station} at ({far[1]},{far[2]})" + (f": {way.split(', craft')[0]}" if way else "")]
-    if have.get(station, 0) > 0:
-        have[station] -= 1
-        return [place_step(station, obs)]
-    return steps_for(station, have, obs, 1, depth + 1) + [place_step(station, obs)]
+        return f"a placed {station} within 2 tiles: no; one is at ({far[1]},{far[2]}), {far[0]} tiles away"
+    rec = RECIPES.get(station)
+    carried = f"you carry {inv[station]}" if inv.get(station) else "you carry none"
+    made = (f"; {station} = " + " + ".join(f"{n} {k}" for k, n in rec.inputs.items())) if rec else ""
+    return f"a placed {station} within 2 tiles: none in view; {carried}{made}"
 
 
-def gather_step(item, short, obs, have, depth=0) -> list[str]:
+def source_fact(item, obs, inv) -> str:
+    """Where `item` comes from, and the nearest such thing in view."""
     srcs = SOURCES.get(item)
     if not srcs:
-        if item in FOOD or item in ("meat", "milk", "egg"):
-            return [f"get {short} {item} (animals, plants)"]
-        return [f"find {short} {item}"]
-    chars = "".join(c for c, _ in srcs if not NEEDS_TOOL.get(c) or have.get(NEEDS_TOOL[c]))
-    near = _nearest(obs, chars) or _nearest(obs, "".join(c for c, _ in srcs))
+        return f"{item}: " + ("from animals or plants" if item in FOOD or item in ("meat", "milk", "egg") else
+                              ("= " + " + ".join(f"{n} {k}" for k, n in RECIPES[item].inputs.items()) if item in RECIPES
+                               else "no source known"))
+    names = " or ".join(n for _, n in srcs)
+    near = _nearest(obs, "".join(c for c, _ in srcs))
     if not near:
-        return [f"get {short} {item}: none in view, explore (look_far D, walk D)"]
-    tool = NEEDS_TOOL.get(near[3])
+        return f"{item} comes from {names}: none in view"
     name = dict(srcs)[near[3]]
-    if tool and not have.get(tool):
-        if item in RECIPES.get(tool, RECIPES["workbench"]).inputs or depth >= 2:   # (stone for the pickaxe that ore needs)
-            others = " or ".join(n for c, n in srcs if c != near[3])
-            return [f"get {short} {item}: the {name} at ({near[1]},{near[2]}) needs a {tool}; find "
-                    + (f"a {others}" if others else "another source") + " (look_far, walk D)"]
-        return steps_for(tool, have, obs, 1, depth + 1) + [f"dig the {name} with the {tool}"]
-    way = _walk(obs, near[1], near[2])
-    if way and tool:
-        way += f" {tool}"
-    return [f"get {short} {item}: {name} at ({near[1]},{near[2]})" + (f": {way}" if way else "")]
+    tool = NEEDS_TOOL.get(near[3])
+    need = f" (needs a {tool} in hand: you carry {'one' if inv.get(tool) else 'none'})" if tool else ""
+    return f"{item} comes from {names}; nearest: {name} at ({near[1]},{near[2]}){need}: {where_to_stand(obs, near[1], near[2])}"
 
 
-def steps_for(name, have, obs, n=1, depth=0) -> list[str]:
-    """What making n x `name` still takes, in order (spends from `have`, a copy), the last step 'craft name'."""
-    rec = RECIPES.get(name)
-    if rec is None:
-        return gather_step(name, n, obs, have, depth)
-    steps = station_steps(rec.station, have, obs, depth) if rec.station and depth < 3 else []
-    for k, per in rec.inputs.items():
-        short = per * n - have.get(k, 0)
-        if short > 0:
-            sub = RECIPES.get(k)
-            made = sub.output.get(k, 1) if sub else 1
-            if sub and (k not in SOURCES or all(have.get(i, 0) >= c for i, c in sub.inputs.items())) and depth < 3:
-                times = -(-short // made)
-                steps += steps_for(k, have, obs, times, depth + 1)
-                have[k] = have.get(k, 0) + times * made
-            else:
-                steps += gather_step(k, short, obs, have, depth)
-                have[k] = have.get(k, 0) + short
-        have[k] = have.get(k, 0) - per * n
-    return steps + [f"craft {name}" + (f" {n}" if n > 1 else "")]
+def recipe_facts(name, inv, obs) -> list[str]:
+    """What `name` takes, what you have of it, and for what is missing where it comes from."""
+    rec = RECIPES[name]
+    have = ", ".join(f"{n} {k} (have {inv.get(k, 0)})" for k, n in rec.inputs.items())
+    out = [f"{name} = {have}" + (f" @{rec.station}" if rec.station else "")]
+    if rec.station:
+        out.append(station_fact(rec.station, inv, obs))
+    out += [source_fact(k, obs, inv) for k, n in rec.inputs.items() if inv.get(k, 0) < n]
+    return out
 
 
 def goal_recipe(goal: str | None) -> str | None:
@@ -216,40 +192,18 @@ def goal_recipe(goal: str | None) -> str | None:
     return next((f for w in words for f in (w, w[:-1], w[:-2]) if f in RECIPES or f in SOURCES), None)
 
 
-def target_for(goal, inv, rec: Record | None):
-    """(what to make, why): the goal's recipe unless it is a keeper already carried, else the next milestone's."""
-    name = goal_recipe(goal)
-    if name and not (name in KEEP and name not in STATION_CH and inv.get(name)) and not (name in SOURCES and inv.get(name, 0) >= PLENTY):
-        return name, f"Your goal '{goal}'"
-    m = rec.next_milestone() if rec else None
-    for t in TARGETS.get(m, []):
-        if t in ("workbench", "campfire") and rec and t not in rec.placed:
-            return t, f"Next milestone '{m}'"
-        if not inv.get(t) and not (t in KEEP and rec and rec.ever.get(t)):
-            return t, f"Next milestone '{m}'"
-    return None, ""
-
-
 def progress_lines(obs, goal, rec: Record | None) -> list[str]:
-    """The computed 'progress' block of the observation (a few short lines)."""
+    """Facts for the goal: the milestones reached, and what the goal's recipe or material takes and where it is."""
     inv = obs["self"]["inventory"]
     out = []
     if rec:
         done = [i + 1 for i, (m, _) in enumerate(MILESTONES) if m in rec.reached]
-        nxt = rec.next_milestone()
-        out.append("Milestones done: " + (", ".join(map(str, done)) or "none") + (f"; next: {nxt}." if nxt else "."))
-    name, why = target_for(goal, inv, rec)
-    if name:
-        if name in STATION_CH:
-            steps = station_steps(name, dict(inv), obs) or [f"your {name} is in reach: use it"]
-        elif name in RECIPES:
-            steps = steps_for(name, dict(inv), obs)
-        else:
-            steps = gather_step(name, max(1, 10 - inv.get(name, 0)), obs, dict(inv))
-        out.append(f"{why}: next " + " > ".join(f"{i + 1}) {s}" for i, s in enumerate(steps[:4])) + ".")
-    plenty = [f"{k} {v}" for k, v in inv.items() if v >= PLENTY and k in SOURCES]
-    if plenty:
-        out.append(f"Plenty of {', '.join(plenty)}: stop gathering that, use it.")
+        out.append("Milestones reached: " + (", ".join(map(str, done)) or "none") + ".")
+    name = goal_recipe(goal)
+    if name in RECIPES:
+        out.append("For your goal: " + "; ".join(recipe_facts(name, inv, obs)) + ".")
+    elif name:
+        out.append("For your goal: " + source_fact(name, obs, inv) + ".")
     return out
 
 

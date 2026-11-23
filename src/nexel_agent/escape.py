@@ -67,5 +67,5 @@ def stuck(obs, memory) -> bool:
 def stuck_line(obs) -> str:
     me = obs["self"]
     where = "in water at the foot of a cliff" if me.get("swimming") else "in a hole or walled in"
-    return (f"You are stuck: no path from here to the land ({where}). Get out first: swim along the water to a low "
-            "bank, or dig the block in front at z = your z + 2 and jump onto it, a layer at a time.")
+    return (f"No path leads from here to the land ({where}). Bodies get out of such places by swimming along the "
+            "water to a low bank, or by digging the block in front at z = your z + 2 and jumping onto it, a layer at a time.")

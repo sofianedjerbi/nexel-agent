@@ -45,6 +45,8 @@ def stable_prefix(name: str, persona: str) -> str:
     tools = "\n".join(f"- {signature(t)}: {TOOL_HINTS[t]}" for t in TOOL_SPECS if t in TOOL_HINTS)
     tools += "\n- also: " + "; ".join(signature(t) for t in TOOL_SPECS if t not in TOOL_HINTS and t not in RARE)
     tools += "; remember TEXT; forget N"
+    tools += ("\n- verbs (one intent, the actions it takes): dig_at TARGET [with T]; go_next_to TARGET; move_away TARGET [N];"
+              " place_near ITEM; craft_here RECIPE [N]; where TARGET. TARGET: x y, #id, a name or a kind (tree, rock, Ana)")
     recipes = " ".join(f"{'By hand' if not st else '@' + st}: " + "; ".join(
         f"{n}=" + "+".join(f"{c} {k}" for k, c in RECIPES[n].inputs.items()) for n in PREFIX_RECIPES
         if n in RECIPES and RECIPES[n].station == st) + "." for st in (None, "workbench", "campfire"))
@@ -53,17 +55,20 @@ You play in real time: answer with a short plan; it runs at once while you think
 World: top-down grid, north is up (y-1), coordinates are absolute (x,y). Health 0-20, food 0-20 (work uses food).
 To gather, stand next to a thing and dig toward it: tree -> wood, berry_bush -> berries + seed, bare_bush -> fiber,
 rock -> stone (slow by hand), ore -> ore (pickaxe). Items next to you come to you. Wood and stone are materials,
-not things to place. @workbench crafts need a workbench PLACED within 2 tiles: craft it, place it, stay by it. Seeds go in tilled soil (dig ground with a hoe). Water: you swim. A step one
+not things to place. @workbench crafts need a placed workbench within 2 tiles of you. Seeds go in tilled soil (dig ground with a hoe). Water: you swim. A step one
 higher: jump D. {rules_text()}
 Commands (D is N, E, S or W; [x] optional):
 {tools}
 Recipes: {recipes}
-{ladder_text()} "next" in your view: the steps your goal lacks.
+{ladder_text()}
 Answer with ONE JSON object and nothing else:
-{{"goal":"<2-5 words>","do":["<command>", 2 to 5 commands]}}
-Example: {{"goal":"get wood","do":["move_to 4 -2","dig N","move_to 7 -1","dig E"]}} (one dig takes a whole tree, bush or rock)
+{{"goal":"<2-5 words>","done_when":{{<test>}},"do":["<command>", 2 to 6 commands]}}
+done_when is your goal's own test, checked after every action: "have": {{"wood": 8}} | "placed": "workbench" |
+"near": "workbench" | "at": [x, y] | "hp_at_least": 15 | "food_at_least": 12 (several keys: all must hold).
+The plan runs to its end, to its first failure, or until one of your cards fires.
+Example: {{"goal":"get wood","done_when":{{"have":{{"wood":6}}}},"do":["dig_at tree","dig_at tree"]}} (a dig takes a whole tree)
 Your memory is yours: "remember TEXT" keeps a note (a place, a person, a promise), "forget N" drops note [N].
-Use only what you carry and coordinates you were shown. "Near" gives the exact move_to and dig for each thing."""
+"Near" says for each thing where you can stand next to it and which way it is from there."""
 
 
 def craftable(inv: dict, grid: list[str]) -> list[str]:
@@ -116,11 +121,11 @@ def near_lines(obs, limit=5) -> list[str]:
             out.append(f"{name} ({tx},{ty}): needs a {need}")
         elif ch not in HARVEST:
             out.append(f"{name} ({tx},{ty})" + ("" if not v else " next to you, " + v[3] if v[0] == 0
-                                                   else f": stand {v[1]} {v[2]}, face {v[3]}"))
+                                                   else f": stand at ({v[1]},{v[2]}), it is {v[3]}"))
         elif v and v[0] == 0:
-            out.append(f"{name} ({tx},{ty}) next to you: dig {v[3]}")
+            out.append(f"{name} ({tx},{ty}) next to you, {v[3]}")
         elif v:
-            out.append(f"{name} ({tx},{ty}): move_to {v[1]} {v[2]}, dig {v[3]}")
+            out.append(f"{name} ({tx},{ty}): stand at ({v[1]},{v[2]}), it is {v[3]}")
         else:
             out.append(f"{name} ({tx},{ty}) {d} away, no way seen")
     return out
@@ -142,7 +147,7 @@ def needs_for(goal: str | None, inv: dict, grid) -> str:
 
 
 def compact_obs(obs, goal=None, heard=(), history=(), pending=(), notes="", lessons="", habit="", record=None,
-                danger=(), recall=()) -> str:
+                danger=(), recall=(), goal_line="") -> str:
     me, grid = obs["self"], obs["grid"]
     r = len(grid) // 2
     crop = [row[r - VIEW:r + VIEW + 1] for row in grid[r - VIEW:r + VIEW + 1]]
@@ -155,6 +160,7 @@ def compact_obs(obs, goal=None, heard=(), history=(), pending=(), notes="", less
              *danger,
              "Carry: " + (", ".join(f"{k} {v}" for k, v in inv.items()) or "nothing") + ".",
              "Can craft now: " + (", ".join(craftable(inv, grid)) or "nothing") + ".",
+             *([goal_line] if goal_line else []),
              *progress_lines(obs, goal, record),
              f"Map (@ = you; rows y{me['y'] - VIEW}..{me['y'] + VIEW}, columns x{me['x'] - VIEW}..{me['x'] + VIEW}):",
              *crop,
@@ -209,6 +215,9 @@ def chat_messages(name: str, persona: str, goal: str, speaker: str, text: str, r
             {"role": "user", "content": f"{ctx}You are busy with: {goal or 'getting by'}. {status}\n{speaker} says: {text}\n/no_think"}]
 
 
+INTENTS = ("follow", "stop", "give", "trade", "fight", "flee")
+
+
 def chat_parse(out: str) -> tuple[str, str]:
     """(what to say, what to do: come | stop | ""): the reply's JSON; failing that its text, a DO: in it read apart."""
     out = re.sub(r"<think>.*?</think>", "", out, flags=re.S).strip()
@@ -218,9 +227,10 @@ def chat_parse(out: str) -> tuple[str, str]:
     except ValueError:
         d = None
     if isinstance(d, dict):
-        say, do = str(d.get("say") or ""), str(d.get("do") or "").lower()
+        say, do = str(d.get("say") or ""), str(d.get("intent") or d.get("do") or "").lower()
     else:
         k = re.search(r"\**\s*DO\s*:\s*(\w+)", out, re.I)
         say, do = (out[:k.start()] if k else out), (k.group(1).lower() if k else "")
     say = re.sub(r"^\s*[\w.-]+\d\s*:\s*", "", " ".join(say.split())).strip().strip('"').strip()   # (not "gatsu0: ...")
-    return say[:160], do if do in ("come", "stop") else ""
+    do = {"come": "follow"}.get(do, do)
+    return say[:160], do if do in INTENTS else ""

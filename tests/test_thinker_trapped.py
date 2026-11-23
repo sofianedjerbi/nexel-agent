@@ -52,8 +52,8 @@ def test_in_the_river_under_cliffs_it_knows_it_is_stuck():
 
 def test_the_prompt_says_it_is_stuck(tmp_path):
     t = thinker(tmp_path, chat=False)
-    assert "You are stuck: no path from here" in t.plan_messages(canyon())[1]["content"]
-    assert "You are stuck" not in t.plan_messages(canyon(bank=(2, -4)))[1]["content"]
+    assert "No path leads from here to the land" in t.plan_messages(canyon())[1]["content"]
+    assert "No path leads" not in t.plan_messages(canyon(bank=(2, -4)))[1]["content"]
 
 
 def test_staying_put_with_nothing_gained_is_a_stall_and_moving_or_gaining_is_not():
@@ -93,7 +93,7 @@ def test_trapped_the_model_hears_it_and_nothing_moves_on_its_own(tmp_path):
     assert all(dt >= 1.0 for dt in same)                             # the same failing move never within a second
     prompts = [c[1]["messages"][1]["content"] for c in calls if c[1].get("stream")]
     assert any("move_to 9 0 FAILED no_path" in p for p in prompts)
-    assert any("You are stuck" in p for p in prompts) and any("gets nowhere here" in p for p in prompts)
+    assert any("No path leads" in p for p in prompts) and any("nothing in your pack changed" in p for p in prompts)
 
 
 def test_never_more_than_about_three_actions_a_second(tmp_path):

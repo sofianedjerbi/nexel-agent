@@ -28,6 +28,8 @@ from .fastprompt import stable_prefix
 from .lessons import Lessons
 from .memory import Memory
 from .planner import LOCAL, Item, Planner
+from .react import React
+from .verbs import VERBS, Verbs
 from .planwatch import PlanWatch
 from .plans import command_text, parse_plan  # noqa: F401  (parse_plan: tools, tests)
 from .playstats import summary
@@ -42,7 +44,7 @@ SAID_S = 120.0                                    # the very same line is not sa
 IDLE_WAIT_S = 0.5                                 # nothing queued: look again this often while the model thinks
 
 
-class Thinker(Planner):
+class Thinker(Planner, React, Verbs):
     def __init__(self, name, persona, token=None, game_url="ws://127.0.0.1:7777/agent", model_url=MODEL_URL,
                  model="default_model", data_dir=Path("agents"), temperature=0.3, max_tokens=120, refill_at=1,
                  chat=True, decision_log=None):
@@ -78,6 +80,7 @@ class Thinker(Planner):
         self.stats = Counter()
         self.calls: list[dict] = []
         self.busy: list[tuple[float, float, str]] = []      # (start, end, source) of every action on the server
+        self.react_init(Path(data_dir))
 
     # ------------------------------------------------------------ notes (the model's "note" field)
     def add_note(self, line: str):
@@ -86,16 +89,19 @@ class Thinker(Planner):
                           str((self.obs or {}).get("time", "")))
 
     # --------------------------------------------------------------- body
-    def abort(self, why: str):
+    def abort(self, why: str, tell: bool = True):
         if any(i.source == "model" for i in self.queue) or self.planning:
             self.stats["aborts"] += 1
-            self.history.append(f"(plan stopped: {why})")
+            if tell:
+                self.history.append(f"(plan stopped: {why})")
         self.epoch += 1
         self.queue = deque(i for i in self.queue if i.source == "chat")
 
     async def observe(self, game):
         obs = await game.observe()
+        t_seen = time.monotonic()
         me = obs["self"]
+        hits = []
         here, when = (me["x"], me["y"]), str(obs.get("time", ""))
         self.body.feel(obs)
         for e in obs["events"]:
@@ -108,16 +114,21 @@ class Thinker(Planner):
                     self.on_chat(e["from"], text, at)
             elif e.get("type") == "attack" and e.get("target") == self.name:
                 self.mem.hit_by(str(e.get("attacker")), e.get("damage"), e.get("weapon"), here, when, me["hp"])
+                who = str(e.get("attacker"))
+                b = next((x for x in obs["entities"] if x["id"] == e.get("id") or x.get("name") == who), None)
+                hits.append((who, b))
                 self.on_hit(e, me)
             elif e.get("type") == "death" and e.get("name") == self.name:
                 self.mem.add("death", f"you died: {e.get('cause')}" + (f" by {e['by']}" if e.get("by") else "")
                              + ", your pack dropped there", e.get("by"), at, when)
                 self.abort("you died")
+                self.cards.died()
             elif e.get("type") == "give" and e.get("to") == self.name:
                 g = self.mem.person(str(e.get("from")))["gave_you"]
                 g[str(e.get("item"))] = g.get(str(e.get("item")), 0) + int(e.get("n") or 1)
                 self.mem.add("gift", f"{e.get('from')} gave you {e.get('n')} {e.get('item')}", e.get("from"), at, when)
         self.obs = obs
+        self.on_look(obs, hits, t_seen)
         return obs
 
     def next_item(self, obs) -> Item | None:
@@ -165,9 +176,16 @@ class Thinker(Planner):
                 except asyncio.TimeoutError:
                     pass
                 continue
-            await asyncio.sleep(max(0.0, last + MIN_GAP_S - time.monotonic()))   # at most ~3 actions a second
+            if item.source != "card":
+                await asyncio.sleep(max(0.0, last + MIN_GAP_S - time.monotonic()))   # at most ~3 actions a second
             last = time.monotonic()
-            await self.execute(game, item, obs)
+            self.running = asyncio.create_task(self.execute(game, item, obs))
+            try:
+                await self.running
+            except asyncio.CancelledError:
+                if asyncio.current_task().cancelling():
+                    raise
+                self.stats["preempted"] += 1          # a card fired: its commands are first in the queue
 
     def on_stall(self, stall):
         """Nothing moved or changed for WINDOW_S: the model is told (what to do about it is its own choice)."""
@@ -180,8 +198,13 @@ class Thinker(Planner):
     async def execute(self, game, item: Item, obs):
         t0 = time.monotonic()
         self.current = item if item.source == "model" else None
+        self.current_source = item.source
+        if item.source == "card":
+            self.card_sent(item)
         if item.tool in LOCAL:
             reply = self.local(item, obs)
+        elif item.tool in VERBS:
+            reply = await self.verb(game, item.tool, item.args)
         else:
             reply = await game.act(item.tool, **item.args)
         t1 = time.monotonic()
@@ -199,7 +222,7 @@ class Thinker(Planner):
         self.history.append(line[:170])
         note_outcome(self.memory, obs, item, reply, t1)
         if not ok and reply.get("error") != "interrupted":
-            self.abort(f"{command_text(item.tool, item.args)} failed: {reply.get('error')}")
+            self.abort(f"{command_text(item.tool, item.args)} failed: {reply.get('error')}", tell=False)   # (its line says so)
         self._log(item, obs, reply, line, t0)
         if not ok and t1 - t0 < 0.15:
             await asyncio.sleep(0.25)                    # a refusal takes no time: do not hammer the server
@@ -236,14 +259,15 @@ class Thinker(Planner):
         """Run the body and the planner until `minutes` are up (or one of them fails); returns the summary."""
         self.http = http
         t0 = time.monotonic()
-        tasks = [asyncio.create_task(self.body_loop(game)), asyncio.create_task(self.plan_loop(http))]
+        tasks = [asyncio.create_task(self.body_loop(game)), asyncio.create_task(self.plan_loop(http)),
+                 asyncio.create_task(self.sense_loop(game))]
         try:
             done, _ = await asyncio.wait(tasks, timeout=minutes * 60 if minutes else None,
                                          return_when=asyncio.FIRST_EXCEPTION)
             for t in done:
                 t.result()
         finally:
-            for t in tasks + ([self.chat_task] if self.chat_task else []):
+            for t in tasks + [x for x in (self.chat_task, self.card_call) if x]:
                 t.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
             s = summary(self.busy, self.calls, time.monotonic() - t0, self.stats)

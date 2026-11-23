@@ -80,7 +80,7 @@ def social(recs, acts, events):
     for r in recs:
         if r.get("kind") == "chat":
             print(f"  chat [{(r['t'] - t0) / 60:.1f} min] {r['to']}: {r['heard']!r} -> {r['said']!r}"
-                  + (f" do={r['do']}" if r.get("do") else "") + (f" promise={r['promise']!r}" if r.get("promise") else ""))
+                  + (f" intent={r.get('intent') or r.get('do')}" if r.get("intent") or r.get("do") else "") + (f" promise={r['promise']!r}" if r.get("promise") else ""))
         elif r.get("kind") == "diary":
             print(f"  diary [{(r['t'] - t0) / 60:.1f} min] {r['text'][:300]!r}")
     says = [r["args"].get("text") for r in acts if r["tool"] == "say" and r["source"] == "model"]

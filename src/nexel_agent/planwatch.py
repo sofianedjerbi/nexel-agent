@@ -33,4 +33,4 @@ class PlanWatch:
 
 def did_nothing(plan: tuple, why: str) -> str:
     return (f"(your plan '{', '.join(plan)}' changed nothing{': ' + why if why else ''}. "
-            "Only what Near lists is really there: pick something from it)")
+            "and your pack is the same as the last time it came)")

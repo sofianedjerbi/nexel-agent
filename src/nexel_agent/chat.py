@@ -28,9 +28,9 @@ def chat_messages(name: str, persona: str, goal: str, speaker: str, text: str, r
             "cryptic, no coordinates unless asked. If you talked before, carry on the conversation (no new hello). "
             "If they hurt you, you remember it and it shows. Asked about the past (what they said, asked, did), answer with "
             "those facts, plainly. Never repeat a line you already said.\n"
-            'Reply with JSON only: {"say": "<your line>", "do": "come" | "stop" | "nothing", "promise": "<what you '
-            'agreed to do for them, or empty>"}. do=come: they ask you to come, follow or help them; do=stop: they ask '
-            "you to stop or to do something else; otherwise nothing.")
+            'Reply with JSON only: {"say": "<your line>", "intent": "none" | "follow" | "stop" | "give" | "trade" | '
+            '"fight" | "flee", "promise": "<what you agreed to do for them, or empty>"}. intent: what you mean to do '
+            "about it (you will plan it yourself right after).")
     facts = [f"You are busy with: {goal or 'getting by'}. You are at ({me.get('x', '?')}, {me.get('y', '?')}), "
              f"health {me.get('hp', '?')}/20, food {me.get('hunger', '?')}/20, carrying: {inv}."]
     if person:
@@ -100,24 +100,21 @@ class Chat:
                                {"role": "user", "content": f"You already said exactly that to {speaker}. Answer what they "
                                                            f"just said (\"{text[:100]}\") with something new. /no_think"}]
                 line = ""
-            if do in ("come", "stop"):
-                self.abort(f"{speaker} asked you to {do}")
-                self.history.append(f"({speaker} asked you to {do}: you did)")
-            if do == "stop":
-                self.history.append(f'({speaker} told you: "{text[:80]}". Do what they asked; pick another goal if it was about yours)')
+            if do:                              # the intent goes to the mind: the next plan is made knowing it
+                where = f" ({speaker} is at ({at[0]},{at[1]}))" if at else ""
+                self.abort(f"you mean to {do} ({speaker})")
+                self.history.append(f'({speaker}: "{text[:80]}" - you said "{line[:80]}", meaning to {do}{where})')
             if promise:
                 mem.promise(speaker, promise)
                 self.history.append(f"(you promised {speaker}: {promise})")
             if line:
                 mem.replied(speaker, line)
                 self.queue.appendleft(self.item("say", {"text": line[:120]}, "chat", f"answering {speaker}"))
-            if do == "come" and at:
-                self.queue.insert(1 if line else 0, self.item("move_to", {"x": at[0], "y": at[1]}, "chat", f"going to {speaker}"))
             if line or do:
                 self.new_plan.set()
                 self.calls.append({"kind": "chat", "latency_s": round(time.monotonic() - t0, 2)})
                 self.decision_log.write(json.dumps({"kind": "chat", "t": time.time(), "to": speaker, "heard": text,
-                                                    "said": line, "do": do, "promise": promise,
+                                                    "said": line, "intent": do, "promise": promise,
                                                     "latency_s": round(time.monotonic() - t0, 2)}) + "\n")
             if not self.chat_next:
                 return

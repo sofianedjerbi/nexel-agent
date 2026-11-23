@@ -15,6 +15,7 @@ from .chat import Chat
 from .escape import stuck, stuck_line
 from .fastprompt import compact_obs
 from .fixes import failure_line, look_far_line
+from .goals import clean, missing
 from .ladder import Record
 from .planwatch import TOLD, did_nothing
 from .plans import LOCAL_SPECS, PlanStream, command_text, parse_command
@@ -24,6 +25,14 @@ from .senses import danger_lines
 log = logging.getLogger("thinker")
 MAX_PLAN = 6                                     # commands taken from one answer
 LOCAL = set(LOCAL_SPECS)                         # remember / forget: the harness keeps them, the game never sees them
+
+
+def inv_after(obs, reply) -> dict:
+    """The pack after an action: the observation's, plus the reply's changes."""
+    inv = dict(obs["self"]["inventory"])
+    for k, n in ((reply.get("result") or {}).get("changed") or {}).get("inventory", {}).items():
+        inv[k] = inv.get(k, 0) + n
+    return inv
 
 
 def by_id(raw, obs):
@@ -62,10 +71,11 @@ class Planner(Chat):
         if diary := self.mem.summary_text():
             recall = [f"diary: {diary[:220]}"] + recall
         user = compact_obs(obs, goal=self.goal, record=self.record, heard=list(self.heard)[-3:], history=list(self.history),
-                           pending=list(pending), notes=self.mem.notes_text(), lessons=" | ".join(f[:110] for f in fails),
-                           danger=danger_lines(obs, self.body), recall=people + recall,
+                           pending=list(pending), notes=" ".join(filter(None, [self.mem.notes_text(),
+                           (f"Your cards: {cards}" if (cards := self.cards.text(3)) else "")])), lessons=" | ".join(f[:110] for f in fails),
+                           danger=danger_lines(obs, self.body), recall=people + recall, goal_line=self.goal_line(obs),
                            habit=" ".join(filter(None, [stuck(obs, self.memory) and stuck_line(obs),
-                                                        f"You keep doing {', '.join(habit)}: try something else." if habit else ""])))
+                                                        f"Of your last 20 commands: {', '.join(habit)}." if habit else ""])))
         return [{"role": "system", "content": self.prefix}, {"role": "user", "content": user}]
 
     def item(self, tool, args, source, why="") -> Item:
@@ -82,6 +92,7 @@ class Planner(Chat):
         """The line the model reads back: what changed, or for a failure what would work instead (fixes.py)."""
         ok = bool(reply.get("ok"))
         self.record.did(item.tool, item.args, ok, time.time())
+        self.check_goal({**obs, "self": {**obs["self"], "inventory": inv_after(obs, reply)}})
         if ok and item.tool == "attack":
             who = next((e.get("name") for e in obs["entities"] if e["id"] == item.args.get("target")), None)
             if who:
@@ -95,6 +106,31 @@ class Planner(Chat):
         if ok or reply.get("error") == "interrupted":
             return summarize_result(item.tool, item.args, reply)
         return failure_line(item.tool, item.args, reply, obs)
+
+    def set_goal(self, goal, test):
+        """A new goal and its own success test (goals.py), checked after every action."""
+        if goal != self.goal and getattr(self, "goal_test", None):
+            self.mem.add("goal", f"goal '{self.goal}' dropped for '{goal}'")
+        self.goal, self.goal_test = goal, clean(test)
+        self.goal_since, self.goal_t0 = dict(self.record.placed), time.time()
+
+    def goal_line(self, obs) -> str:
+        test = getattr(self, "goal_test", None)
+        if not test:
+            return f"Your goal '{self.goal}' has no done_when test." if self.goal else ""
+        return (f"Your goal '{self.goal}' (done_when {json.dumps(test)}), for {int(time.time() - self.goal_t0)} s; "
+                f"still missing: {'; '.join(missing(test, obs, self.record, self.goal_since)) or 'nothing'}.")
+
+    def check_goal(self, obs):
+        test = getattr(self, "goal_test", None)
+        if test and not missing(test, obs, self.record, self.goal_since):
+            secs = int(time.time() - self.goal_t0)
+            self.tell(f"(goal '{self.goal}' done in {secs} s: {json.dumps(test)} holds)")
+            self.mem.add("goal", f"goal '{self.goal}' done in {secs} s", None, (obs["self"]["x"], obs["self"]["y"]))
+            self.decision_log.write(json.dumps({"kind": "goal", "t": time.time(), "goal": self.goal, "done": True,
+                                                "test": test, "secs": secs}) + "\n")
+            self.stats["goals_done"] += 1
+            self.goal_test = None
 
     def tell(self, line: str):
         """A line for the model's 'Done' list, once (not the same warning four times over)."""
@@ -189,8 +225,8 @@ class Planner(Chat):
         if not stale:
             for raw in ps.finish()[:max(0, MAX_PLAN - n_ok - n_bad)]:
                 take(raw)
-            if ps.goal:
-                self.goal = ps.goal
+            if ps.goal and (ps.goal != self.goal or ps.done_when):
+                self.set_goal(ps.goal, ps.done_when)
             if ps.note:
                 self.add_note(ps.note)
             n = self.watch.arrived(tuple(plan), self.obs["self"]["inventory"]) if plan else 0

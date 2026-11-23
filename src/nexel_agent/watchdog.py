@@ -32,5 +32,4 @@ class Watchdog:
 
 def stall_line(stall) -> str:
     x, y = stall["at"]
-    return (f"(for {stall['secs']} s you have stayed around ({x},{y}) and nothing in your pack changed: what you are "
-            "doing gets nowhere here. Do something different, or go somewhere else)")
+    return f"(for {stall['secs']} s you have stayed around ({x},{y}) and nothing in your pack changed)"

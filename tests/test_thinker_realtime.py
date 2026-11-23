@@ -50,7 +50,7 @@ def test_prompt_is_short_and_its_prefix_stable():
     assert stable_prefix("Vex", "a trader") == stable_prefix("Vex", "a trader")
     user = compact_obs(fake_obs((0, 0)))
     assert len(stable_prefix("Vex", "a trader")) < 4000 and len(user) < 1500
-    assert "tree (0,-2): move_to 0 -1, dig N" in user
+    assert "tree (0,-2): stand at (0,-1), it is N" in user
 
 
 # ---------------------------------------------------------------- fakes
@@ -111,8 +111,12 @@ def model_transport(plans, delay=0.3, chat_line="Sure, take two.", calls=None):
     return httpx.MockTransport(handler), calls
 
 
-def thinker(tmp_path, **kw):
-    return Thinker("Vex", "a trader", data_dir=tmp_path, model_url="http://model/v1/chat/completions", **kw)
+def thinker(tmp_path, cards=False, **kw):
+    """A thinker on the fake model; cards=False: no card-writing calls (tests that count the model's calls)."""
+    t = Thinker("Vex", "a trader", data_dir=tmp_path, model_url="http://model/v1/chat/completions", **kw)
+    if not cards:
+        t.ask_cards = lambda *a, **k: None
+    return t
 
 
 # ---------------------------------------------------------------- body
@@ -135,7 +139,7 @@ def test_plan_runs_in_order_and_a_failure_drops_the_rest(tmp_path):
     step(t, game, 3)
     tools = [a[1] for a in game.acts]
     assert tools == ["move_to", "dig"]                                  # the third was dropped, nothing else done
-    assert any("plan stopped" in h for h in t.history) and t.stats["aborts"] == 1
+    assert t.stats["aborts"] == 1
     assert any("dig N FAILED nothing_there" in h for h in t.history)    # the failure, said back as it was
 
 

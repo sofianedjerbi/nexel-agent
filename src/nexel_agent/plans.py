@@ -12,7 +12,8 @@ from .sim.specs import TOOL_SPECS
 
 DIR_WORDS = {"N", "E", "S", "W", "up"}
 LOCAL_SPECS = {"remember": {"args": {"text": "str"}}, "forget": {"args": {"n": "int"}}}   # the player's own memory
-SPECS = {**TOOL_SPECS, **LOCAL_SPECS}
+from .verbs import VERB_SPECS  # noqa: E402
+SPECS = {**TOOL_SPECS, **LOCAL_SPECS, **VERB_SPECS}
 FILLER_WORDS = {"with", "the", "a", "to", "at", "using", "x", "y", "dir", "facing"}   # "dig N with pickaxe", "move_to x 3 y 4"
 
 
@@ -109,6 +110,7 @@ class PlanStream:
         self.sent = 0
         self.goal = None
         self.note = None
+        self.done_when = None
 
     def feed(self, piece: str) -> list:
         self.text += piece
@@ -149,6 +151,7 @@ class PlanStream:
         if isinstance(d, dict):
             self.goal = self.goal or (d.get("goal") if isinstance(d.get("goal"), str) else None)
             self.note = d.get("note") if isinstance(d.get("note"), str) else None
+            self.done_when = d.get("done_when") if isinstance(d.get("done_when"), dict) else None
             todo = d.get("do") if isinstance(d.get("do"), list) else ([d] if "tool" in d else [])
             new = todo[self.sent:]
             self.sent = max(self.sent, len(todo))
