@@ -144,3 +144,27 @@ def test_a_goal_test_says_what_is_missing_and_the_body_sees_it_done(tmp_path):
             await t.play(game, http, minutes=1.5 / 60)
     asyncio.run(go())
     assert t.stats["goals_done"] >= 1 and any("goal 'get wood' done" in e["text"] for e in t.mem.episodes)
+
+
+def test_dig_at_a_tree_seen_before_far_out_of_view_walks_there(tmp_path):
+    sim, a, game, t = setup(tmp_path)
+    for x in range(a.x, a.x + 31):
+        sim.world.set(x, a.y, ground="dirt", block="none", level=0)
+    sim.world.set(a.x + 30, a.y, block="tree")
+    t.memory["seen"] = {"tree": (a.x + 30, a.y)}                         # (look_far saw it)
+    x0 = a.x
+    r = asyncio.run(t.verb(game, "dig_at", {"text": "tree"}))
+    assert r.get("ok"), r
+    assert a.inventory.get("wood", 0) >= 1 and a.x >= x0 + 5          # (it left the cleared patch; a nearer tree may do)
+
+
+def test_place_near_finds_a_free_tile_when_every_side_is_taken(tmp_path):
+    sim, a, game, t = setup(tmp_path)
+    for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+        sim.world.set(a.x + dx, a.y + dy, block="fence")
+    sim.world.set(a.x + 1, a.y, block="none")                            # one way out, its sides are free
+    sim.world.set(a.x + 2, a.y, block="fence")
+    a.inventory["workbench"] = 1
+    r = asyncio.run(t.verb(game, "place_near", {"text": "workbench"}))
+    assert r.get("ok"), r
+    assert a.inventory.get("workbench", 0) == 0

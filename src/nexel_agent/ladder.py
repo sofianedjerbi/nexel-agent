@@ -99,12 +99,14 @@ def _level(ch: str) -> int:
     return int(ch) if ch.isdigit() else ord(ch) - 55 if ch.isupper() else 96 - ord(ch) if ch.islower() else 0
 
 
-def free_dirs(obs) -> list[str]:
-    """Sides of you where a thing can be put down: free flat ground, not on a hill's edge."""
+def free_dirs(obs, at=(0, 0)) -> list[str]:
+    """Sides of you (or of the tile `at` from you) where a thing can be put down: free flat ground, not a hill's edge."""
     g, h, r = obs["grid"], obs.get("heights"), len(obs["grid"]) // 2
     out = []
     for d, (dx, dy) in DIRS.items():
-        x, y = r + dx, r + dy
+        x, y = r + at[0] + dx, r + at[1] + dy
+        if not (1 <= x < len(g) - 1 and 1 <= y < len(g) - 1):
+            continue
         if g[y][x] not in FREE:
             continue
         if h and any(_level(h[y + j][x + i]) < _level(h[y][x]) for i in (-1, 0, 1) for j in (-1, 0, 1)

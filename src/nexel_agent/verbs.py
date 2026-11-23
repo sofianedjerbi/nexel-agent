@@ -2,10 +2,10 @@
 plays plain game actions for it, like move_to's pathfinding does:
 
     go_next_to TARGET      walk to a free side of it; says which way it is      (TARGET: "x y", a name, a kind or #id)
-    dig_at TARGET [with T] go next to it and dig it
+    dig_at TARGET [with T] go next to it (however far: in view, or where it was last seen) and dig it
     move_away TARGET [N]   walk to a reachable spot at least N tiles (default 8) from it
-    place_near ITEM        put ITEM on a free flat side of you
-    craft_here RECIPE [N]  craft; when its station is in view but not within 2 tiles, walk next to it first
+    place_near ITEM        put ITEM on a free flat side of you, or of the nearest reachable tile that has one
+    craft_here RECIPE [N]  craft; with its station placed in view or seen before but not within 2 tiles, walk to it first
     where TARGET / find NAME   where something is (no action)
 
 Whether to do any of it is the model's choice.
@@ -65,21 +65,19 @@ class Verbs:
         text = str(args.get("text", "")).strip()
         obs = await self.observe(game)
         if tool in ("where", "find"):
-            spots = locate(obs, text)
-            return done(f"{text}: " + (", ".join(f"({x},{y})" for x, y in spots[:4]) or "not in view"))
+            spots = self.spots(obs, text)
+            return done(f"{text}: " + (", ".join(f"({x},{y})" for x, y in spots[:4]) or "not in view and never seen"))
         if tool == "place_near":
-            d = free_dirs(obs)
-            if not d:
-                return fail("no_room", "no free flat side next to you (each side is taken, water or a hill's edge)")
-            return await game.act("place", dir=d[0], item=text.split()[0] if text else "")
+            return await self.place_near(game, obs, text.split()[0] if text else "")
         if tool == "craft_here":
             w = text.split()
             name, n = (w[0] if w else ""), (int(w[1]) if len(w) > 1 and w[1].isdigit() else 1)
             st = RECIPES[name].station if name in RECIPES else None
-            if st and not any(math.dist(p, (obs["self"]["x"], obs["self"]["y"])) <= 2.9 for p in locate(obs, st)):
-                spots = locate(obs, st)
+            me = obs["self"]
+            if st and not any(max(abs(p[0] - me["x"]), abs(p[1] - me["y"])) <= 2 for p in locate(obs, st)):
+                spots = self.spots(obs, st)
                 if spots:
-                    r = await self.go_next_to(game, obs, spots[0])
+                    r = await self.travel(game, obs, spots[0])
                     if not r.get("ok"):
                         return r
             return await game.act("craft", recipe=name, n=n)
@@ -90,16 +88,68 @@ class Verbs:
             num = [p.lstrip("-").isdigit() for p in w]
             if (len(w) == 3 and all(num)) or (len(w) >= 2 and num[-1] and not num[0]):
                 dist, target = int(w[-1]), " ".join(w[:-1])
-        spots = locate(obs, target)
+        spots = self.spots(obs, target)
         if not spots:
-            return fail("not_found", f"no {target!r} in view")
+            return fail("not_found", f"no {target!r} in view, and none seen before")
         if tool == "move_away":
             return await self.move_away(game, obs, spots[0], dist)
-        r = await self.go_next_to(game, obs, spots[0])
+        r = await self.travel(game, obs, spots[0])
         if not r.get("ok") or tool == "go_next_to":
             return r
         args = {"dir": r["result"]["dir"], **({"with": tool_in_hand} if tool_in_hand else {})}
         return await game.act("dig", **args)
+
+    def spots(self, obs, target) -> list[tuple]:
+        """Where target is: in view (nearest first), else where it was last seen (the player's map memory)."""
+        here = locate(obs, target)
+        if here:
+            return here
+        seen = getattr(self, "memory", {}).get("seen", {})
+        key = target.lstrip("#").lower().replace("_", " ")
+        return [tuple(seen[key])] if key in seen else []
+
+    async def travel(self, game, obs, spot, legs=6) -> dict:
+        """Next to spot, however far: walk legs toward it (pathfinding on each) until it is in view, then beside it."""
+        for _ in range(legs):
+            me = obs["self"]
+            r = len(obs["grid"]) // 2
+            if abs(spot[0] - me["x"]) <= r - 1 and abs(spot[1] - me["y"]) <= r - 1:
+                return await self.go_next_to(game, obs, spot)
+            reach = reachable(obs)
+            q = min(reach, key=lambda q: math.dist((me["x"] + q[0], me["y"] + q[1]), spot))
+            if q == (0, 0):
+                res = await game.act("move_to", x=spot[0], y=spot[1])     # (the server's pathfinding: 64 tiles)
+                if not res.get("ok"):
+                    return fail("no_path", f"({spot[0]},{spot[1]}) cannot be reached from ({me['x']},{me['y']}): "
+                                f"{res.get('detail') or res.get('error')}")
+            else:
+                res = await game.act("move_to", x=me["x"] + q[0], y=me["y"] + q[1], run=True)
+                if not res.get("ok"):
+                    return res
+            obs = await self.observe(game)
+        return fail("too_far", f"({spot[0]},{spot[1]}) still out of reach after {legs} legs")
+
+    async def place_near(self, game, obs, item) -> dict:
+        """Put item on a free, flat, placeable side: of you, else of the nearest reachable tile that has one."""
+        last = None
+        for d in free_dirs(obs):
+            res = await game.act("place", dir=d, item=item)
+            if res.get("ok") or res.get("error") in ("missing_item", "not_placeable"):
+                return res
+            last = res
+        me = obs["self"]
+        spots = sorted((n, q) for q, n in reachable(obs).items() if 0 < n <= 8 and free_dirs(obs, q))
+        for n, q in spots[:3]:
+            mv = await game.act("move_to", x=me["x"] + q[0], y=me["y"] + q[1])
+            if not mv.get("ok"):
+                continue
+            obs = await self.observe(game)
+            for d in free_dirs(obs):
+                res = await game.act("place", dir=d, item=item)
+                if res.get("ok") or res.get("error") in ("missing_item", "not_placeable"):
+                    return res
+                last = res
+        return last or fail("no_room", "no free flat tile to put it on within 8 steps")
 
     async def go_next_to(self, game, obs, spot) -> dict:
         """Walk to the nearest reachable side of spot; result dir = the way it is from there."""
