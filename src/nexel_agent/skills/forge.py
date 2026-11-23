@@ -70,14 +70,16 @@ def recipes_text():
 
 
 def code_of(text, name="") -> str:
-    """The code block of the answer (the last fenced block that defines the function; never the reasoning)."""
-    blocks = re.findall(r"```[a-zA-Z]*[ \t]*\n(.*?)(?:```|$)", text, re.S)
-    with_def = [b for b in blocks if f"def {name}" in b] or [b for b in blocks if "def " in b]
-    runs = [b for b in with_def if check(name, b.strip()) is None]
-    if runs or with_def:
-        return (runs or with_def)[-1].strip()
-    i = text.find(f"def {name}")
-    return text[i:].strip() if i != -1 else ""
+    """The code of the answer: from the last `def name(` that compiles to the fence after it (never the reasoning)."""
+    starts = [m.start() for m in re.finditer(rf"^def {re.escape(name)}\(", text, re.M)] or \
+        [m.start() for m in re.finditer(r"^def \w+\(", text, re.M)]
+    found, good = [], ""
+    for a in starts:
+        b = text.find("```", a)
+        src = text[a:b if b != -1 else None].strip()
+        found.append(src)
+        good = src if check(name, src) is None else good
+    return good or (found[-1] if found else "")
 
 
 def state(body) -> str:

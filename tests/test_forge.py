@@ -73,6 +73,8 @@ def test_the_code_is_the_block_that_defines_the_function():
     text = "```text\nI will — carefully — dig\n```\n```py\ndef get_wood(n):\n    return True\n```"
     assert F.code_of(text, "get_wood") == "def get_wood(n):\n    return True"
     assert F.code_of("Reasoning first.\ndef get_wood(n):\n    return 1", "get_wood").startswith("def get_wood")
+    assert F.code_of("```text\nplan\n```python\n```python\ndef get_wood(n):\n    return 2\n```", "get_wood") == \
+        "def get_wood(n):\n    return 2"
 
 
 def test_a_remembered_tree_that_is_gone_is_said_so_not_dug_as_ground(tmp_path):
