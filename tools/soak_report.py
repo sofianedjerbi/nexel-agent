@@ -54,8 +54,9 @@ def main(path, events=None):
 
 def progress(acts):
     """Crafted, placed, kinds gained, failures by error, and the milestones replayed from the log (minute reached)."""
-    ok = lambda tool: Counter(str(r["args"].get("recipe" if tool == "craft" else "item")) for r in acts if r["tool"] == tool and r["ok"])
-    print("crafted:", dict(ok("craft")), "| placed:", dict(ok("place")))
+    name = lambda r: str(r["args"].get("recipe") or r["args"].get("item") or str(r["args"].get("text", "")).split(" ")[0])
+    ok = lambda tools: Counter(name(r) for r in acts if r["tool"] in tools and r["ok"])
+    print("crafted:", dict(ok(("craft", "craft_here"))), "| placed:", dict(ok(("place", "place_near"))))
     print("failures:", dict(Counter(f"{r['tool']} {r['error']}" for r in acts if not r["ok"]).most_common(12)))
     rec, inv, t0, kinds = Record(), Counter(), acts[0]["t"], set()
     for r in acts:
