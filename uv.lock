@@ -464,7 +464,7 @@ dev = [
 [[package]]
 name = "nexel-worlds"
 version = "0.1.0"
-source = { git = "https://github.com/sofianedjerbi/nexel-worlds#b0ccb957b1d45b3b6d4a18b7127050cced96dcd4" }
+source = { git = "https://github.com/sofianedjerbi/nexel-worlds#b8e7e70a08dc1ba8855058fe280add1dd636d844" }
 dependencies = [
     { name = "cryptography" },
     { name = "websockets" },

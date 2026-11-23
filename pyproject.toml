@@ -40,3 +40,48 @@ dev = [
 [tool.pytest.ini_options]
 asyncio_default_fixture_loop_scope = "function"
 addopts = "-n 4"
+
+# ---------------------------------------------------------------- lint (CI: .github/workflows/ci.yml)
+# Blocking: these rule families, less the rules today's code breaks (the `ignore` list is the debt:
+# drop a rule from it once the code passes it). The format check is not blocking until the format pass.
+[tool.ruff]
+target-version = "py314"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "B", "UP", "SIM", "I", "C4", "RUF", "PIE", "ASYNC"]
+ignore = [
+    "ASYNC109", "ASYNC110", "ASYNC230", "B007", "B905", "C408", "C420", "E501", "E731", "F401", "F841",
+    "I001", "RUF005", "RUF006", "RUF007", "RUF021", "RUF059", "RUF100", "SIM102", "SIM105", "SIM115",
+    "SIM905", "UP041",
+]
+
+# ---------------------------------------------------------------- releases (python-semantic-release)
+# On every push to main, .github/workflows/semantic-release.yml reads the Conventional Commits since the
+# last tag vX.Y.Z, bumps project.version here (and uv.lock), writes CHANGELOG.md, tags and makes the
+# GitHub Release; .github/workflows/release.yml then builds the sdist and wheel onto it.
+[tool.semantic_release]
+version_toml = ["pyproject.toml:project.version"]
+tag_format = "v{version}"
+commit_parser = "conventional"
+commit_message = "chore(release): v{version}"
+major_on_zero = false
+allow_zero_version = true
+build_command = "uv lock && git add uv.lock"
+assets = ["uv.lock"]
+
+[tool.semantic_release.branches.main]
+match = "main"
+prerelease = false
+
+[tool.semantic_release.changelog]
+mode = "update"
+insertion_flag = "<!-- version list -->"
+exclude_commit_patterns = ['''^chore\(release\)''', '''^Merge ''']
+
+[tool.semantic_release.changelog.default_templates]
+changelog_file = "CHANGELOG.md"
+
+[tool.semantic_release.remote]
+type = "github"
+token = { env = "GH_TOKEN" }
