@@ -176,7 +176,11 @@ def gather_step(item, short, obs, have, depth=0) -> list[str]:
         return [f"get {short} {item}: none in view, explore (look_far D, walk D)"]
     tool = NEEDS_TOOL.get(near[3])
     name = dict(srcs)[near[3]]
-    if tool and not have.get(tool) and depth < 3:
+    if tool and not have.get(tool):
+        if item in RECIPES.get(tool, RECIPES["workbench"]).inputs or depth >= 2:   # (stone for the pickaxe that ore needs)
+            others = " or ".join(n for c, n in srcs if c != near[3])
+            return [f"get {short} {item}: the {name} at ({near[1]},{near[2]}) needs a {tool}; find "
+                    + (f"a {others}" if others else "another source") + " (look_far, walk D)"]
         return steps_for(tool, have, obs, 1, depth + 1) + [f"dig the {name} with the {tool}"]
     way = _walk(obs, near[1], near[2])
     if way and tool:

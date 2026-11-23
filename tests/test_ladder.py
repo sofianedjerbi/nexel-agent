@@ -116,3 +116,14 @@ def test_digging_bare_ground_says_so_and_look_far_says_what_is_out_there():
     res = {"rows_near_to_far": ["....", "..T.", "M...", "~~~~"], "agents": [{"name": "Ana", "dx": 3, "dy": -20}]}
     assert look_far_line({"dir": "N"}, res) == "look_far N -> tree ~13 tiles, rock ~15 tiles; water from ~17 tiles; people: Ana (+3,-20) (N of you)"
     assert look_far_line({"dir": "E"}, {"rows_near_to_far": ["..b."]}) == "look_far E -> berry_bush ~11 tiles; no tree or rock (E of you)"
+
+
+def test_stone_only_from_ore_without_a_pickaxe_says_find_a_rock_not_a_loop():
+    o = fake_obs((0, 0))
+    g = [list(r) for r in o["grid"]]
+    g[10][11] = "*"                                                      # ore E of you, no rock anywhere
+    o["grid"] = ["".join(r) for r in g]
+    o["self"]["inventory"] = {"wood": 10, "fiber": 2}
+    line = " ".join(progress_lines(o, "craft pickaxe", None))
+    assert "get 3 stone: the ore at (1,0) needs a pickaxe; find a rock or cave wall (look_far, walk D)" in line
+    assert line.count("> 4) craft pickaxe") == 1 and "dig the ore" not in line

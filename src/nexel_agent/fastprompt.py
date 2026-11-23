@@ -77,7 +77,7 @@ def craftable(inv: dict, grid: list[str]) -> list[str]:
         if all(inv.get(k, 0) >= n for k, n in rec.inputs.items()):
             st = rec.station
             out.append(name if not st or STATIONS.get(st) in near else f"{name}(@{st})")
-    return out[:10]
+    return out[:7]
 
 
 def _via(obs, reach, tx, ty):
@@ -93,7 +93,7 @@ def _via(obs, reach, tx, ty):
     return best
 
 
-def near_lines(obs, limit=7) -> list[str]:
+def near_lines(obs, limit=5) -> list[str]:
     """The nearest thing of each kind in the full view, with where to stand and which way to face."""
     me, grid = obs["self"], obs["grid"]
     r = len(grid) // 2

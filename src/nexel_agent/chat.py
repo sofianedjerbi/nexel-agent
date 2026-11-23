@@ -26,7 +26,8 @@ def chat_messages(name: str, persona: str, goal: str, speaker: str, text: str, r
             "short sentence (at most 20 words), about what they actually said and what is going on between you. Your "
             "character shows in your attitude, not in theatre. Answer questions truthfully from the facts given; never "
             "cryptic, no coordinates unless asked. If you talked before, carry on the conversation (no new hello). "
-            "If they hurt you, you remember it and it shows. Never repeat a line you already said.\n"
+            "If they hurt you, you remember it and it shows. Asked about the past (what they said, asked, did), answer with "
+            "those facts, plainly. Never repeat a line you already said.\n"
             'Reply with JSON only: {"say": "<your line>", "do": "come" | "stop" | "nothing", "promise": "<what you '
             'agreed to do for them, or empty>"}. do=come: they ask you to come, follow or help them; do=stop: they ask '
             "you to stop or to do something else; otherwise nothing.")
