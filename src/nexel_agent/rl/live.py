@@ -1,6 +1,6 @@
 """A learned player on the real server: the policy trained in the sim (rl/npolicy.py, numpy) acts on the agent API's
 observation with the same encoding (rl/encode.py) and the same timing as in training: a decision when the last action
-ends (0.2 s at the soonest), when hurt, or every 0.5 s. No model in the action loop; with --model-url, someone
+ends (0.2 s at the soonest), at once when hurt or someone comes into view, or after 5 s. No model in the action loop; with --model-url, someone
 talking to it gets a line back from the local model (chat.py's prompt), and nothing else.
     python -m megastructure.rl.live --name Rook --policy rl_runs/r1/policy.npz --game ws://127.0.0.1:7790/agent"""
 
@@ -19,7 +19,7 @@ from ..fastprompt import chat_parse
 from .achieve import HOSTILE
 from .encode import ACTIONS, action_name, encode, legal, to_command
 
-MIN_S, MAX_S = 0.2, 0.5
+MIN_S, IDLE_S, WAIT_MAX_S, POLL_S = 0.2, 0.5, 5.0, 0.25
 
 
 class LiveBody:
@@ -55,6 +55,24 @@ class LiveBody:
                 self.foes.pop(args["target"])
         self.last_ok = 1.0 if r.get("ok") else -1.0
 
+    async def wait(self, game, task, me, t0):
+        """As in the env (rl/core.py): till the action ends (0.2 s at the soonest; idle, 0.5 s), or at once when hurt
+        or someone comes into view, or 5 s at the latest. The events seen meanwhile are all kept."""
+        seen = {b["id"] for b in self.obs_entities}
+        events = []
+        await asyncio.sleep(MIN_S)
+        while True:
+            obs = await game.observe()
+            events += obs.get("events", [])
+            s, dt = obs["self"], time.monotonic() - t0
+            new = {b["id"] for b in obs.get("entities", [])} - seen
+            if s["hp"] < me["hp"] or s["deaths"] != me["deaths"] or new or dt >= WAIT_MAX_S \
+                    or (task.done() if task is not None else dt >= IDLE_S):
+                obs["events"] = events
+                self.obs_entities = obs.get("entities", [])
+                return obs
+            await asyncio.sleep(POLL_S)
+
     async def say_back(self, game, http, speaker, text, me):
         msgs = chat_messages(self.a.name, self.a.persona, "", speaker, text, me=me)
         try:
@@ -76,6 +94,7 @@ class LiveBody:
         async with Client(self.a.game) as game:
             await game.hello(self.a.name, f"rl-{self.a.name}", self.a.persona)
             obs = await game.observe()
+            self.obs_entities = obs.get("entities", [])
             hp, deaths, task, running, t_report = obs["self"]["hp"], obs["self"]["deaths"], None, None, time.monotonic()
             while time.monotonic() < t_end:
                 me = obs["self"]
@@ -111,11 +130,9 @@ class LiveBody:
                     task = asyncio.create_task(game.act(tool, **args))
                     task.add_done_callback(lambda t, tool=tool, args=args: self.done(tool, args, "", t))
                     running = (cmd, task)
-                await asyncio.sleep(MIN_S)
-                if task is not None and not task.done():
-                    await asyncio.wait([task], timeout=MAX_S - (time.monotonic() - t0))
+                under_way = running[1] if running and not running[1].done() else None
                 self.last = i
-                obs = await game.observe()
+                obs = await self.wait(game, under_way, me, t0)
                 if self.log and (self.stats["decisions"] % 200 == 0 or time.monotonic() - t_report > 60):
                     t_report = time.monotonic()
                     self.log.write(json.dumps(self.report(me, action_name(i))) + "\n")

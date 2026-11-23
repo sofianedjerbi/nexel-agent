@@ -115,6 +115,16 @@ def test_the_same_action_again_goes_on():
     assert a.count("wood") and "collect_wood" in env.ledger.done
 
 
+def test_an_action_runs_till_it_ends():
+    env = SimEnv(ep_ticks=10 ** 6)
+    env.reset(5)
+    a = env.a
+    env.sim.set_tile(a.x + 1, a.y, block="tree")
+    t0 = env.sim.tick
+    _, r, *_ = env.step(idx("dig_E"))             # one decision: the chop (~2.4 s by hand) goes to its end
+    assert a.count("wood") and r >= 1.0 and env.sim.tick - t0 >= 20
+
+
 def test_a_pit_is_not_a_trap():
     """Dug down three layers, the actions can cut steps up out of it (dig the land in front at head height, jump)."""
     env = SimEnv(ep_ticks=10 ** 6)

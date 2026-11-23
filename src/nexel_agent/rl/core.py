@@ -1,19 +1,21 @@
 """The learning env over the in-process sim (the game's own Python: no gymnasium here; rl/vec.py wraps it).
 
 An episode: a freshly generated world (seed), one player at its spawn in the morning, mobs, food and night as in the
-game, until the next dawn (or death). A decision is taken when the last action ends (0.2 s at the soonest), when the player is hurt,
-or every DECIDE ticks (0.5 s) at the latest; `noop` lets a long action (chopping) go on."""
+game, until the next dawn (or death). An action runs till it ends (0.2 s at the soonest); the next decision comes then,
+or at once when the player is hurt or someone comes into view, or after WAIT_MAX (5 s) at the latest. `noop` lets what
+it was doing go on, or, idle, waits 0.5 s."""
 
 import math
 from pathlib import Path
 
 from ..sim import Simulation
-from ..sim.constants import DAY_TICKS
+from ..sim.constants import DAY_TICKS, VIEW_R
 from .achieve import HOSTILE, Ledger
 from .encode import ACTIONS, encode, legal, to_command
 
-DECIDE = 5                          # ticks: the longest a decision waits
-MIN_TICKS = 2                       # and the shortest (0.2 s: a step), unless hurt
+DECIDE = 5                          # ticks: an idle noop waits this long
+MIN_TICKS = 2                       # the shortest a decision waits (0.2 s: a step), unless hurt
+WAIT_MAX = 50                       # and the longest (a chop by hand takes ~5 s)
 START = 0.3                         # the time of day an episode starts (morning)
 EP_TICKS = int(0.75 * DAY_TICKS)    # to the dawn after the first night, and a little more
 HURT = 0.1                          # reward per half heart lost
@@ -62,12 +64,16 @@ class SimEnv:
             act = sim.submit(a, tool, args)
             self.running = (cmd, act)
             self.pending.append((act, tool, args, target.kind if target else ""))
-        for t in range(self.decide):
+        seen = self.in_view()
+        for t in range(WAIT_MAX):
             sim.step()
             if a.deaths > deaths0 or a.hp < hp0:
-                break
-            if t + 1 >= MIN_TICKS and act is not None and act.result is not None:
-                break
+                break                                   # hurt: decide now
+            busy = a.action is not None or a.aside is not None
+            if t + 1 >= MIN_TICKS and (act.result is not None if act is not None else not busy and t + 1 >= self.decide):
+                break                                   # what it was doing is done (or, idle, 0.5 s went by)
+            if t % 5 == 4 and self.in_view() - seen:
+                break                                   # someone came into view
         r, made = 0.0, {}
         self.last_ok = 0.0
         for p in [p for p in self.pending if p[0].result is not None]:
@@ -103,6 +109,10 @@ class SimEnv:
             L.close_fights(died)
             info = self.summary(died)
         return self.encoded(), r, died, truncated and not died, info
+
+    def in_view(self) -> set:
+        a, R = self.a, VIEW_R
+        return {c.id for c in self.sim.creatures.values() if abs(c.x - a.x) <= R and abs(c.y - a.y) <= R}
 
     def summary(self, died: bool) -> dict:
         c = self.ledger.counts
