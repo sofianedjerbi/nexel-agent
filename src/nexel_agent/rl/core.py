@@ -14,6 +14,15 @@ from .achieve import HOSTILE, Ledger
 from .encode import ACTIONS, encode, legal, to_command
 from .milestones import Milestones
 
+
+def split(cmd) -> list:
+    """The tool calls of one action: itself; or, climb, the game's own way up a step: the block over your head dug
+    (if any), the land in front at head height (if any), then a jump that way."""
+    tool, args = cmd
+    if tool == "climb":
+        return [("dig", {"dir": "up"}), ("dig", {"dir": args["dir"], "z": args["z"]}), ("jump", {"dir": args["dir"]})]
+    return [cmd]
+
 DECIDE = 5                          # ticks: an idle noop waits this long
 MIN_TICKS = 2                       # the shortest a decision waits (0.2 s: a step), unless hurt
 WAIT_MAX = 50                       # and the longest (a chop by hand takes ~5 s)
@@ -34,7 +43,7 @@ class SimEnv:
         self.t0 = self.sim.tick
         self.ledger = Ledger()
         self.facing, self.last, self.last_ok, self.hurt = "S", 0, 0.0, 0.0
-        self.pending, self.running = [], None
+        self.pending, self.running, self.then = [], None, None
         self.marks = Milestones(self.sim, self.a)
         self.just_hit = False
         self.reactions = {}
@@ -51,7 +60,7 @@ class SimEnv:
         if self.just_hit:
             self.reactions[kind] = self.reactions.get(kind, 0) + 1
             self.just_hit = False
-        if kind in ("step", "jump", "dig", "dig_at") and ACTIONS[i][1]:
+        if kind in ("step", "jump", "dig", "dig_at", "climb") and ACTIONS[i][1]:
             self.facing = ACTIONS[i][1]
         inv0, hp0, deaths0 = dict(a.inventory), a.hp, a.deaths
         act = None
@@ -60,11 +69,8 @@ class SimEnv:
         if cmd is None:
             L.counts["idle"] += a.action is None
         else:
-            tool, args = cmd
-            target = sim.creatures.get(args.get("target")) if tool == "attack" else None
-            act = sim.submit(a, tool, args)
-            self.running = (cmd, act)
-            self.pending.append((act, tool, args, target.kind if target else ""))
+            first, *then = split(cmd)
+            act = self.submit(cmd, *first, then=then)
         # (When the next decision comes, only: being hurt or someone coming into view never chooses what to do; the
         # policy does, and it may well go on with the same action.)
         seen = self.in_view()
@@ -73,6 +79,9 @@ class SimEnv:
             if a.deaths > deaths0 or a.hp < hp0:
                 break                                   # hurt: decide now
             busy = a.action is not None or a.aside is not None
+            if self.then and self.running[1].result is not None:
+                act = self.submit(self.running[0], *self.then[0], then=self.then[1:])   # (climb: the next step)
+                continue
             if t + 1 >= MIN_TICKS and (act.result is not None if act is not None else not busy and t + 1 >= self.decide):
                 break                                   # what it was doing is done (or, idle, 0.5 s went by)
             if t % 5 == 4 and self.in_view() - seen:
@@ -109,6 +118,14 @@ class SimEnv:
             L.close_fights(died)
             info = self.summary(died)
         return self.encoded(), r, died, truncated and not died, info
+
+    def submit(self, cmd, tool, args, then=None):
+        target = self.sim.creatures.get(args.get("target")) if tool == "attack" else None
+        act = self.sim.submit(self.a, tool, args)
+        self.running = (cmd, act)
+        self.then = then
+        self.pending.append((act, tool, args, target.kind if target else ""))
+        return act
 
     def in_view(self) -> set:
         a, R = self.a, VIEW_R

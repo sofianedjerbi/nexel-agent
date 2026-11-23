@@ -24,6 +24,7 @@ def _actions():
     acts += [("jump", d, None) for d in DIRS]
     acts += [("dig", d, w) for w in (None, "axe", "pickaxe", "hoe") for d in DIRS]
     acts += [("dig_at", d, h) for h in (1, 2) for d in DIRS]          # the land in front, a layer or two over your feet
+    acts += [("climb", d, None) for d in DIRS]      # a step up a wall: the land in front at head height dug, then a jump
     acts += [("dig_down", None, None), ("pick_up", None, None), ("attack", None, None)]
     acts += [("water", None, None), ("sleep", None, None), ("feed", None, None), ("milk", None, None), ("wear", None, None)]
     acts += [("place", None, it) for it in PLACE]
@@ -58,6 +59,8 @@ def to_command(i: int, obs: dict, facing: str):
         return "dig", {"dir": d, **({"with": arg} if arg else {})}
     if kind == "dig_at":
         return "dig", {"dir": d, "z": int(me.get("z", 0)) + arg}
+    if kind == "climb":
+        return "climb", {"dir": d, "z": int(me.get("z", 0)) + 2}
     if kind in ("dig_down", "pick_up"):
         return kind, {}
     if kind == "attack":
@@ -107,6 +110,9 @@ def legal(obs: dict) -> np.ndarray:
         if kind == "dig_at":            # (on the level, the game reads it as tilling and refuses)
             dx, dy = STEP[d]
             m[i] = bool(hs) and LEVEL.get(hs[VIEW_R + dy][VIEW_R + dx], 0) - LEVEL.get(hs[VIEW_R][VIEW_R], 0) >= arg
+        elif kind == "climb":           # (a wall in front: one layer or more over your feet)
+            dx, dy = STEP[d]
+            m[i] = bool(hs) and LEVEL.get(hs[VIEW_R + dy][VIEW_R + dx], 0) - LEVEL.get(hs[VIEW_R][VIEW_R], 0) >= 1
         elif kind == "dig" and arg:
             m[i] = bool(inv.get(arg))
         elif kind == "attack":

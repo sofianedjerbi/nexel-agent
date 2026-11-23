@@ -17,6 +17,7 @@ from ..chat import chat_messages
 from ..client import Client
 from ..fastprompt import chat_parse
 from .achieve import HOSTILE
+from .core import split
 from .encode import ACTIONS, action_name, encode, legal, to_command
 
 MIN_S, IDLE_S, WAIT_MAX_S, POLL_S = 0.2, 0.5, 5.0, 0.25
@@ -32,10 +33,7 @@ class LiveBody:
         self.crafts, self.reactions, self.foes, self.fails_by = set(), {}, {}, {}
         self.log = open(a.log, "a") if a.log else None
 
-    def done(self, tool, args, kind, t):
-        if t.cancelled() or t.exception() is not None:
-            return
-        r = t.result()
+    def done(self, tool, args, r):
         if not r.get("ok") and r.get("error") == "interrupted":
             self.stats["interrupted"] += 1
             return
@@ -54,6 +52,14 @@ class LiveBody:
                 self.stats["won"] += 1
                 self.foes.pop(args["target"])
         self.last_ok = 1.0 if r.get("ok") else -1.0
+
+    async def call(self, game, cmd):
+        """One action as in the env (core.split): a tool call, or a climb's digs then jump."""
+        r = None
+        for step in split(cmd):
+            r = await game.act(step[0], **step[1])
+            self.done(step[0], step[1], r)
+        return r
 
     async def wait(self, game, task, me, t0):
         """As in the env (rl/core.py): till the action ends (0.2 s at the soonest; idle, 0.5 s), or at once when hurt
@@ -117,7 +123,7 @@ class LiveBody:
                 kind = ACTIONS[i][0]
                 if self.hurt > 0:
                     self.reactions[kind] = self.reactions.get(kind, 0) + 1
-                if kind in ("step", "jump", "dig", "dig_at") and ACTIONS[i][1]:
+                if kind in ("step", "jump", "dig", "dig_at", "climb") and ACTIONS[i][1]:
                     self.facing = ACTIONS[i][1]
                 self.stats["decisions"] += 1
                 cmd = to_command(i, obs, self.facing)
@@ -127,9 +133,7 @@ class LiveBody:
                 if cmd is None:
                     self.stats["idle"] += me.get("action") is None
                 else:
-                    tool, args = cmd
-                    task = asyncio.create_task(game.act(tool, **args))
-                    task.add_done_callback(lambda t, tool=tool, args=args: self.done(tool, args, "", t))
+                    task = asyncio.create_task(self.call(game, cmd))
                     running = (cmd, task)
                 under_way = running[1] if running and not running[1].done() else None
                 self.last = i

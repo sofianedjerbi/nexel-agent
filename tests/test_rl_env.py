@@ -165,6 +165,23 @@ def test_farming_and_depth_milestones():
     assert env.sim.height(a) <= -5 and "depth_5" in env.ledger.done
 
 
+def test_climb_out_of_a_deep_pit():
+    """Ten layers down, the same action (climb N) asked again and again brings it back up."""
+    env = SimEnv(ep_ticks=10 ** 6)
+    env.reset(1000003)
+    sim, a = env.sim, env.a
+    for _ in range(10):
+        env.step(idx("dig_down"))
+    low = sim.height(a)
+    assert low <= -8
+    for _ in range(30):
+        if env.encoded()["mask"][idx("climb_N")]:
+            env.step(idx("climb_N"))
+        else:
+            env.step(idx("step_N"))
+    assert sim.height(a) >= low + 6, (low, sim.height(a))
+
+
 def test_legal_mask_follows_the_rules():
     from megastructure.rl.encode import legal
     env = SimEnv(ep_ticks=10 ** 6)
