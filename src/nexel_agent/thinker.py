@@ -38,6 +38,7 @@ from .watchdog import Watchdog, stall_line
 log = logging.getLogger("thinker")
 MODEL_URL = "http://127.0.0.1:8080/v1/chat/completions"
 MIN_GAP_S = 0.33                                  # between two actions sent (~3 a second)
+SAID_S = 120.0                                    # the very same line is not said twice within this
 IDLE_WAIT_S = 0.5                                 # nothing queued: look again this often while the model thinks
 
 
@@ -72,6 +73,7 @@ class Thinker(Planner):
         self.watch = PlanWatch()                              # plans asked again that changed nothing: told back
         self.current: Item | None = None                      # the planned command being played now
         self.last_skip = ""
+        self.said: dict[str, float] = {}                      # a line said -> when (the same line is not said again soon)
         self.dog = Watchdog()                                 # no progress for 20 s: the model is told, nothing more
         self.stats = Counter()
         self.calls: list[dict] = []
@@ -130,6 +132,11 @@ class Thinker(Planner):
                           f"({me['x']},{me['y']}): not done)")
                 self.stats["misplaced"] += 1
                 continue
+            if it.tool in ("say", "shout") and (when := self.said.get(str(it.args.get("text", "")).strip().lower())) \
+                    and time.monotonic() - when < SAID_S:
+                self.tell(f"(you said \"{it.args.get('text')}\" {time.monotonic() - when:.0f} s ago: they heard it; not said again)")
+                self.stats["say_repeat"] += 1
+                continue
             if just_failed(self.memory, it.tool, it.args, time.monotonic()):
                 self.stats["backoff"] += 1                        # the same command failed a moment ago: not resent at once
                 self.abort(f"'{command_text(it.tool, it.args)}' failed a moment ago")
@@ -185,6 +192,8 @@ class Thinker(Planner):
         self.lessons.learn(item.tool, item.args, reply)
         line = self.result_line(item, reply, obs)
         self.stats[f"{item.source}:{'ok' if ok else 'fail'}"] += 1
+        if item.tool in ("say", "shout") and ok:
+            self.said[str(item.args.get("text", "")).strip().lower()] = t1
         if item.source == "model":
             self.recent.append(command_text(item.tool, item.args))
         self.history.append(line[:260])

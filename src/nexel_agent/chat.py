@@ -53,6 +53,11 @@ def promise_of(out: str) -> str:
     return p.strip()[:80] if isinstance(p, str) and p.strip().lower() not in ("", "none", "nothing", "empty") else ""
 
 
+def said_before(line: str, lines) -> bool:
+    norm = lambda x: " ".join(x.lower().strip(" .!?\"'").split())
+    return bool(line) and norm(line) in {norm(x) for x in lines}
+
+
 class Chat:
     def on_hit(self, e, me):
         """Hit: the plan stops and the next one is made knowing it (who, with what, how hurt you are). What to do about
@@ -77,14 +82,23 @@ class Chat:
             msgs = chat_messages(self.name, self.persona, self.goal or "", speaker, text, list(self.heard)[-3:-1], me,
                                  mem.person_text(speaker), mem.relevant(f"{text} {self.goal or ''}", (me.get("x"), me.get("y")),
                                                                         [speaker], k=3), said)
-            try:
-                r = await self.http.post(self.model_url, timeout=30, json=self._body(msgs, 80, 0.8, False))
-                r.raise_for_status()
-                out = r.json()["choices"][0]["message"]["content"] or ""
-                (line, do), promise = chat_parse(out), promise_of(out)
-            except (httpx.HTTPError, KeyError, IndexError, ValueError) as e:
-                log.warning("%s: chat error %r", self.name, e)
-                line, do, promise = "", "", ""
+            line, do, promise = "", "", ""
+            for attempt in range(2):            # a line said before is asked again once ("never repeat"), else not said
+                try:
+                    r = await self.http.post(self.model_url, timeout=30, json=self._body(msgs, 80, 0.8 + 0.3 * attempt, False))
+                    r.raise_for_status()
+                    out = r.json()["choices"][0]["message"]["content"] or ""
+                    (line, do), promise = chat_parse(out), promise_of(out)
+                except (httpx.HTTPError, KeyError, IndexError, ValueError) as e:
+                    log.warning("%s: chat error %r", self.name, e)
+                    break
+                if not said_before(line, mem.people.get(speaker, {}).get("you_said", [])):
+                    break
+                self.stats["chat_repeat"] += 1
+                msgs = msgs + [{"role": "assistant", "content": out},
+                               {"role": "user", "content": f"You already said exactly that to {speaker}. Answer what they "
+                                                           f"just said (\"{text[:100]}\") with something new. /no_think"}]
+                line = ""
             if do in ("come", "stop"):
                 self.abort(f"{speaker} asked you to {do}")
                 self.history.append(f"({speaker} asked you to {do}: you did)")

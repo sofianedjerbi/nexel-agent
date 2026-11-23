@@ -130,3 +130,20 @@ def test_danger_is_said_with_distance_what_it_does_and_the_health_trend():
     assert "tusker #7 (2,-1) 3 tiles NE, hp 8, hits 3, a boar: charges in a straight line, step aside, drops meat" in text
     assert "WINDING UP A CHARGE toward W" in text
     assert "HURT: health 14/20 (-6 in 15 s), by a tusker." in text and "Night:" in text
+
+
+def test_a_line_already_said_is_asked_again_and_a_plan_does_not_say_hi_five_times(tmp_path):
+    t = thinker(tmp_path)
+    t.mem.replied("Ana", "Busy with wood.")
+    game = FakeGame(act_s=0.1, events=[{"type": "say", "from": "Ana", "text": "what are you doing?"}])
+    transport, calls = model_transport(['{"goal":"get wood","do":["say hi","say hi","dig N"]}'], delay=0.2,
+                                       chat_line='{"say": "Busy with wood.", "do": "nothing"}')
+
+    async def go():
+        async with httpx.AsyncClient(transport=transport) as http:
+            await t.play(game, http, minutes=1.0 / 60)
+    asyncio.run(go())
+    chats = [c for c in calls if not c[1].get("stream")]
+    assert len(chats) >= 2 and "You already said exactly that" in chats[1][1]["messages"][-1]["content"]
+    said = [a[2]["text"] for a in game.acts if a[1] == "say"]
+    assert "Busy with wood." not in said and said.count("hi") == 1 and t.stats["say_repeat"] >= 1
