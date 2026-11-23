@@ -57,7 +57,7 @@ Commands for act (verbs do the walking for you):
   the player remembers it: after it, "dig_at tree" walks to a tree look_far saw, even one far out of view.
   A start may have no tree or rock in view: the world is large, things are found by looking and walking.
 Facts: {recipes}. A craft marked @workbench needs a placed workbench within 2 tiles of you; craft_here walks there
-if one is in view. Wood and stone cannot be placed. Bare bushes and thickets give fiber. Ore needs a pickaxe.
+if one is in view. Wood and stone cannot be placed. A berry_bush dug gives berries + seed and becomes a bare_bush; a bare_bush (or a thicket) dug gives fiber. Ore needs a pickaxe.
 Answer: first your reasoning in a ```text block (at most 10 short lines: the steps, what can go wrong), then the code in one
 ```python block: def <name>(...): with a one-line docstring; check replies and look again after acting; return True
 when done, False when it cannot be done. Never call a variable act, look, me, have or find."""

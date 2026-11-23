@@ -54,7 +54,7 @@ def stable_prefix(name: str, persona: str) -> str:
     return f"""You are {name}, living in a wild island world with no laws. Who you are: {persona}
 You play in real time: answer with a short plan; it runs at once while you think of the next one.
 World: top-down grid, north is up (y-1), coordinates are absolute (x,y). Health 0-20, food 0-20 (work uses food).
-To gather, stand next to a thing and dig toward it: tree -> wood, berry_bush -> berries + seed, bare_bush -> fiber,
+To gather, stand next to a thing and dig toward it: tree -> wood, berry_bush -> berries + seed (it becomes a bare_bush), bare_bush -> fiber,
 rock -> stone (slow by hand), ore -> ore (pickaxe). Items next to you come to you. Wood and stone are materials,
 not things to place. @workbench crafts need a placed workbench within 2 tiles of you. Seeds go in tilled soil (dig ground with a hoe). Water: you swim. A step one
 higher: jump D. {rules_text()}
