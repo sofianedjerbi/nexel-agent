@@ -81,6 +81,16 @@ def test_a_card_is_data_with_perception_facts_only():
     assert valid({"when": {"being": "pincer"}, "do": ["attack", "pincer"]})["do"] == ["attack pincer"]   # one, in pieces
 
 
+def test_a_situation_card_fires_when_it_starts_not_while_it_lasts():
+    cards = Cards(None, "Vex")
+    cards.add([{"when": {"being": "cow", "within": 3}, "do": ["say moo"]}])
+    obs = fake_obs((0, 0))
+    obs["entities"] = [{"id": 5, "kind": "cow", "dx": 1, "dy": 0, "hp": 6}]
+    assert cards.match(obs, [], now=100.0) and not cards.match(obs, [], now=110.0)     # still there: no second time
+    away = {**obs, "entities": []}
+    assert not cards.match(away, [], now=111.0) and cards.match(obs, [], now=120.0)    # gone and back: again
+
+
 def test_a_card_answers_a_hit_in_a_fraction_of_a_second(tmp_path):
     t = thinker(tmp_path)
     t.cards.add([{"when": {"hit_by": "any"}, "do": ["attack {id}"], "why": "nobody hits me twice"}])

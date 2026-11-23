@@ -53,7 +53,7 @@ class React:
         if not parsed:
             return
         self.cards.fired_now(i)
-        self.abort(f"your card fired: when {card['when']} do {card['do']}", tell=False)
+        self.abort(f"your card fired: when {card['when']} do {card['do']}", tell=False, soft=True)   # (the plan streaming goes on after it)
         items = [self.item(*c, "card", f"card: {card['why'] or card['when']}") for c in parsed]   # (the new epoch)
         ages = [(obs["tick"] - e.get("tick", obs["tick"])) / 10 for e in obs["events"] if e.get("type") == "attack"]
         self.firing = {"t_seen": t_seen, "event_age_s": max(ages) if ages else 0.0, "card": card, "cmds": cmds,

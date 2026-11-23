@@ -58,6 +58,7 @@ class Cards:
         self.cards: list = json.loads(path.read_text()) if path and path.exists() else []
         self.last: dict = {}                 # (card index, subject id) -> when it last fired
         self.fired: list = []                # (t, card index): for trust after a death
+        self.on: set = set()                 # (card, subject) whose situation held at the last look
 
     def save(self):
         if self.path:
@@ -86,6 +87,7 @@ class Cards:
         [(who, being dict or None)] from this look's events."""
         now = now or time.time()
         me = obs["self"]
+        holding, found = set(), None
         for i, c in self.usable():
             w, subject = c["when"], None
             if "hit_by" in w:
@@ -112,10 +114,13 @@ class Cards:
             if "in_water" in w and bool(w["in_water"]) != bool(me.get("swimming")):
                 continue
             key = (i, (subject or {}).get("id"))
-            if now - self.last.get(key, 0) < COOLDOWN_S:
-                continue
+            holding.add(key)
+            if found or (key in self.on and "hit_by" not in w) or now - self.last.get(key, 0) < COOLDOWN_S:
+                continue                              # (a situation fires its card when it starts; a hit, each time)
             self.last[key] = now
-            return i, c, [fill(d, subject, me) for d in c["do"]]
+            found = (i, c, [fill(d, subject, me) for d in c["do"]])
+        self.on = holding
+        return found
         return None
 
     def fired_now(self, i, now=None):
