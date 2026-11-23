@@ -148,6 +148,23 @@ def test_a_pit_is_not_a_trap():
     assert sim.height(a) > low
 
 
+def test_farming_and_depth_milestones():
+    env = SimEnv(ep_ticks=10 ** 6)
+    env.reset(5)
+    a = env.a
+    env.sim.set_tile(a.x + 1, a.y, block="none")
+    a.inventory.update({"hoe": 1, "seed": 2, "watering_can": 1})
+    env.obs = env.sim.observe(a)
+    for name in ("dig_E_hoe", "place_seed", "water"):
+        assert env.encoded()["mask"][idx(name)]
+        env.step(idx(name))
+        env.step(0)
+    assert {"till", "plant", "water_crop", "place_seed"} <= env.ledger.done, env.ledger.done
+    for _ in range(6):
+        env.step(idx("dig_down"))
+    assert env.sim.height(a) <= -5 and "depth_5" in env.ledger.done
+
+
 def test_legal_mask_follows_the_rules():
     from megastructure.rl.encode import legal
     env = SimEnv(ep_ticks=10 ** 6)

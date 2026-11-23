@@ -1,7 +1,7 @@
 """The learning env over the in-process sim (the game's own Python: no gymnasium here; rl/vec.py wraps it).
 
 An episode: a freshly generated world (seed), one player at its spawn in the morning, mobs, food and night as in the
-game, until the next dawn (or death). An action runs till it ends (0.2 s at the soonest); the next decision comes then,
+game, until the third dawn (or death). An action runs till it ends (0.2 s at the soonest); the next decision comes then,
 or at once when the player is hurt or someone comes into view, or after WAIT_MAX (5 s) at the latest. `noop` lets what
 it was doing go on, or, idle, waits 0.5 s."""
 
@@ -12,12 +12,13 @@ from ..sim import Simulation
 from ..sim.constants import DAY_TICKS, VIEW_R
 from .achieve import HOSTILE, Ledger
 from .encode import ACTIONS, encode, legal, to_command
+from .milestones import Milestones
 
 DECIDE = 5                          # ticks: an idle noop waits this long
 MIN_TICKS = 2                       # the shortest a decision waits (0.2 s: a step), unless hurt
 WAIT_MAX = 50                       # and the longest (a chop by hand takes ~5 s)
 START = 0.3                         # the time of day an episode starts (morning)
-EP_TICKS = int(0.75 * DAY_TICKS)    # to the dawn after the first night, and a little more
+EP_TICKS = int(2.75 * DAY_TICKS)    # three days and nights: to the third dawn, and a little more
 HURT = 0.1                          # reward per half heart lost
 
 
@@ -34,7 +35,7 @@ class SimEnv:
         self.ledger = Ledger()
         self.facing, self.last, self.last_ok, self.hurt = "S", 0, 0.0, 0.0
         self.pending, self.running = [], None
-        self.night = self.sim.is_night()
+        self.marks = Milestones(self.sim, self.a)
         self.just_hit = False
         self.reactions = {}
         self.obs = self.sim.observe(self.a)
@@ -64,6 +65,8 @@ class SimEnv:
             act = sim.submit(a, tool, args)
             self.running = (cmd, act)
             self.pending.append((act, tool, args, target.kind if target else ""))
+        # (When the next decision comes, only: being hurt or someone coming into view never chooses what to do; the
+        # policy does, and it may well go on with the same action.)
         seen = self.in_view()
         for t in range(WAIT_MAX):
             sim.step()
@@ -79,7 +82,7 @@ class SimEnv:
         for p in [p for p in self.pending if p[0].result is not None]:
             self.pending.remove(p)
             res = p[0].result
-            r += L.result(p[1], p[2], res, p[3])
+            r += L.result(p[1], p[2], res, p[3], a.hp)
             if p[1] == "craft" and res.get("ok"):
                 for k, n in (res.get("made") or {}).items():
                     made[k] = made.get(k, 0) + n
@@ -97,10 +100,7 @@ class SimEnv:
                       key=lambda c: math.dist((c.x, c.y), (a.x, a.y)), default=None)
             if foe is not None:
                 L.foes[foe.id] = foe.kind
-        night = sim.is_night()
-        if self.night and not night and not died:
-            r += L.unlock("survive_night")
-        self.night = night
+        r += self.marks.update(L, lost > 0, died)
         self.last = i
         self.obs = sim.observe(a)
         truncated = sim.tick - self.t0 >= self.ep_ticks
@@ -117,4 +117,5 @@ class SimEnv:
     def summary(self, died: bool) -> dict:
         c = self.ledger.counts
         return {"achievements": sorted(self.ledger.done), "ticks": self.sim.tick - self.t0, "died": died,
-                "distinct_crafts": len(self.ledger.crafted), **c, "reactions": dict(self.reactions)}
+                "distinct_crafts": len(self.ledger.crafted), "distinct_places": len(self.ledger.placed),
+                "nights": self.marks.nights, "chunks": len(self.marks.chunks), **c, "reactions": dict(self.reactions)}

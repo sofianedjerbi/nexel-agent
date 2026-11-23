@@ -57,7 +57,8 @@ class LiveBody:
 
     async def wait(self, game, task, me, t0):
         """As in the env (rl/core.py): till the action ends (0.2 s at the soonest; idle, 0.5 s), or at once when hurt
-        or someone comes into view, or 5 s at the latest. The events seen meanwhile are all kept."""
+        or someone comes into view, or 5 s at the latest. The events seen meanwhile are all kept. (Decision timing only:
+        a hit or a newcomer never chooses what to do; the policy does.)"""
         seen = {b["id"] for b in self.obs_entities}
         events = []
         await asyncio.sleep(MIN_S)
