@@ -73,8 +73,9 @@ class Cards:
         return new
 
     def usable(self):
-        """Own cards first, then everyone else's; trust 0 is out."""
-        return sorted([(i, c) for i, c in enumerate(self.cards) if c.get("trust", 1) > 0],
+        """Own cards first, then everyone else's; trust 0 is out, and so is a card this player dropped."""
+        dropped = set(getattr(self, "dropped", ()))
+        return sorted([(i, c) for i, c in enumerate(self.cards) if c.get("trust", 1) > 0 and i not in dropped],
                       key=lambda ic: ic[1].get("author") != self.me)
 
     def match(self, obs, hits, now=None) -> tuple | None:
@@ -128,7 +129,17 @@ class Cards:
         self.save()
 
     def text(self, k=4) -> str:
-        return " | ".join(f"when {c['when']} do {c['do']}" for _, c in self.usable()[:k] if c.get("author") == self.me)
+        return " | ".join(f"[{i}] when {c['when']} do {c['do']} (fired {c.get('fired', 0)}x)" for i, c in self.usable()[:k])
+
+    def drop(self, i) -> bool:
+        """The player stops using card i (its own goes out of the shared file too)."""
+        if not (isinstance(i, int) and 0 <= i < len(self.cards)):
+            return False
+        if self.cards[i].get("author") == self.me:
+            self.cards[i]["trust"] = 0
+            self.save()
+        self.dropped = set(getattr(self, "dropped", ())) | {i}
+        return True
 
 
 def fill(cmd, subject, me):

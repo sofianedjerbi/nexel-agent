@@ -227,17 +227,6 @@ class Thinker(Planner, React, Verbs):
         if not ok and t1 - t0 < 0.15:
             await asyncio.sleep(0.25)                    # a refusal takes no time: do not hammer the server
 
-    def local(self, item, obs) -> dict:
-        """remember / forget: the model's own memory, kept by the harness (no game action)."""
-        me = obs["self"]
-        if item.tool == "remember":
-            n = self.mem.remember(str(item.args.get("text", "")), (me["x"], me["y"]), str(obs.get("time", "")))
-            return {"ok": True, "result": {"ticks": 0, "changed": {}, "text": f"noted [{n}]"}}
-        n = item.args.get("n")
-        if isinstance(n, int) and self.mem.forget(n):
-            return {"ok": True, "result": {"ticks": 0, "changed": {}, "text": f"forgot [{n}]"}}
-        return {"ok": False, "error": "no_note", "detail": f"no note [{n}]; your notes: {self.mem.notes_text() or 'none'}"}
-
     def _log(self, item, obs, reply, line, t0):
         me = obs["self"]
         rec = {"t": time.time(), "dur_s": round(time.monotonic() - t0, 2), "tick": obs["tick"], "agent": self.name,

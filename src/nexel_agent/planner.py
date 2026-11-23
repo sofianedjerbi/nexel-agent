@@ -132,6 +132,21 @@ class Planner(Chat):
             self.stats["goals_done"] += 1
             self.goal_test = None
 
+    def local(self, item, obs) -> dict:
+        """remember / forget / drop_card: the model's own memory and cards, kept by the harness (no game action)."""
+        me = obs["self"]
+        if item.tool == "remember":
+            n = self.mem.remember(str(item.args.get("text", "")), (me["x"], me["y"]), str(obs.get("time", "")))
+            return {"ok": True, "result": {"ticks": 0, "changed": {}, "text": f"noted [{n}]"}}
+        n = item.args.get("n")
+        if item.tool == "drop_card":
+            ok = self.cards.drop(n)
+            return {"ok": True, "result": {"ticks": 0, "changed": {}, "text": f"card [{n}] dropped"}} if ok else \
+                {"ok": False, "error": "no_card", "detail": f"no card [{n}]"}
+        if isinstance(n, int) and self.mem.forget(n):
+            return {"ok": True, "result": {"ticks": 0, "changed": {}, "text": f"forgot [{n}]"}}
+        return {"ok": False, "error": "no_note", "detail": f"no note [{n}]; your notes: {self.mem.notes_text() or 'none'}"}
+
     def tell(self, line: str):
         """A line for the model's 'Done' list, once (not the same warning four times over)."""
         key = line[:60]

@@ -125,6 +125,8 @@ def test_on_joining_the_model_writes_its_first_cards_and_everyone_shares_them(tm
     assert "reaction cards" in ask[0]["content"] and "tusker" in ask[1]["content"] and "joined" in ask[1]["content"]
     other = Cards(tmp_path / "_cards.json", "Ana")
     assert [c["do"] for _, c in other.usable()] == [["move_away {id} 10"]] and other.cards[0]["author"] == "Vex"
+    assert other.drop(0) and other.usable() == [] and Cards(tmp_path / "_cards.json", "Bo").usable()   # Ana's choice only
+    assert t.cards.drop(0) and Cards(tmp_path / "_cards.json", "Bo").usable() == []                    # its author's: gone
 
 
 def test_a_goal_test_says_what_is_missing_and_the_body_sees_it_done(tmp_path):
