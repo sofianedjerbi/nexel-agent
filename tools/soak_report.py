@@ -83,6 +83,15 @@ def social(recs, acts, events):
                   + (f" intent={r.get('intent') or r.get('do')}" if r.get("intent") or r.get("do") else "") + (f" promise={r['promise']!r}" if r.get("promise") else ""))
         elif r.get("kind") == "diary":
             print(f"  diary [{(r['t'] - t0) / 60:.1f} min] {r['text'][:300]!r}")
+    for r in recs:
+        if r.get("kind") == "cards":
+            print(f"  cards written [{(r['t'] - t0) / 60:.1f} min, {r['source']}, {r['latency_s']}s]:",
+                  [(c["when"], c["do"]) for c in r["new"]])
+        elif r.get("kind") == "card":
+            print(f"  card fired [{(r['t'] - t0) / 60:.1f} min] {'hit' if r['hit'] else 'sight'}: {r['when']} -> {r['do']}"
+                  f" reaction {r['reaction_s']}s (since the look {r['since_look_s']}s)")
+        elif r.get("kind") == "goal":
+            print(f"  goal done [{(r['t'] - t0) / 60:.1f} min] {r['goal']!r} {r['test']} in {r['secs']}s")
     says = [r["args"].get("text") for r in acts if r["tool"] == "say" and r["source"] == "model"]
     if says:
         print("  said in plans:", says[:8])
