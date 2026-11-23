@@ -56,6 +56,10 @@ Tools: `tools/ai_players.sh` (= `players`), `tools/llm_bench.py` (model call tim
 `tools/soak_report.py` (a run's decisions.jsonl), `tools/qa_visitor.py`, `tools/rl_soak_visitor.py` and `tools/chat_probe.py` (scripted visitors
 for a QA copy of a world), `tools/forge_night.sh` (the skill forge, at night, on a running model server).
 
+The brain view (`tools/brain/index.html`): what an RL player sees, thinks, decides and remembers, live from
+`python -m nexel_agent.rl.live ... --brain 8790` (open it with `?feed=http://127.0.0.1:8790/feed`) or from a recording
+(`?replay=demo_replay.jsonl`, made by `tools/brain/from_demo.py` from a run's logs). The feed: `docs/brain_feed.md`.
+
 ## Tests
 
 ```sh

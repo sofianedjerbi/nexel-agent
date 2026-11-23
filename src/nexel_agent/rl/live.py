@@ -18,6 +18,7 @@ from ..chat import chat_messages
 from megastructure.client import Client
 from ..fastprompt import chat_parse
 from .achieve import HOSTILE
+from .brain import Brain
 from .core import split
 from .encode import ACTIONS, ITEMS, N_NEAR, action_name, encode, legal, to_command
 from .social import SocialMemory
@@ -39,6 +40,7 @@ class LiveBody:
         self.mind = None                                    # (the LLM planner that sets goals: rl/mind.py)
         self.given = []
         self.log = open(a.log, "a") if a.log else None
+        self.brain = Brain(a.brain, a.log and Path(a.log).with_name("brain.jsonl"), a.name, a.persona) if getattr(a, "brain", 0) else None
 
     def done(self, tool, args, r):
         if not r.get("ok") and r.get("error") == "interrupted":
@@ -172,13 +174,16 @@ class LiveBody:
                 goal = self.mind.goal if self.mind else None
                 enc = encode(obs, self.facing, self.last, self.last_ok, self.hurt, self.social.flags(obs), goal,
                              self.social.people_flags(obs, N_NEAR))
-                i = self.pol.act(enc, self.rng, legal(obs, self.facing, self.social, goal) if self.a.mask else None)
+                mask = legal(obs, self.facing, self.social, goal) if self.a.mask else None
+                i = self.pol.act(enc, self.rng, mask)
                 kind = ACTIONS[i][0]
                 if self.hurt > 0:
                     self.reactions[kind] = self.reactions.get(kind, 0) + 1
                 if kind in ("step", "jump", "dig", "dig_at", "climb") and ACTIONS[i][1]:
                     self.facing = ACTIONS[i][1]
                 self.stats["decisions"] += 1
+                if self.brain:                                  # (what it sees and thinks, for the brain view)
+                    self.brain.see(obs, self, enc, mask, i)
                 cmd = to_command(i, obs, self.facing, self.social, goal)
                 t0, self.last_ok = time.monotonic(), 0.0        # (as in the env: how the actions that end in this wait went)
                 if cmd is not None and running and running[0] == cmd and not running[1].done():
@@ -232,6 +237,7 @@ def main():
     p.add_argument("--log", default="")
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--mask", type=int, default=1, help="the policy was trained with the legal-action mask")
+    p.add_argument("--brain", type=int, default=0, help="serve what it sees and thinks on 127.0.0.1:PORT/feed (rl/brain.py)")
     p.add_argument("--memory", default="", help="where the LLM layer keeps its notes on people (memory.json)")
     a = p.parse_args()
     print(json.dumps(asyncio.run(LiveBody(a).play())))
