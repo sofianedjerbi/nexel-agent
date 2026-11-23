@@ -32,11 +32,14 @@ async def main():
     p.add_argument("--target", required=True)
     p.add_argument("--log", required=True, help="the target's decisions.jsonl (for where it stands)")
     p.add_argument("--name", default="Mira")
+    p.add_argument("--from-min", type=float, default=0.0, help="start the script at this minute (a restarted visitor)")
     a = p.parse_args()
-    t0 = time.monotonic()
+    t0 = time.monotonic() - a.from_min * 60
     async with Client(a.game) as g:
         await g.hello(a.name, f"qa-{a.name}")
         for at, what, arg in SCRIPT:
+            if at < a.from_min:
+                continue
             await asyncio.sleep(max(0.0, t0 + at * 60 - time.monotonic()))
             pos = where(a.log)
             if pos:
@@ -51,6 +54,15 @@ async def main():
                 tid = next((e["id"] for e in obs["entities"] if e.get("name") == a.target), None)
                 for _ in range(arg):
                     r = await g.act("attack", target=tid) if tid else {"ok": False}
+                    for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):      # (out of reach on a slope: try each side)
+                        if r.get("ok") or not tid or r.get("error") != "out_of_range":
+                            break
+                        o = await g.observe()
+                        e = next((e for e in o["entities"] if e["id"] == tid), None)
+                        if not e:
+                            break
+                        await g.request("dev_teleport", x=o["self"]["x"] + e["dx"] + dx, y=o["self"]["y"] + e["dy"] + dy)
+                        r = await g.act("attack", target=tid)
                     print(f"[{at:.1f} min] {a.name} hits {a.target}: {'ok' if r.get('ok') else r}", flush=True)
                 continue
             await g.act("say", text=arg)
