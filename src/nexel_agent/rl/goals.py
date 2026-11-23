@@ -27,8 +27,11 @@ class Goal:
 class Goals:
     """In the sim: draws goals, tells when one is done (and pays it, a few times an episode at most)."""
 
-    def __init__(self, sim, a, rng):
+    def __init__(self, sim, a, rng, peaceful=None):
+        """peaceful(): the names of the people about who are not out to hurt the player (the neighbours): the goals
+        with a person are drawn among them (help comes when one of them is set upon)."""
         self.sim, self.a, self.rng = sim, a, rng
+        self.peaceful = peaceful or (lambda: [o.name for o in sim.agents.values() if o is not a])
         self.goal, self.paid, self.next = Goal(start=sim.tick), 0, sim.tick + sec(20)
         self.counts = {k: [0, 0] for k in KINDS if k != "free"}          # kind: [done, set]
 
@@ -37,11 +40,13 @@ class Goals:
 
     def draw(self, forced_person=None):
         sim, rng, a = self.sim, self.rng, self.a
-        near = [o.name for o in sim.agents.values() if o is not a and o.online and math.dist((o.x, o.y), (a.x, a.y)) <= 20]
+        near = [n for n in self.peaceful() if (o := sim.by_name.get(n)) is not None and o.online
+                and math.dist((o.x, o.y), (a.x, a.y)) <= 20]
         kinds = ["free"] * 4 + ["gather", "craft"] + (list(WITH_PERSON) if near else [])
         kind = "help" if forced_person else rng.choice(kinds)
         person = forced_person or (rng.choice(near) if kind in WITH_PERSON else None)
-        pool = {"gather": GATHER, "craft": CRAFT, "ask": ASK}.get(kind)
+        has = sorted(sim.by_name[person].inventory) if kind == "ask" and person in sim.by_name else []
+        pool = {"gather": GATHER, "craft": CRAFT, "ask": has or ASK}.get(kind)        # (ask for what they carry)
         item = rng.choice(pool) if pool else (max(a.inventory, key=a.inventory.get, default=None) if kind == "give" else None)
         self.goal = Goal(kind, item, person, sim.tick, a.count(item) if item else 0)
         if kind != "free":

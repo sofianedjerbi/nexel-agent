@@ -38,6 +38,7 @@ def _actions():
     acts += [("eat", None, f) for f in EAT]
     acts += [("say", None, None), ("give", None, None)]     # (appended: a policy trained before them keeps its indices)
     acts += [("ask", None, None), ("approach", None, None)]
+    acts += [("attack", None, k) for k in (1, 2)]     # attack the 2nd, 3rd nearest being (the obs's slots); plain attack: the 1st
     return tuple(acts)
 
 
@@ -101,10 +102,11 @@ def to_command(i: int, obs: dict, facing: str, social=None, goal=None):
         return "climb", {"dir": d, "z": int(me.get("z", 0)) + 2}
     if kind in ("dig_down", "pick_up"):
         return kind, {}
-    if kind == "attack":
-        near = [e for e in obs.get("entities", []) if e.get("kind") != "wisp"]
+    if kind == "attack":                                  # (the being in that slot of the obs: nearest first)
+        ents = obs.get("entities", [])
+        e = ents[arg or 0] if len(ents) > (arg or 0) else None
         w = max((w for w in WEAPONS if inv.get(w)), key=lambda w: WEAPONS[w], default=None)
-        return "attack", {"target": near[0]["id"] if near else -1, **({"with": w} if w else {})}
+        return "attack", {"target": e["id"] if e else -1, **({"with": w} if w else {})}
     if kind == "water":
         return "water", {"dir": facing, "with": "watering_can"}
     if kind == "sleep":
@@ -188,9 +190,9 @@ def legal(obs: dict, facing: str = "S", social=None, goal=None) -> np.ndarray:
             else:
                 m[i] = arg != "hoe" and not (BLOCK_NAME.get(ch) == "ore" and arg != "pickaxe")
         elif kind == "attack":
-            ents = [e for e in obs.get("entities", []) if e.get("kind") != "wisp"]
-            if ents:
-                e = ents[0]
+            ents = obs.get("entities", [])
+            if len(ents) > (arg or 0) and ents[arg or 0].get("kind") != "wisp":
+                e = ents[arg or 0]
                 dz = (LEVEL.get(hs[VIEW_R + e["dy"]][VIEW_R + e["dx"]], 0) - LEVEL.get(hs[VIEW_R][VIEW_R], 0)) if hs and abs(e["dx"]) <= VIEW_R and abs(e["dy"]) <= VIEW_R else 0
                 m[i] = math.hypot(e["dx"], e["dy"], dz * LAYER) <= REACH.get(weapon, REACH[None])
             else:
@@ -217,9 +219,9 @@ def legal(obs: dict, facing: str = "S", social=None, goal=None) -> np.ndarray:
         elif kind == "wear":
             m[i] = any(inv.get(w) and w not in worn for w in WEAR)
         elif kind == "say":
-            m[i] = bool(_people(obs, VIEW_R))
+            m[i] = bool(_people(obs, VIEW_R)) and (social is None or social.can_talk(obs["tick"]))
         elif kind == "ask":
-            m[i] = bool(_people(obs, VIEW_R)) and wanted(obs, goal) is not None
+            m[i] = bool(_people(obs, VIEW_R)) and wanted(obs, goal) is not None and (social is None or social.can_talk(obs["tick"]))
         elif kind == "give":
             m[i] = any(handed(obs, goal, social, e.get("name")) for e in _people(obs, USE_R))
         elif kind == "approach":

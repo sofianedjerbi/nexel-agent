@@ -1,7 +1,11 @@
 """Peaceful neighbours in the sim (part of the environment, as the rival is: scripted, never the policy). Now and
 then one comes by and spends a few minutes around the player: wanders near, works (chops, digs), and once in a
-while says hello, asks for something, or hands something over; given something, it sometimes gives back. They say
-plain short lines; on the live server real players and the LLM's chat take their place."""
+while says hello, asks for something, proposes to team up, or hands something over; given something, it sometimes
+gives back; asked for something it carries, it brings it over or says no. It carries a small pack, as a player
+does, and drops it when killed. Hit by the player, it hits back a few seconds, then goes; and it remembers, as do
+the neighbours who saw it: they say no to the player's asks, give nothing, keep their distance, and now and then
+come back to set upon it - for a few minutes: a grudge fades, faster with a gift, at once when the player helps it.
+They say plain short lines; on the live server real players and the LLM's chat take their place."""
 
 import math
 import random
@@ -13,11 +17,15 @@ EVERY = (sec(60), sec(200))          # between two visits
 STAY = (sec(120), sec(300))
 ACT = (sec(3), sec(8))               # between two things it does
 ASKS = ("wood", "stone", "berries", "fiber", "plank", "dirt")
-GIFTS = {"berries": 3, "wood": 3, "fiber": 2, "stone": 2}
+PACK = ("berries", "wood", "fiber", "stone", "seed", "dirt")   # what a neighbour may carry, a few of each at most
+ANGRY = sec(8)                       # (a blow is seen by whoever is in view of it: the game's own events)
+GRUDGE = sec(240)                    # a grudge fades in a few minutes,
+GIFT_EASES = sec(120)                # faster when the player gives it something; at once when the player helps it in a fight
 
 
 class Folk:
-    def __init__(self, sim, player, seed: int, name="Neighbour"):
+    def __init__(self, sim, player, seed: int, name="Neighbour", town=None):
+        """town: the list of all the neighbours (who saw what)."""
         self.sim, self.p = sim, player
         self.rng = random.Random(seed * 17 + 3)
         self.a = sim.login(name, f"folk-{name}")
@@ -26,6 +34,18 @@ class Folk:
         self.until = self.act = 0
         self.owed = False                       # given something by the player: it may give back
         self.asked, self.proposed = None, False  # asked by the player for something it said yes to; asked to team up
+        self.angry = 0                          # hit by the player: till when it hits back
+        self.grudge_until = 0                   # it was hit by the player, or saw a neighbour hit: till when it minds
+        self.set_upon = False                   # the rival is going for it now (the env says)
+        self.town = town if town is not None else [self]
+
+    @property
+    def grudge(self) -> bool:
+        return self.sim.tick < self.grudge_until
+
+    @grudge.setter
+    def grudge(self, held: bool):
+        self.grudge_until = self.sim.tick + GRUDGE if held else 0
 
     @property
     def on(self) -> bool:
@@ -34,31 +54,56 @@ class Folk:
     def dist(self) -> float:
         return math.dist((self.a.x, self.a.y), (self.p.x, self.p.y))
 
+    def go(self, wait=EVERY):
+        self.a.online, self.angry = False, 0
+        self.next = self.sim.tick + self.rng.randint(*wait)
+
     def tick(self):
         sim, a = self.sim, self.a
         if not a.online:
             if sim.tick >= self.next and self.p.hp > 0:
                 self.arrive()
             return
-        if sim.tick >= self.until or self.dist() > 30:
-            a.online = False
-            self.next = sim.tick + self.rng.randint(*EVERY)
-            return
+        if a.hp <= 0 or sim.tick >= self.until or self.dist() > 30:
+            return self.go()
         for e in a.events:
             if e.get("type") == "give" and e.get("to") == a.name:
                 self.owed = True
+                self.grudge_until -= GIFT_EASES                           # (a gift softens it)
+            elif e.get("type") == "attack" and e.get("attacker") == self.p.name and e.get("target") == "Rival" \
+                    and self.set_upon:
+                self.grudge = False                                       # (it stood by it against the rival: forgiven)
+            elif e.get("type") == "attack" and e.get("attacker") == self.p.name and e.get("target") in {f.a.name for f in self.town}:
+                if e.get("target") == a.name:
+                    self.angry, self.asked = sim.tick + ANGRY, None      # (hit by the player: it hits back, then goes)
+                self.grudge = True                                        # (hit, or saw it: within earshot of the blow)
             elif e.get("type") == "say" and e.get("from") == self.p.name:          # asked for something?
                 text = str(e.get("text", "")).replace(" ", "_")
                 it = next((k for k in sorted(a.inventory, key=len, reverse=True) if k in text), None)
-                if it and self.rng.random() < 0.6:
+                if it and not self.grudge and self.rng.random() < 0.6:
                     self.asked = it
                 elif it or "spare" in text:
                     sim.submit(a, "say", {"text": self.rng.choice(("sorry, need it", "no, can't", "not now"))})
         a.events = []
+        if self.angry:
+            if sim.tick >= self.angry:
+                return self.go((EVERY[0] * 2, EVERY[1] * 2))
+            if sim.tick >= self.act:
+                self.act = sim.tick + sec(1)
+                if self.dist() <= 2.5:
+                    sim.submit(a, "attack", {"target": self.p.id})
+                else:
+                    sim.submit(a, "move_to", {"x": self.p.x, "y": self.p.y})
+            return
         if sim.tick < self.act or a.action is not None:
             return
         self.act = sim.tick + self.rng.randint(*ACT)
         d, r = self.dist(), self.rng.random()
+        if self.grudge:                                  # (keeps its distance, works on its own)
+            if d < 8:
+                ang = math.atan2(a.y - self.p.y, a.x - self.p.x)
+                return sim.submit(a, "move_to", {"x": self.p.x + round(10 * math.cos(ang)), "y": self.p.y + round(10 * math.sin(ang))})
+            return self.work()
         if self.asked:                                   # (said yes: it brings it over)
             if d <= 2:
                 item, self.asked = self.asked, None
@@ -79,13 +124,17 @@ class Folk:
             return sim.submit(a, "say", {"text": f"got any {self.rng.choice(ASKS)} to spare?"})
         if r < 0.55 and d <= 2:
             return self.give()
-        for name, (dx, dy) in DIRS.items():               # work: whatever is beside it
+        self.work()
+
+    def work(self):
+        sim, a = self.sim, self.a
+        for name, (dx, dy) in DIRS.items():               # whatever is beside it
             if sim.world.block(a.x + dx, a.y + dy) in ("tree", "rock", "thicket", "berry_bush"):
                 return sim.submit(a, "dig", {"dir": name})
         sim.submit(a, "move_to", {"x": a.x + self.rng.randint(-4, 4), "y": a.y + self.rng.randint(-4, 4)})
 
     def give(self):
-        item = next((k for k in GIFTS if self.a.count(k)), None)
+        item = next((k for k in PACK if self.a.count(k)), None)
         if item:
             self.sim.submit(self.a, "give", {"target": self.p.id, "item": item, "n": 1})
 
@@ -100,8 +149,10 @@ class Folk:
             self.next = sim.tick + sec(30)
             return
         a.inventory.clear()
-        a.inventory.update(GIFTS)
+        for k in self.rng.sample(PACK, 3):                 # (a small pack, as a player carries)
+            a.inventory[k] = self.rng.randint(1, 3)
         a.x, a.y, a.z, a.hp, a.online = x, y, 99, 20, True
         a.events = []
         self.until, self.act, self.owed = sim.tick + self.rng.randint(*STAY), sim.tick + sec(2), False
         self.asked, self.proposed = None, False
+        self.angry = sim.tick + ANGRY if self.grudge and self.rng.random() < 0.3 else 0     # (back to settle it)

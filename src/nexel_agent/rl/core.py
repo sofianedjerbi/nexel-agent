@@ -12,12 +12,12 @@ from pathlib import Path
 from megastructure.sim import Simulation
 from megastructure.sim.constants import DAY_TICKS, VIEW_R
 from .achieve import HOSTILE, Ledger
-from .encode import ACTIONS, ITEMS, encode, legal, to_command
+from .encode import ACTIONS, ITEMS, N_NEAR, encode, legal, to_command
 from .milestones import Milestones
 from .folk import Folk
 from .goals import Goals
 from .rival import Rival
-from .social import SOCIAL, SocialMemory
+from .social import HIT_S, SOCIAL, SocialMemory
 
 
 FIGHT = 12                          # attack: swings at one target, till it falls or gets away (~5 s at most)
@@ -40,16 +40,17 @@ WAIT_MAX = 50                       # and the longest (a chop by hand takes ~5 s
 START = 0.3                         # the time of day an episode starts (morning)
 EP_TICKS = int(2.75 * DAY_TICKS)    # three days and nights: to the third dawn, and a little more
 HURT = 0.1                          # reward per half heart lost (and, Crafter's way, gained back)
-OUTCOME = {"won": "defeat_player", "fled": "escape_attack", "endured": "survive_attack"}
+OUTCOME = {"won": "defeat_player", "fled": "escape_attack", "endured": "survive_attack", "killed": None}
 
 
 class SimEnv:
     def __init__(self, ep_ticks: int = EP_TICKS, decide: int = DECIDE, rivals: int = 1, roam: int = 1,
-                 live_seed: int = -1, live_pct: int = 0, folk: int = 1, goals: int = 1):
+                 live_seed: int = -1, live_pct: int = 0, folk: int = 2, goals: int = 1, death_ends: int = 1):
         """rivals: a sparring partner (rl/rival.py); roam: start anywhere on the land within 400 tiles, not at the
         world's spawn; live_seed/live_pct: that share of the episodes in the live world's seed (its land, unaltered)."""
         self.ep_ticks, self.decide, self.rivals, self.roam = ep_ticks, decide, rivals, roam
         self.live_seed, self.live_pct, self.n_folk, self.use_goals = live_seed, live_pct, folk, goals
+        self.death_ends = death_ends      # 0: as live, a death drops the pack and you wake at your spawn; the episode goes on
         self.sim = None
 
     def reset(self, seed: int):
@@ -63,9 +64,13 @@ class SimEnv:
         self.rng = random.Random(seed * 13 + 1)
         self.rival = Rival(self.sim, self.a, seed, pick=self.pick_target) if self.rivals else None
         self.rival_on = False
-        self.goals = Goals(self.sim, self.a, random.Random(seed * 7 + 5)) if self.use_goals else None
-        self.folk = [Folk(self.sim, self.a, seed + k, f"Neighbour{k}") for k in range(self.n_folk)]
+        self.goals = Goals(self.sim, self.a, random.Random(seed * 7 + 5), lambda: [f.a.name for f in self.folk]) if self.use_goals else None
+        town: list = []
+        self.folk = [Folk(self.sim, self.a, seed + k, f"Neighbour{k}", town) for k in range(self.n_folk)]
+        town += self.folk
         self.social = SocialMemory(self.a.name, ITEMS)
+        self.piles, self.taken = {}, {}           # packs dropped by people who died here, what it picked up of them
+        self.sim.listeners.append(self.on_event)
         self.t0 = self.sim.tick
         self.ledger = Ledger()
         self.facing, self.last, self.last_ok, self.hurt = "S", 0, 0.0, 0.0
@@ -78,7 +83,8 @@ class SimEnv:
 
     def encoded(self):
         goal = self.goals.goal if self.goals else None
-        return {**encode(self.obs, self.facing, self.last, self.last_ok, self.hurt, self.social.flags(self.obs), goal),
+        return {**encode(self.obs, self.facing, self.last, self.last_ok, self.hurt, self.social.flags(self.obs), goal,
+                         self.social.people_flags(self.obs, N_NEAR)),
                 "mask": legal(self.obs, self.facing, self.social, goal)}
 
     def step(self, i: int):
@@ -110,6 +116,7 @@ class SimEnv:
                     self.goals.draw(forced_person=self.rival.p.name)      # (a neighbour is set upon: help them)
                 self.rival_on = self.rival.on
             for f in self.folk:
+                f.set_upon = bool(self.rival and self.rival.on and self.rival.p is f.a)
                 f.tick()
             if a.deaths > deaths0 or (a.hp < hp0 and not self.fighting()):
                 break                                   # hurt: decide now (in a fight, it goes on: timing only)
@@ -129,12 +136,22 @@ class SimEnv:
         self.obs = sim.observe(a)
         self.social.see(self.obs)
         made.update(self.social.got_now)                 # (given: not collected)
+        for k, n in self.taken.items():                  # (taken from a fallen person's pack: not collected either)
+            made[k] = made.get(k, 0) + n
+        self.taken = {}
         near = min((math.dist((o.x, o.y), (a.x, a.y)) for o in sim.agents.values() if o is not a and o.online), default=99)
         results = []
         for p in [p for p in self.pending if p[0].result is not None]:
             self.pending.remove(p)
             res = p[0].result
             results.append((p[1], p[2], res))
+            hit = next((f for f in self.folk if f.a.id == p[2].get("target")), None) if p[1] == "attack" and res.get("ok") else None
+            if hit is not None:
+                L.counts["hit_neighbour"] = L.counts.get("hit_neighbour", 0) + 1               # (every blow)
+                if sim.tick - self.social.hit_me.get(hit.a.name, -10 ** 9) > HIT_S:          # (it had not hit me lately)
+                    L.counts["hit_neighbour_unprovoked"] = L.counts.get("hit_neighbour_unprovoked", 0) + 1
+            if p[1] == "say" and res.get("ok"):
+                L.counts["said"] = L.counts.get("said", 0) + 1
             r += L.result(p[1], p[2], res, p[3], a.hp)
             for k in self.social.achieved(p[1], p[2], bool(res.get("ok")), sim.tick, near, res.get("to")):
                 r += L.unlock(k)
@@ -165,7 +182,7 @@ class SimEnv:
             if self.rival.outcome == "won":
                 L.killed.add(self.rival.a.id)
             mine = self.rival.p is a or self.rival.outcome == "won"
-            r += L.unlock(OUTCOME[self.rival.outcome]) if not died and mine else 0
+            r += L.unlock(OUTCOME[self.rival.outcome]) if not died and mine and OUTCOME[self.rival.outcome] else 0
             L.counts["visit_" + self.rival.outcome] = L.counts.get("visit_" + self.rival.outcome, 0) + 1
             self.rival.outcome = None
         r += self.marks.update(L, lost > 0, died)
@@ -174,18 +191,38 @@ class SimEnv:
         self.last = i
         truncated = sim.tick - self.t0 >= self.ep_ticks
         info = {}
-        if died or truncated:
+        if died:
+            L.counts["deaths"] = L.counts.get("deaths", 0) + 1
+            if not self.death_ends:                 # (as live: the pack fell, it wakes at its spawn, and plays on)
+                L.close_fights(True)
+                self.pending, self.running, self.then = [], None, None
+        end = died and self.death_ends
+        if end or truncated:
             L.close_fights(died)
             info = self.summary(died)
-        return self.encoded(), r, died, truncated and not died, info
+        return self.encoded(), r, bool(end), truncated and not end, info
 
     def submit(self, cmd, tool, args, then=None):
-        target = self.sim.creatures.get(args.get("target")) if tool == "attack" else None
+        target = self.sim.creatures.get(args.get("target")) if tool == "attack" else None      # (a creature: its kind, for defeat_*)
         act = self.sim.submit(self.a, tool, args)
         self.running = (cmd, act)
         self.then = then
         self.pending.append((act, tool, args, target.kind if target else ""))
         return act
+
+    def on_event(self, ev):
+        """The sim's own events (absolute places): a person's pack falling where they died, and the player picking it up."""
+        if ev.get("type") == "death" and ev.get("name") != self.a.name and ev.get("dropped"):
+            pile = self.piles.setdefault((ev["x"], ev["y"]), {})
+            for k, n in ev["dropped"].items():
+                pile[k] = pile.get(k, 0) + n
+        elif ev.get("type") == "pick_up" and ev.get("name") == self.a.name and (ev["x"], ev["y"]) in self.piles:
+            pile = self.piles[(ev["x"], ev["y"])]
+            for k, n in (ev.get("items") or {}).items():
+                t = min(n, pile.get(k, 0))
+                if t:
+                    pile[k] -= t
+                    self.taken[k] = self.taken.get(k, 0) + t
 
     def pick_target(self):
         """Whom the rival goes for: now and then a neighbour near the player, else the player."""

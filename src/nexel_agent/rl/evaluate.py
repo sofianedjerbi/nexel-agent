@@ -55,7 +55,7 @@ def metrics(eps: list) -> dict:
     attacked = sum(e["won"] + e["lost"] + e["fled"] for e in eps)
     return {"score": round(crafter_score(rates), 3), "score_r6set": round(crafter_score(rates, R6_SET), 3), "n": n,
             "ach": round(float(np.mean([len(e["achievements"]) for e in eps])), 2),
-            "ticks": int(np.mean([e["ticks"] for e in eps])), "deaths": sum(e["died"] for e in eps),
+            "ticks": int(np.mean([e["ticks"] for e in eps])), "deaths": sum(e.get("deaths", int(e["died"])) for e in eps),
             "crafts_distinct": round(float(np.mean([e["distinct_crafts"] for e in eps])), 2),
             "crafts": round(float(np.mean([e["crafts"] for e in eps])), 1),
             "places": round(float(np.mean([e["places"] for e in eps])), 1),
@@ -63,13 +63,15 @@ def metrics(eps: list) -> dict:
             "nights": round(float(np.mean([e.get("nights", 0) for e in eps])), 2),
             "chunks": round(float(np.mean([e.get("chunks", 0) for e in eps])), 1),
             "fail_pct": round(100 * sum(e["fails"] for e in eps) / max(1, sum(e["acts"] for e in eps)), 1),
-            "visits": "/".join(f"{sum(e.get('visit_' + k, 0) for e in eps)}{k[0].upper()}" for k in ("won", "fled", "endured")),
+            "visits": "/".join(f"{sum(e.get('visit_' + k, 0) for e in eps)}{k[0].upper()}" for k in ("won", "fled", "endured", "killed")),
             "goals": " ".join(f"{k}:{sum(e.get('goals', {}).get(k, [0, 0])[0] for e in eps)}/{sum(e.get('goals', {}).get(k, [0, 0])[1] for e in eps)}"
                               for k in ("gather", "craft", "give", "ask", "stay", "help", "avoid")),
             "social": round(float(np.mean([len(e.get("social", [])) for e in eps])), 2),
             "social_kinds": {k: round(sum(k in e.get("social", []) for e in eps) / n, 2) for k in ("greeted_someone", "answered_someone", "gave_item", "traded", "helped", "worked_near_player")},
             "fights": f"{sum(e['won'] for e in eps)}W/{sum(e['lost'] for e in eps)}L/{sum(e['fled'] for e in eps)}F of {attacked}",
-            "hits": sum(e["hits"] for e in eps),
+            "hits": sum(e["hits"] for e in eps), "hit_neighbour": sum(e.get("hit_neighbour", 0) for e in eps),
+            "hit_neighbour_unprovoked": sum(e.get("hit_neighbour_unprovoked", 0) for e in eps),
+            "said": round(float(np.mean([e.get("said", 0) for e in eps])), 1),
             "top": {a: round(r, 2) for a, r in sorted(rates.items(), key=lambda kv: -kv[1]) if r > 0}}
 
 

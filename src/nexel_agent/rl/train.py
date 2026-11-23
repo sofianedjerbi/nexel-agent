@@ -58,7 +58,7 @@ class Check(BaseCallback):
         self.log(f"[check] step={self.num_timesteps} min={(time.time() - self.t0) / 60:.0f} sps={sps:.0f} "
                  f"score={m['score']} r6set={m['score_r6set']} (random {self.base['random']['score']}, legal random {self.base.get('random_legal', {}).get('score')}, noop {self.base['noop']['score']}) "
                  f"ach={m['ach']} ticks={m['ticks']} deaths={m['deaths']}/{m['n']} crafts_distinct={m['crafts_distinct']} "
-                 f"places={m['places']} places_distinct={m['places_distinct']} nights={m['nights']} chunks={m['chunks']} fail%={m['fail_pct']} fights={m['fights']} rival={m['visits']} social={m['social']}/6 goals=[{m['goals']}] hits={m['hits']} "
+                 f"places={m['places']} places_distinct={m['places_distinct']} nights={m['nights']} chunks={m['chunks']} fail%={m['fail_pct']} fights={m['fights']} rival={m['visits']} social={m['social']}/6 hit_neighbour={m['hit_neighbour']} unprovoked={m['hit_neighbour_unprovoked']} said/ep={m['said']} goals=[{m['goals']}] hits={m['hits']} "
                  f"train_score={tr.get('score')} train_ach={tr.get('ach')}")
         self.log("        top: " + json.dumps(m["top"]))
         self.log("        social: " + json.dumps(m["social_kinds"]))
@@ -118,6 +118,7 @@ def main():
     p.add_argument("--ent-end", type=float, default=None, help="the entropy bonus falls linearly to this by --steps")
     p.add_argument("--live-seed", type=int, default=-1, help="the live world's seed: --live-pct of the train episodes there")
     p.add_argument("--live-pct", type=int, default=20)
+    p.add_argument("--death-ends", type=int, default=1, help="0: as live, a death drops the pack and the episode goes on")
     p.add_argument("--gamma", type=float, default=0.995)
     p.add_argument("--days", type=float, default=0.75, help="episode length in days (from the morning): 0.75 is one night, 2.75 three")
     p.add_argument("--mask", type=int, default=1, help="1: MaskablePPO with the legal-action mask")
@@ -125,7 +126,7 @@ def main():
     torch.set_num_threads(2)
     out = ROOT / a.run
     out.mkdir(parents=True, exist_ok=True)
-    ep = [f"ep_ticks={int(a.days * 12000)}"]
+    ep = [f"ep_ticks={int(a.days * 12000)}", f"death_ends={a.death_ends}"]
     live = [f"live_seed={a.live_seed}", f"live_pct={a.live_pct}"] if a.live_seed >= 0 else []
     env = PipeVecEnv(a.envs, rng_seed=hash(a.run) % 1000, env_args=ep + live)        # (eval: held-out seeds only)
     ev = PipeVecEnv(a.eval_envs, env_args=ep)

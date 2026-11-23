@@ -19,7 +19,7 @@ from megastructure.client import Client
 from ..fastprompt import chat_parse
 from .achieve import HOSTILE
 from .core import split
-from .encode import ACTIONS, ITEMS, action_name, encode, legal, to_command
+from .encode import ACTIONS, ITEMS, N_NEAR, action_name, encode, legal, to_command
 from .social import SocialMemory
 
 MIN_S, IDLE_S, WAIT_MAX_S, POLL_S = 0.2, 0.5, 5.0, 0.25
@@ -37,6 +37,7 @@ class LiveBody:
         self.stats.update(said=0, gave=0)
         self.tick, self.me, self.obs_entities, self.fighting = 0, {}, [], False
         self.mind = None                                    # (the LLM planner that sets goals: rl/mind.py)
+        self.given = []
         self.log = open(a.log, "a") if a.log else None
 
     def done(self, tool, args, r):
@@ -54,6 +55,8 @@ class LiveBody:
             self.stats["placed"] += 1
         elif tool in ("say", "give"):
             self.stats["said" if tool == "say" else "gave"] += 1
+            if tool == "give":
+                self.given.append(((r.get("result") or {}).get("to"), args.get("item"), args.get("n", 1)))
         elif tool == "attack":
             self.stats["swings"] = self.stats.get("swings", 0) + 1
             if (r.get("result") or {}).get("killed"):
@@ -106,7 +109,7 @@ class LiveBody:
         speaker, text = self.heard or ("someone", "(nobody has said anything yet)")
         if not self.http:
             return plain if ask else "hey"
-        busy = f"you want some {ask}" if ask else (self.goal_text() or "")
+        busy = "; ".join(p for p in (f"you want some {ask}" if ask else self.goal_text(), self.deeds()) if p)
         msgs = chat_messages(self.a.name, self.a.persona, busy, speaker, text, me=self.me)
         try:
             r = await self.http.post(self.a.model_url, timeout=30, json={"model": "default_model", "messages": msgs,
@@ -116,6 +119,11 @@ class LiveBody:
         except Exception:
             line = ""
         return (line or "hey")[:120]
+
+    def deeds(self) -> str:
+        """What it actually did lately, for the words to go by (facts)."""
+        gave = [f"{n} {k} to {to}" for to, k, n in self.given[-3:]]
+        return ("you gave " + ", ".join(gave)) if gave else "you have not given anything to anyone"
 
     def goal_text(self) -> str:
         g = self.mind.goal if self.mind else None
@@ -141,8 +149,9 @@ class LiveBody:
                 if self.mind:
                     self.mind.see(obs)
                     if self.mind.due():
+                        self.mind.deeds = self.deeds()
                         asyncio.create_task(self.mind.think(obs))
-                    if self.mind.to_say:                 # (the planner's own line, once)
+                    if self.mind.to_say and self.social.can_talk(obs["tick"]):    # (its own line: the same chat cooldown)
                         line, self.mind.to_say = self.mind.to_say, None
                         asyncio.create_task(game.act("say", text=line))
                         self.stats["said"] += 1
@@ -161,7 +170,8 @@ class LiveBody:
                         self.foes[foe["id"]] = foe["kind"]
                 hp, deaths = me["hp"], me["deaths"]
                 goal = self.mind.goal if self.mind else None
-                enc = encode(obs, self.facing, self.last, self.last_ok, self.hurt, self.social.flags(obs), goal)
+                enc = encode(obs, self.facing, self.last, self.last_ok, self.hurt, self.social.flags(obs), goal,
+                             self.social.people_flags(obs, N_NEAR))
                 i = self.pol.act(enc, self.rng, legal(obs, self.facing, self.social, goal) if self.a.mask else None)
                 kind = ACTIONS[i][0]
                 if self.hurt > 0:

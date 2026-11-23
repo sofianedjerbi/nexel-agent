@@ -12,12 +12,13 @@ import time
 from pathlib import Path
 
 from ..chat import CHAT_STYLE
+from megastructure.tiles import RECIPES
 from .goals import KINDS, Goal
 
 THINK_S = 20.0
 SALIENT = ("say", "shout", "give", "attack")
-GOALS_DOC = ("goal is one of: free (no goal: play as you see fit), gather ITEM, craft ITEM, give ITEM to PERSON, "
-             "ask PERSON for ITEM, stay with PERSON, help PERSON fight, avoid PERSON")
+GOALS_DOC = ("Goals: gather (an item), craft (an item), give (an item, to a person), ask (a person, for an item), "
+             "stay (with a person), help (a person, in a fight), avoid (a person), free (no goal)")
 
 
 class Mind:
@@ -28,6 +29,8 @@ class Mind:
         self.goal, self.goal_at = Goal(), time.monotonic()
         self.last, self.salient, self.busy = 0.0, False, False
         self.to_say: str | None = None
+        self.names: dict = {}
+        self.deeds = ""                  # what the body did lately (the live body says: rl/live.py)
         self.stats = {"thoughts": 0, "said": 0, "errors": 0, "goals": {}}
 
     def see(self, obs: dict):
@@ -61,9 +64,19 @@ class Mind:
         inv = ", ".join(f"{k} {v}" for k, v in sorted(me.get("inventory", {}).items(), key=lambda kv: -kv[1])[:10]) or "nothing"
         g = self.goal
         goal = "free" if g.kind == "free" else " ".join(str(p) for p in (g.kind, g.item, g.person and f"(with {g.person})") if p)
+        have = me.get("inventory", {})
+        close = sorted(((sum(max(0, n - have.get(k, 0)) for k, n in r.inputs.items()), name, r) for name, r in RECIPES.items()
+                        if name not in have), key=lambda t: t[0])
+        close = [f"{name} (lacks {', '.join(f'{n - have.get(k, 0)} {k}' for k, n in r.inputs.items() if have.get(k, 0) < n)})"
+                 for miss, name, r in close if 0 < miss <= 2][:5]
         lines = [f"You: health {me['hp']}/20, food {me['hunger']}/20, carrying {inv}. {obs.get('time', '')}.",
-                 f"Your goal now: {goal}, set {time.monotonic() - self.goal_at:.0f} s ago."]
+                 (f"Your goal now: {goal}, set {time.monotonic() - self.goal_at:.0f} s ago." if g.kind != "free" else "You have no goal now.")]
+        if close:
+            lines.append("Things you could make with a little more: " + "; ".join(close) + ".")
+        if self.deeds:
+            lines.append("What you did lately: " + self.deeds + ".")
         people = [e for e in obs.get("entities", []) if e.get("kind") == "agent"]
+        self.names = {str(p.get("name", "")).lower(): p.get("name") for p in people} | {n.lower(): n for n in self.relations}
         for p in people:
             n = p.get("name")
             rel = self.relations.get(n, {})
@@ -80,8 +93,8 @@ class Mind:
     def messages(self, obs: dict) -> list:
         sys_ = (f"You are {self.name}, a player in a survival sandbox game. Your character: {self.persona}\n"
                 "Your body plays by itself (moving, gathering, crafting, fighting back); you choose what it is after. "
-                f"{GOALS_DOC}. ITEM is a game item name, PERSON a name you see. Reply with JSON only: "
-                '{"goal": "...", "with": "PERSON or empty", "item": "ITEM or empty", "say": "a short chat line or empty", '
+                f"{GOALS_DOC}. Reply with JSON only: "
+                '{"goal": "gather|craft|give|ask|stay|help|avoid|free", "with": "a name you see, or empty", "item": "a game item name, or empty", "say": "a short chat line or empty", '
                 '"relation_update": {"PERSON": {"ally": true|false, "note": "what you want to remember about them"}}}. '
                 "The line you say, if any: " + CHAT_STYLE)
         return [{"role": "system", "content": sys_}, {"role": "user", "content": self.facts(obs) + "\n/no_think"}]
@@ -102,14 +115,17 @@ class Mind:
     def apply(self, d: dict):
         kind = str(d.get("goal", "free")).split()[0].lower() if d.get("goal") else "free"
         kind = kind if kind in KINDS else "free"
-        g = Goal(kind, (d.get("item") or None), (d.get("with") or None))
+        who = str(d.get("with") or "").strip()
+        who = self.names.get(who.lower(), who) or None               # (the name as the game spells it)
+        g = Goal(kind, (str(d.get("item") or "").strip().lower().replace(" ", "_") or None), who)
         if (g.kind, g.item, g.person) != (self.goal.kind, self.goal.item, self.goal.person):
             self.goal, self.goal_at = g, time.monotonic()
             self.stats["goals"][kind] = self.stats["goals"].get(kind, 0) + 1
         say = str(d.get("say") or "").strip()
         self.to_say = say[:120] or None
         for who, upd in (d.get("relation_update") or {}).items():
-            if isinstance(upd, dict) and who:
+            who = self.names.get(str(who).lower(), who)
+            if isinstance(upd, dict) and who and who.lower() not in ("no_one", "nobody", "none", "someone"):
                 rel = self.relations.setdefault(who, {})
                 if "ally" in upd:
                     rel["ally"] = bool(upd["ally"])

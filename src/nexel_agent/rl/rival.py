@@ -1,8 +1,9 @@
-"""A sparring partner in the sim: another person who now and then turns up near the player and goes for it (part of
-the environment, as a mob is: scripted, never the policy). It comes from a few tiles off, walks up, swings (bare
-hands, sometimes a spear), and gives up after a while or when the player has got away; killed, it is gone till next
-time. Sometimes it goes for a neighbour near the player instead. The player's side of it is told to the env: who hit,
-whether it got away, whether it won."""
+"""A hostile player in the sim (part of the environment, as a mob is: scripted, never the policy). Now and then it
+turns up a few tiles off, walks up and swings (bare hands, sometimes a spear) for a while, as a hostile player does
+live: it can kill, and a kill costs what it costs live - the pack falls where you die, and it takes it, then you wake
+at your spawn. It comes back, soon after a win, later after a beating. Killed, it is gone till next time. It is
+beatable: started at full health, a fight with bare hands goes your way more often than not. Sometimes it goes for a
+neighbour near the player instead. The env is told how each visit ended."""
 
 import math
 import random
@@ -10,11 +11,11 @@ import random
 from megastructure.sim.constants import sec
 
 EVERY = (sec(100), sec(260))      # between two visits
-LAST = sec(8)                     # how long it keeps at it
-SWING = sec(1.2)                  # (a blow a second or so: a third of your health if you just stand there)
-HP = 6                            # (fists: a few seconds of hitting back see it off)
+AGAIN = (sec(60), sec(150))       # after it won (or you just took it): sooner
+LAST = sec(12)                    # how long it keeps at it
+SWING = sec(1.2)                  # (a blow a second or so)
+HP = 6                            # (fists, a swing every 0.4 s: it falls in a few seconds of hitting back)
 REACH, LOSE = 2.5, 7              # it swings from this close; this far, it has lost the player
-SPARE = 4                         # it stops at this much health left (half hearts)
 
 
 class Rival:
@@ -27,8 +28,8 @@ class Rival:
         self.a.online = False
         self.next = sim.tick + self.rng.randint(*EVERY)
         self.until = self.swing = 0
-        self.deaths = self.a.deaths
-        self.outcome = None               # what the last visit came to: "won" (player killed it), "fled", "endured"
+        self.deaths, self.p_deaths, self.p_at = self.a.deaths, 0, (0, 0)
+        self.outcome = None      # how the last visit ended: "won" (it was killed), "fled", "endured", "killed" (it killed)
 
     @property
     def on(self) -> bool:
@@ -44,12 +45,19 @@ class Rival:
                 self.arrive()
             return
         if a.deaths > self.deaths:
-            return self.leave("won")
+            return self.leave("won", EVERY)
+        if p.deaths > self.p_deaths:                       # it killed: the pack fell there, it takes it
+            pile = sim.items.pop(self.p_at, None) or {}
+            sim.dirty_items.add(self.p_at)
+            for k, n in pile.items():
+                a.add(k, n)
+            return self.leave("killed", AGAIN)
+        self.p_at = (p.x, p.y)
         d = self.dist()
         if d > LOSE:
-            return self.leave("fled")
-        if sim.tick >= self.until or p.hp <= SPARE:          # (a sparring partner: it leaves you a little life)
-            return self.leave("endured")
+            return self.leave("fled", EVERY)
+        if sim.tick >= self.until:
+            return self.leave("endured", AGAIN)
         if sim.tick < self.swing:
             return
         self.swing = sim.tick + SWING
@@ -70,14 +78,14 @@ class Rival:
             self.next = sim.tick + sec(20)
             return
         a.inventory.clear()
-        if self.rng.random() < 0.3:
+        if self.rng.random() < 0.2:
             a.inventory["spear"] = 1
         a.x, a.y, a.z, a.hp, a.online = x, y, 99, HP, True
-        self.deaths, self.outcome = a.deaths, None
+        self.deaths, self.p_deaths, self.p_at, self.outcome = a.deaths, p.deaths, (p.x, p.y), None
         self.until, self.swing = sim.tick + LAST, sim.tick + sec(1)
 
-    def leave(self, outcome):
+    def leave(self, outcome, wait):
         self.outcome = outcome
         self.sim.interrupt(self.a, "gone")
         self.a.online = False
-        self.next = self.sim.tick + self.rng.randint(*EVERY)
+        self.next = self.sim.tick + self.rng.randint(*wait)

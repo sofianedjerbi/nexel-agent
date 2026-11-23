@@ -333,3 +333,111 @@ def test_ask_goal_and_a_neighbour_who_says_yes():
         if env.goals.counts["ask"][0]:
             break
     assert env.goals.counts["ask"][0] == 1 and a.count("wood") >= 1
+
+
+def neighbour_beside(env):
+    sim, a, f = env.sim, env.a, env.folk[0]
+    f.next = sim.tick + 1
+    env.step(0)
+    f.a.x, f.a.y, f.a.z = a.x + 1, a.y, 99
+    f.act = 10 ** 9
+    env.obs = sim.observe(a)
+    return f
+
+
+def test_a_neighbour_hit_hits_back_and_goes():
+    env = SimEnv(ep_ticks=10 ** 6, roam=0, rivals=0)
+    env.reset(5)
+    f = neighbour_beside(env)
+    hp = env.a.hp
+    o, *_ = env.step(idx("attack"))
+    from nexel_agent.rl.encode import PEOPLE, VEC
+    late = N_ACTIONS - 181
+    assert o["vec"][VEC - late - PEOPLE + 1] == 1               # (the nearest: "I hit it lately")
+    f.act = 0
+    for _ in range(40):
+        env.step(0)
+    assert env.a.hp < hp and not f.on                          # (it hit back, then went)
+
+
+def test_the_chat_cooldown():
+    env = SimEnv(ep_ticks=10 ** 6, roam=0, rivals=0)
+    env.reset(5)
+    neighbour_beside(env)
+    assert env.encoded()["mask"][idx("say")]
+    env.step(idx("say"))
+    env.step(0)
+    assert not env.encoded()["mask"][idx("say")]                # (just spoke, nobody answered: not for 30 s)
+    env.sim.submit(env.folk[0].a, "say", {"text": "hey"})
+    env.step(0)
+    assert env.encoded()["mask"][idx("say")]                    # (spoken to: a line back is fine)
+
+
+def test_a_kill_costs_the_pack_and_the_game_goes_on():
+    env = SimEnv(ep_ticks=10 ** 6, roam=0, folk=0, death_ends=0)
+    env.reset(5)
+    sim, a, rv = env.sim, env.a, env.rival
+    a.inventory.update({"wood": 5})
+    rv.next = sim.tick + 1
+    env.step(0)
+    rv.a.x, rv.a.y, rv.a.z = a.x + 1, a.y, 99
+    a.hp = 1
+    for _ in range(20):
+        _, _, end, _, _ = env.step(0)
+        assert not end
+        if a.deaths:
+            break
+    env.step(0)
+    assert a.deaths == 1 and not a.count("wood") and rv.a.count("wood") == 5 and env.ledger.counts["deaths"] == 1
+
+
+def test_neighbours_remember_a_blow():
+    env = SimEnv(ep_ticks=10 ** 6, roam=0, rivals=0)
+    env.reset(5)
+    f = neighbour_beside(env)
+    env.step(idx("attack"))
+    env.step(0)
+    assert f.grudge
+    f.angry = 0
+    f.a.events = [{"type": "say", "from": env.a.name, "text": "could you spare some wood?"}]
+    f.a.inventory["wood"] = 2
+    f.tick()
+    assert f.asked is None                                      # (it says no)
+
+
+def test_a_fallen_neighbours_pack_is_not_collected():
+    env = SimEnv(ep_ticks=10 ** 6, roam=0, rivals=0)
+    env.reset(5)
+    f = neighbour_beside(env)
+    f.a.inventory.clear()
+    f.a.inventory["fiber"] = 2
+    f.a.hp = 1
+    env.step(idx("attack"))
+    for _ in range(20):
+        env.step(idx("pick_up") if env.encoded()["mask"][idx("pick_up")] else 0)
+        if env.a.count("fiber"):
+            break
+    env.step(0)
+    assert env.a.count("fiber") == 2 and "collect_fiber" not in env.ledger.done
+    assert env.ledger.counts["hit_neighbour_unprovoked"] == 1
+
+
+def test_a_grudge_fades():
+    from nexel_agent.rl.folk import GRUDGE, GIFT_EASES
+    env = SimEnv(ep_ticks=10 ** 6, roam=0, rivals=0)
+    env.reset(5)
+    f = env.folk[0]
+    f.grudge = True
+    assert f.grudge
+    env.sim.tick += GRUDGE - GIFT_EASES + 1
+    assert f.grudge
+    f.grudge_until -= GIFT_EASES                                # (as a gift does)
+    assert not f.grudge
+
+
+def test_attack_picks_a_slot():
+    from nexel_agent.rl.actions import to_command
+    obs = {"tick": 0, "self": {"inventory": {}, "z": 0},
+           "entities": [{"id": 7, "kind": "agent", "dx": 1, "dy": 0}, {"id": 9, "kind": "agent", "dx": 2, "dy": 0}]}
+    assert to_command(idx("attack"), obs, "S")[1]["target"] == 7
+    assert to_command(idx("attack_1"), obs, "S")[1]["target"] == 9

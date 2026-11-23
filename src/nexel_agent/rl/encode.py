@@ -40,7 +40,10 @@ SOCIAL_FLAGS = 3                     # spoken to just now, asked for something I
 ACTIONS_V1 = 179                     # the actions an r12 policy knew: their last-action slots stay where they were
 GOAL = len(GOAL_KINDS) + len(ITEMS) + 4      # the goal: kind, item, the person (dx, dy, hp, in view) (rl/goals.py)
 # (each part that came later is appended, so an older policy grows into a newer one: rl/train.py init_from)
-VEC = BODY + len(ITEMS) + N_NEAR * (3 + len(KINDS)) + ACTIONS_V1 + SOCIAL_FLAGS + (N_ACTIONS - ACTIONS_V1) + GOAL
+PEOPLE = 2 * N_NEAR                  # per nearest being: hit me lately, I hit it lately (rl/social.py)
+ACTIONS_V2 = 181                     # the actions an r13-r15 policy knew (their slots before the goal)
+VEC = (BODY + len(ITEMS) + N_NEAR * (3 + len(KINDS)) + ACTIONS_V1 + SOCIAL_FLAGS + (ACTIONS_V2 - ACTIONS_V1) + GOAL + PEOPLE
+       + (N_ACTIONS - ACTIONS_V2))
 
 _GRID_LUT = np.zeros(128, np.uint8)
 for _ch, _i in CHAR_ID.items():
@@ -51,7 +54,7 @@ for _ch, _v in LEVEL.items():
 
 
 def encode(obs: dict, facing: str = "S", last_action: int = 0, last_ok: float = 0.0, hurt: float = 0.0, social=(0, 0, 0),
-           goal=None) -> dict:
+           goal=None, people=None) -> dict:
     """grid: (21, 21) char ids; height: (21, 21) the land's height minus yours, in layers / 4, clipped to [-1, 1];
     vec: body, clock, last action and how it went, pack counts (log), the three nearest beings."""
     rows = obs["grid"]
@@ -82,14 +85,18 @@ def encode(obs: dict, facing: str = "S", last_action: int = 0, last_ok: float = 
             v[o + 3 + KINDS.index(k)] = 1
         o += 3 + len(KINDS)
     o = BODY + len(ITEMS) + N_NEAR * (3 + len(KINDS))
-    v[o + last_action if last_action < ACTIONS_V1 else o + SOCIAL_FLAGS + last_action] = 1
+    late = N_ACTIONS - ACTIONS_V2
+    v[o + last_action if last_action < ACTIONS_V1 else o + SOCIAL_FLAGS + last_action if last_action < ACTIONS_V2
+      else VEC - late + last_action - ACTIONS_V2] = 1
     v[o + ACTIONS_V1:o + ACTIONS_V1 + SOCIAL_FLAGS] = social
-    g = VEC - GOAL
+    if people is not None:
+        v[VEC - late - PEOPLE:VEC - late] = people
+    g = VEC - late - PEOPLE - GOAL
     if goal is not None and goal.kind != "free":
         v[g + GOAL_KINDS.index(goal.kind)] = 1
         if goal.item in ITEM_ID:
             v[g + len(GOAL_KINDS) + ITEM_ID[goal.item]] = 1
         p = person(obs, goal.person)
         if p is not None:
-            v[VEC - 4:] = (p["dx"] / VIEW_R, p["dy"] / VIEW_R, p.get("hp", 0) / 20, 1.0)
+            v[g + GOAL - 4:g + GOAL] = (p["dx"] / VIEW_R, p["dy"] / VIEW_R, p.get("hp", 0) / 20, 1.0)
     return {"grid": grid, "height": height, "vec": v}
