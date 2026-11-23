@@ -5,6 +5,14 @@ Written by [python-semantic-release](https://python-semantic-release.readthedocs
 
 <!-- version list -->
 
+## v0.3.0 (2026-11-23)
+
+### Features
+
+- **rl**: Ring, one decision that walls the player in when the pack can close a room
+  ([`560d103`](https://github.com/sofianedjerbi/nexel-agent/commit/560d1035f1b2fa4a005a28502b9aa0e52d190502))
+
+
 ## v0.2.0 (2026-11-23)
 
 ### Documentation
