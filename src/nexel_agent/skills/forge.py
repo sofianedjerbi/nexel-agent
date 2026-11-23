@@ -52,6 +52,9 @@ Commands for act (verbs do the walking for you):
   "place_near ITEM": put ITEM down on a free flat tile next to you (or the nearest reachable one).
   "go_next_to TARGET", "move_to X Y", "walk N|E|S|W" (keeps walking that way), "look_far N|E|S|W", "fight TARGET", "eat ITEM".
   A failed act has "ok": False and says why in "error"/"detail"; nothing in view: "error": "not_found".
+  "look_far D" reports what lies up to 58 tiles that way (its "result"]["text"] lists things with their x,y) and
+  the player remembers it: after it, "dig_at tree" walks to a tree look_far saw, even one far out of view.
+  A start may have no tree or rock in view: the world is large, things are found by looking and walking.
 Facts: {recipes}. A craft marked @workbench needs a placed workbench within 2 tiles of you; craft_here walks there
 if one is in view. Wood and stone cannot be placed. Bare bushes and thickets give fiber. Ore needs a pickaxe.
 Answer: first your reasoning in a ```text block (the steps, what can go wrong, how you check), then the code in one
