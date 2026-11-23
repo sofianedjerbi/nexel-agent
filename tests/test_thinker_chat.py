@@ -20,7 +20,7 @@ def test_the_reply_and_its_deed_are_read_apart():
 def test_the_prompt_asks_for_a_real_answer_and_says_where_you_are():
     m = chat_messages("gatsu0", "a grim swordsman", "harvest wood", "doben00", "where are you?", (),
                       {"x": 103, "y": 80, "hp": 20, "hunger": 18, "inventory": {"wood": 40}})
-    assert "never cryptic" in m[0]["content"] and "no coordinates" in m[0]["content"] and "\"intent\"" in m[0]["content"]
+    assert "never cryptic" in m[0]["content"] and "mostly lowercase" in m[0]["content"] and "not needy" in m[0]["content"] and "no coordinates" in m[0]["content"] and "\"intent\"" in m[0]["content"]
     assert "(103, 80)" in m[1]["content"] and "wood 40" in m[1]["content"] and "doben00 says: where are you?" in m[1]["content"]
 
 
