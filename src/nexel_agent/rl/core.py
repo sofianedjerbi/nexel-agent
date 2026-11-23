@@ -48,7 +48,7 @@ class SimEnv:
         if self.just_hit:
             self.reactions[kind] = self.reactions.get(kind, 0) + 1
             self.just_hit = False
-        if kind in ("step", "jump", "dig") and ACTIONS[i][1]:
+        if kind in ("step", "jump", "dig", "dig_at") and ACTIONS[i][1]:
             self.facing = ACTIONS[i][1]
         inv0, hp0, deaths0 = dict(a.inventory), a.hp, a.deaths
         act = None

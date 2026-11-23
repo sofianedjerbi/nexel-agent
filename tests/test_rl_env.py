@@ -115,6 +115,28 @@ def test_the_same_action_again_goes_on():
     assert a.count("wood") and "collect_wood" in env.ledger.done
 
 
+def test_a_pit_is_not_a_trap():
+    """Dug down three layers, the actions can cut steps up out of it (dig the land in front at head height, jump)."""
+    env = SimEnv(ep_ticks=10 ** 6)
+    env.reset(1000003)
+    sim, a = env.sim, env.a
+
+    def until_done(name, n=60):
+        for _ in range(n):
+            env.step(idx(name))
+            if env.running and env.running[1].result is not None:
+                return env.running[1].result
+        return env.running[1].result
+
+    for _ in range(3):
+        assert until_done("dig_down")["ok"]
+    low = sim.height(a)
+    for _ in range(3):
+        until_done("dig_at_N_2")
+        until_done("jump_N")
+    assert sim.height(a) > low
+
+
 def test_legal_mask_follows_the_rules():
     from megastructure.rl.encode import legal
     env = SimEnv(ep_ticks=10 ** 6)

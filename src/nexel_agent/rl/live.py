@@ -33,6 +33,8 @@ class LiveBody:
         self.log = open(a.log, "a") if a.log else None
 
     def done(self, tool, args, kind, t):
+        if t.cancelled() or t.exception() is not None:
+            return
         r = t.result()
         if not r.get("ok") and r.get("error") == "interrupted":
             self.stats["interrupted"] += 1
@@ -95,7 +97,7 @@ class LiveBody:
                 kind = ACTIONS[i][0]
                 if self.hurt > 0:
                     self.reactions[kind] = self.reactions.get(kind, 0) + 1
-                if kind in ("step", "jump", "dig") and ACTIONS[i][1]:
+                if kind in ("step", "jump", "dig", "dig_at") and ACTIONS[i][1]:
                     self.facing = ACTIONS[i][1]
                 self.stats["decisions"] += 1
                 cmd = to_command(i, obs, self.facing)
@@ -118,6 +120,9 @@ class LiveBody:
                     t_report = time.monotonic()
                     self.log.write(json.dumps(self.report(me, action_name(i))) + "\n")
                     self.log.flush()
+            if task is not None and not task.done():
+                task.cancel()
+                await asyncio.gather(task, return_exceptions=True)
         if http:
             await http.aclose()
         return self.report(obs["self"], "")

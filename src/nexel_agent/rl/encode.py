@@ -36,6 +36,7 @@ def _actions():
     acts += [("step", d, None) for d in DIRS]
     acts += [("jump", d, None) for d in DIRS]
     acts += [("dig", d, w) for w in (None, "axe", "pickaxe") for d in DIRS]
+    acts += [("dig_at", d, h) for h in (1, 2) for d in DIRS]          # the land in front, a layer or two over your feet
     acts += [("dig_down", None, None), ("pick_up", None, None), ("attack", None, None)]
     acts += [("place", None, it) for it in PLACE]
     acts += [("craft", None, r) for r in CRAFT]
@@ -66,6 +67,8 @@ def to_command(i: int, obs: dict, facing: str):
         return kind, {"dir": d}
     if kind == "dig":
         return "dig", {"dir": d, **({"with": arg} if arg else {})}
+    if kind == "dig_at":
+        return "dig", {"dir": d, "z": int(me.get("z", 0)) + arg}
     if kind == "dig_down":
         return "dig_down", {}
     if kind == "pick_up":

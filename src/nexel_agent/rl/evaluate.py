@@ -10,7 +10,7 @@ import numpy as np
 from .achieve import ACHIEVEMENTS, crafter_score
 from .vec import EVAL0, PipeVecEnv
 
-EVAL_SEEDS = tuple(range(EVAL0, EVAL0 + 16))
+EVAL_SEEDS = tuple(range(EVAL0, EVAL0 + 24))
 
 
 def run(venv: PipeVecEnv, act, seeds=EVAL_SEEDS) -> dict:
