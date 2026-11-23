@@ -196,3 +196,13 @@ def test_place_near_finds_a_free_tile_when_every_side_is_taken(tmp_path):
 def test_a_target_named_with_its_place_is_that_place():
     from megastructure.verbs import locate
     assert locate(fake_obs((0, 0)), "berry_bush at 3 -4") == [(3, -4)] == locate(fake_obs((0, 0)), "tree (3,-4)")
+
+
+def test_a_hit_no_card_matched_says_so_with_the_cards_it_has(tmp_path):
+    t = thinker(tmp_path)
+    t.cards.add([{"when": {"hit_by": "any", "hp_below": 5}, "do": ["fight {id}"], "why": "low"}])
+    obs = fake_obs((0, 0))
+    obs["entities"] = [{"id": 12, "kind": "agent", "name": "Ana", "dx": 1, "dy": 0, "hp": 20}]
+    t.on_look(obs, [("Ana", obs["entities"][0])], time.monotonic())
+    assert any('a hit by Ana came and no card of yours matched; your cards: [0] {"hit_by":"any","hp_below":5.0} -> fight {id}' in h
+               for h in t.history)

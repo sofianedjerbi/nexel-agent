@@ -18,11 +18,13 @@ import httpx
 from ..goals import missing
 from ..tiles import RECIPES
 from .library import Library
+from .live import lessons
 from .sandbox import Sandbox, check
 from .simworld import SimBody
 
 SEEDS = (1, 5, 7, 9, 10)                     # generated worlds with trees and rocks within 40 tiles of the spawn
 PASS = 4
+EXTRA_SEEDS = (13, 20)                       # two more worlds for a skill play found at fault
 TASKS = [  # (name, call args, what it is for, done_when) -- the curriculum, in order
     ("get_wood", (6,), "get at least n wood into your pack", {"have": {"wood": 6}}),
     ("get_stone", (3,), "get at least n stone into your pack", {"have": {"stone": 3}}),
@@ -112,11 +114,15 @@ def ask(url, msgs, max_tokens=3000) -> tuple[str, float]:
     return r.json()["choices"][0]["message"]["content"] or "", time.monotonic() - t0
 
 
-def forge(url, lib: Library, tries=4, only=None, author="forge", log=print, redo=False):
-    rows = []
+def forge(url, lib: Library, tries=4, only=None, author="forge", log=print, redo=False, play: dict | None = None):
+    """play: skill -> failures seen in play (live.py); such a skill is written again, against them, in more worlds."""
+    rows, play = [], play or {}
     for name, args, what, test in TASKS:
-        if (only and name not in only) or (name in lib.index and not redo):
-            continue                                  # (a skill the library has already: kept)
+        if (only and name not in only) or (name in lib.index and not redo and name not in play):
+            continue                                  # (a skill the library has already, that play found no fault in: kept)
+        seeds = SEEDS + EXTRA_SEEDS if name in play else SEEDS
+        from_play = ("\nIn play, players failed at this: " + "; ".join(play[name][:4]) + ". The skill must hold up there "
+                     "too (a bush or tree may be gone when you arrive; look again).") if name in play else ""
         have = lib.sources()
         listing = "\n".join(f"  {n}{tuple(lib.index[n]['call'].split(',')) if lib.index[n]['call'] else '()'}: "
                             f"{lib.index[n]['doc']}" for n in have) or "  (none yet)"
@@ -124,17 +130,18 @@ def forge(url, lib: Library, tries=4, only=None, author="forge", log=print, redo
         msgs = [{"role": "system", "content": API.replace("{recipes}", recipes_text())},
                 {"role": "user", "content": f"Library skills you may call:\n{listing}\nWrite {sig}: {what}. It will be "
                                             f"called as {name}{args!r} by a player who starts carrying nothing, somewhere "
-                                            f"in the world. It passes when this holds at the end: {json.dumps(test)}."}]
+                                            f"in the world. It passes when this holds at the end: {json.dumps(test)}.{from_play}"}]
         row = {"skill": name, "attempts": []}
         for k in range(tries):
             text, gen_s = ask(url, msgs)
             src = code_of(text, name)
-            res = trial(name, src, args, test, have, tests={n: lib.index[n]["done_when"] for n in have})
+            res = trial(name, src, args, test, {k: v for k, v in have.items() if k != name}, seeds,
+                        tests={n: lib.index[n]["done_when"] for n in have})
             ok = sum(r[1] for r in res)
             row["attempts"].append({"gen_s": round(gen_s, 1), "pass": f"{ok}/{len(res)}", "src": src,
                                     "errors": [r[2]["error"] for r in res]})
             log(f"{name} try {k + 1}: {ok}/{len(res)} worlds, gen {gen_s:.0f}s, errors {[r[2]['error'] for r in res]}")
-            if ok >= PASS:
+            if ok >= PASS + (len(res) - len(SEEDS)):
                 lib.add(name, src, ",".join("n" for _ in args), test, author, f"{ok}/{len(res)}", gen_s)
                 break
             bad = next(r for r in res if not r[1])
@@ -145,7 +152,8 @@ def forge(url, lib: Library, tries=4, only=None, author="forge", log=print, redo
                       + f"\nThe last reply, as your code got it: {json.dumps(bad[2].get('last_reply'), default=str)[:600]}"
                       + f"\nAt the end: {state_from(bad)}. "
                       f"Test: {json.dumps(test)}. Reason in a ```text block about the cause, then write the fixed function."}]
-        row["ok"] = any(int(a["pass"].split("/")[0]) >= PASS for a in row["attempts"])
+        row["ok"] = any(int(a["pass"].split("/")[0]) >= PASS + (len(seeds) - len(SEEDS)) for a in row["attempts"])
+        row["from_play"] = play.get(name, [])
         rows.append(row)
         old = json.loads(lib.path.joinpath("forge_log.json").read_text()) if lib.path.joinpath("forge_log.json").exists() else []
         lib.path.joinpath("forge_log.json").write_text(json.dumps([r for r in old if r["skill"] != name] + [row], indent=1))
@@ -164,9 +172,13 @@ def main():
     p.add_argument("--only", help="comma list of skills")
     p.add_argument("--author", default="Qwen3-30B-A3B-Instruct-2507")
     p.add_argument("--redo", action="store_true", help="write again the skills the library has")
+    p.add_argument("--from-play", help="the players' data dir: their repeated failures pick what to write again")
     a = p.parse_args()
-    rows = forge(a.model_url, Library(Path(a.lib)), a.tries, a.only.split(",") if a.only else None, a.author,
-                 log=lambda s: print(s, flush=True), redo=a.redo)
+    lib = Library(Path(a.lib))
+    play = lessons(Path(a.from_play), lib.index) if a.from_play else {}
+    print("from play:", json.dumps(play, indent=1), flush=True)
+    rows = forge(a.model_url, lib, a.tries, a.only.split(",") if a.only else None, a.author,
+                 log=lambda s: print(s, flush=True), redo=a.redo, play=play)
     print(json.dumps({"passed": [r["skill"] for r in rows if r["ok"]], "failed": [r["skill"] for r in rows if not r["ok"]]}))
 
 

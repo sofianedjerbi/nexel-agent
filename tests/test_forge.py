@@ -73,7 +73,7 @@ def test_the_forge_keeps_a_skill_that_passes_and_retries_one_that_fails(tmp_path
     assert "It passed in 0 of 2 worlds" in asked[1][-1]["content"]
     again = Library(tmp_path / "_skills")
     assert "get_wood" in again.sources() and again.index["get_wood"]["sim"] == "2/2"
-    assert again.lines() == "get_wood N"
+    assert again.lines() == "get_wood N [done: wood N]"
     json.loads((tmp_path / "_skills" / "forge_log.json").read_text())
 
 
@@ -123,3 +123,29 @@ def test_a_plan_runs_a_library_skill_to_its_end_and_its_test_says_won(tmp_path):
     assert looks[:4] == ["N", "E", "S", "W"]
     assert Library(tmp_path / "_skills").index["scan"]["wins"] >= 1
     assert "Your skills (\"skill NAME [N]\" does the whole of it" in calls[-1][1]["messages"][1]["content"]
+
+
+def test_failures_in_play_pick_the_skill_to_write_again_and_are_quoted(tmp_path, monkeypatch):
+    from megastructure.skills.live import lessons
+    log = tmp_path / "agents" / "gatsu0" / "decisions.jsonl"
+    log.parent.mkdir(parents=True)
+    rec = {"tool": "dig_at", "args": {"text": "bare_bush"}, "ok": False, "error": "not_found", "goal": "get fiber", "source": "model"}
+    log.write_text("\n".join(json.dumps(rec) for _ in range(25)) + "\n")
+    found = lessons(tmp_path / "agents", {"make_axe": {"wins": 1, "losses": 4}})
+    assert found["get_fiber"] == ["'dig_at bare_bush' failed 25x (not_found) while the goal was 'get fiber' (gatsu0)"]
+    assert found["make_axe"] == ["the skill lost 4 of 5 runs in play"]
+    lib = Library(tmp_path / "_skills")
+    for name, args, _, test in F.TASKS:                                  # (a full library: only play's faults are redone)
+        lib.add(name, f"def {name}(*a):\n    return True\n", ",".join("n" for _ in args), test, "old", "4/5")
+    asked = []
+
+    def fake_ask(url, msgs, max_tokens=3000):
+        asked.append(msgs)
+        return "```python\ndef get_fiber(n):\n    return False\n```", 1.0
+    monkeypatch.setattr(F, "ask", fake_ask)
+    monkeypatch.setattr(F, "SEEDS", (1,))
+    monkeypatch.setattr(F, "EXTRA_SEEDS", (7,))
+    rows = F.forge("http://model", lib, tries=1, play=found)
+    assert [r["skill"] for r in rows] == ["get_fiber", "make_axe"]        # (only what play found at fault)
+    assert "In play, players failed at this: 'dig_at bare_bush' failed 25x" in asked[0][1]["content"]
+    assert rows[0]["attempts"][0]["pass"] == "0/2" and lib.index["get_fiber"]["author"] == "old"   # (kept: the new one failed)
