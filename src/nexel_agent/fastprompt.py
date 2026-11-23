@@ -66,7 +66,8 @@ Answer with ONE JSON object and nothing else:
 done_when (your goal's test, checked after each action, all keys must hold): "have": {{"wood": 8}} | "placed": "workbench" |
 "near": "workbench" | "at": [x, y] | "hp_at_least": 15. A plan runs to its end, its first failure or a card;
 "repeat": N plays it again up to N times while done_when does not hold.
-Example: {{"goal":"get wood","done_when":{{"have":{{"wood":6}}}},"do":["dig_at tree","dig_at tree"]}} (a dig takes a whole tree)
+Example: {{"goal":"get wood","done_when":{{"have":{{"wood":6}}}},"do":["dig_at tree","dig_at tree"]}} (a dig takes a whole tree);
+with a skill: {{"goal":"get wood","done_when":{{"have":{{"wood":6}}}},"do":["skill get_wood 6"]}}
 "remember TEXT" keeps a note of yours (a place, a person, a promise); "forget N" drops note [N]."""
 
 
