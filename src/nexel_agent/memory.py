@@ -89,6 +89,9 @@ class Memory:
         self.save()
 
     def remember(self, text: str, at=None, when="") -> int:
+        same = next((x for x in self.notes if x["text"] == text.strip()[:140]), None)
+        if same:                                      # (the same note again: kept once)
+            return same["id"]
         n = self.next_id
         self.next_id += 1
         self.notes = (self.notes + [{"id": n, "t": self.now(), "at": list(at) if at else None, "when": when,

@@ -189,6 +189,30 @@ def recipe_facts(name, inv, obs) -> list[str]:
     return out
 
 
+LADDER = ("workbench", "axe", "pickaxe", "hoe", "campfire", "wood_wall", "door", "roof", "chest", "bed", "sword")
+
+
+def not_made_line(obs, rec) -> str:
+    """The curriculum as facts: what was made already, and what not yet (in the usual order), and which of those
+    the pack pays for right now."""
+    inv = obs["self"]["inventory"]
+    made = [k for k in LADDER if rec.ever.get(k) or k in rec.placed]
+    todo = []
+    for k in LADDER:
+        if k in made and not (k == "workbench" and "workbench" not in rec.placed):
+            continue
+        if k == "workbench" and rec.ever.get(k):
+            todo.append("a placed workbench")
+            continue
+        r = RECIPES[k]
+        pays = all(inv.get(i, 0) >= n for i, n in r.inputs.items())
+        here = not r.station or station_near(obs, r.station)
+        todo.append(k + (" (you can make it now)" if pays and here else " (your pack pays for it; needs a placed "
+                                                                         f"{r.station} near)" if pays else ""))
+    return (f"Made so far: {', '.join(made) or 'nothing from the recipe book'}. Not made yet: "
+            + ", ".join(todo[:6]) + ".")
+
+
 def goal_recipe(goal: str | None) -> str | None:
     words = (goal or "").lower().replace("-", " ").replace("_", " ").split()
     words += [a + "_" + b for a, b in zip(words, words[1:])]
@@ -200,8 +224,7 @@ def progress_lines(obs, goal, rec: Record | None) -> list[str]:
     inv = obs["self"]["inventory"]
     out = []
     if rec:
-        done = [i + 1 for i, (m, _) in enumerate(MILESTONES) if m in rec.reached]
-        out.append("Milestones reached: " + (", ".join(map(str, done)) or "none") + ".")
+        out.append(not_made_line(obs, rec))
     name = goal_recipe(goal)
     if name in RECIPES:
         out.append("For your goal: " + "; ".join(recipe_facts(name, inv, obs)) + ".")

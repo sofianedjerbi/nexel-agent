@@ -177,10 +177,12 @@ class Thinker(Planner, React, Verbs):
             self.new_plan.clear()
             item = self.next_item(obs)
             if item is None:                             # the model has not said what to do yet: wait for it
+                t_wait = time.monotonic()
                 try:
                     await asyncio.wait_for(self.new_plan.wait(), IDLE_WAIT_S)
                 except asyncio.TimeoutError:
                     pass
+                self.wait_s = getattr(self, "wait_s", 0.0) + time.monotonic() - t_wait   # (no command queued)
                 continue
             if item.source != "card":
                 await asyncio.sleep(max(0.0, last + MIN_GAP_S - time.monotonic()))   # at most ~3 actions a second
@@ -225,7 +227,7 @@ class Thinker(Planner, React, Verbs):
             self.said[str(item.args.get("text", "")).strip().lower()] = t1
         if item.source == "model":
             self.recent.append(command_text(item.tool, item.args))
-        self.history.append(line[:150])
+        self.history.append(line[:130])
         note_outcome(self.memory, obs, item, reply, t1)
         if not ok and reply.get("error") != "interrupted":
             self.abort(f"{command_text(item.tool, item.args)} failed: {reply.get('error')}", tell=False, soft=True)
@@ -268,6 +270,7 @@ class Thinker(Planner, React, Verbs):
                 t.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
             s = summary(self.busy, self.calls, time.monotonic() - t0, self.stats)
+            s["no_command_pct"] = round(100 * getattr(self, "wait_s", 0.0) / max(1e-6, time.monotonic() - t0), 1)
             (self.dir / "summary.json").write_text(json.dumps(s, indent=1))
             log.info("%s summary %s", self.name, json.dumps(s))
             self.decision_log.flush()

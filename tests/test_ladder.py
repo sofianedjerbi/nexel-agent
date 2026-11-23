@@ -48,7 +48,8 @@ def test_a_material_goal_and_the_milestones_are_facts():
     rec = Record()
     rec.seen({"wood": 40})
     lines = progress_lines(world({"wood": 40}), "harvest wood", rec)
-    assert lines[0] == "Milestones reached: 1."
+    assert lines[0] == ("Made so far: nothing from the recipe book. Not made yet: workbench (you can make it now), axe, "
+                        "pickaxe, hoe, campfire, wood_wall (your pack pays for it; needs a placed workbench near).")
     assert lines[1].startswith("For your goal: wood comes from tree") and "nearest: tree at (0,-2)" in lines[1]
     no_orders(" ".join(lines))
 
@@ -98,7 +99,7 @@ def test_place_forms_the_model_writes_all_parse():
 
 def test_prompt_states_facts_and_stays_short():
     prefix = stable_prefix("gatsu0", "A grim swordsman.")
-    assert "Milestones: 1 wood > 2 workbench placed" in prefix and "done_when" in prefix and len(prefix) < 4000
+    assert "done_when" in prefix and "Milestones" not in prefix and len(prefix) < 3700
     user = compact_obs(world({"wood": 45}), goal="craft hoe", record=Record())
     assert "For your goal: hoe = 2 wood (have 45)" in user and len(user) < 1700
     assert "tree (0,-2): stand at (0,-1), it is N" in user
@@ -115,7 +116,7 @@ def test_the_next_plan_reads_what_failed(tmp_path):
             await t.play(game, http, minutes=2.0 / 60)
     asyncio.run(go())
     later = [c[1]["messages"][1]["content"] for c in calls if c[1].get("stream")][1:]
-    assert any("place N wood FAILED" in u and "Milestones reached:" in u for u in later)
+    assert any("place N wood FAILED" in u and "Not made yet: workbench (you can make it now)" in u for u in later)
     assert (tmp_path / "Vex" / "progress.json").exists()
 
 
@@ -151,3 +152,14 @@ def test_what_was_seen_before_is_remembered_where_it_was(tmp_path):
     assert "seen before, out of view: tree (0,-2) 32 tiles, rock (4,2) 28 tiles" in user.replace("rock (4,2) 28 tiles, tree (0,-2) 32 tiles", "tree (0,-2) 32 tiles, rock (4,2) 28 tiles")
     from megastructure.memory import Memory
     assert Memory(tmp_path / "Vex" / "memory.json").places["tree"] == (0, -2)            # (kept across a restart)
+
+
+def test_the_curriculum_is_what_was_not_made_yet():
+    rec = Record()
+    rec.seen({"workbench": 1, "wood": 2})
+    line = progress_lines(world({"wood": 2, "workbench": 1}), "", rec)[0]
+    assert line.startswith("Made so far: workbench. Not made yet: a placed workbench, axe")
+    rec.did("place", {"item": "workbench"}, True)
+    line = progress_lines(world({"wood": 2, "stone": 1}, [("&", 1, 1)]), "", rec)[0]
+    assert "Not made yet: axe, pickaxe, hoe (you can make it now)" in line
+    no_orders(line)
