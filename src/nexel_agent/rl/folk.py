@@ -1,5 +1,6 @@
 """Peaceful neighbours in the sim (part of the environment, as the rival is: scripted, never the policy). Now and
-then one comes by and spends a few minutes around the player: wanders near, works (chops, digs), and once in a
+then one comes by and spends a few minutes around the player (now and then sticking right beside it, as a person
+who follows you about): wanders near, works (chops, digs), and once in a
 while says hello, asks for something, proposes to team up, or hands something over; given something, it sometimes
 gives back; asked for something it carries, it brings it over or says no. It carries a small pack, as a player
 does, and drops it when killed. Hit by the player, it hits back a few seconds, then goes; and it remembers, as do
@@ -19,6 +20,7 @@ ACT = (sec(3), sec(8))               # between two things it does
 ASKS = ("wood", "stone", "berries", "fiber", "plank", "dirt")
 PACK = ("berries", "wood", "fiber", "stone", "seed", "dirt")   # what a neighbour may carry, a few of each at most
 ANGRY = sec(8)                       # (a blow is seen by whoever is in view of it: the game's own events)
+STICKY = 0.4                         # the share of visits it sticks right beside the player (a person who follows you about)
 GRUDGE = sec(240)                    # a grudge fades in a few minutes,
 GIFT_EASES = sec(120)                # faster when the player gives it something; at once when the player helps it in a fight
 
@@ -37,6 +39,8 @@ class Folk:
         self.angry = 0                          # hit by the player: till when it hits back
         self.grudge_until = 0                   # it was hit by the player, or saw a neighbour hit: till when it minds
         self.set_upon = False                   # the rival is going for it now (the env says)
+        self.sticky = False                     # this visit, it sticks right beside the player
+        self.shadowing = False                  # this episode, it is always beside the player (it comes back after leaving)
         self.town = town if town is not None else [self]
 
     @property
@@ -56,7 +60,7 @@ class Folk:
 
     def go(self, wait=EVERY):
         self.a.online, self.angry = False, 0
-        self.next = self.sim.tick + self.rng.randint(*wait)
+        self.next = self.sim.tick + (sec(60) if self.shadowing else self.rng.randint(*wait))
 
     def tick(self):
         sim, a = self.sim, self.a
@@ -99,6 +103,9 @@ class Folk:
             return
         self.act = sim.tick + self.rng.randint(*ACT)
         d, r = self.dist(), self.rng.random()
+        if self.sticky and not self.grudge and d > 1.5 and r < 0.7:     # (back to its place beside the player)
+            self.act = sim.tick + sec(1)
+            return sim.submit(a, "move_to", {"x": self.p.x + 1, "y": self.p.y})
         if self.grudge:                                  # (keeps its distance, works on its own)
             if d < 8:
                 ang = math.atan2(a.y - self.p.y, a.x - self.p.x)
@@ -138,6 +145,10 @@ class Folk:
         if item:
             self.sim.submit(self.a, "give", {"target": self.p.id, "item": item, "n": 1})
 
+    def shadow(self):
+        """This episode it stays right beside the player all along (a person who follows you about), from the start."""
+        self.shadowing, self.next = True, self.sim.tick + sec(5)
+
     def arrive(self):
         sim, a, p = self.sim, self.a, self.p
         for _ in range(30):
@@ -155,4 +166,7 @@ class Folk:
         a.events = []
         self.until, self.act, self.owed = sim.tick + self.rng.randint(*STAY), sim.tick + sec(2), False
         self.asked, self.proposed = None, False
+        self.sticky = self.shadowing or self.rng.random() < STICKY
+        if self.shadowing:
+            self.until = sim.tick + sec(24 * 3600)
         self.angry = sim.tick + ANGRY if self.grudge and self.rng.random() < 0.3 else 0     # (back to settle it)

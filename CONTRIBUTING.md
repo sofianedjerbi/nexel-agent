@@ -84,14 +84,16 @@ Start a game first (in nexel-worlds: `nexel-worlds`, http://127.0.0.1:7777/), th
 python -m nexel_agent.players                       # 2 players on Qwen3-8B, the game at :7777
 python -m nexel_agent.players --n 8 --model 30b --minutes 60      # models: 4b 8b 14b 30b
 python -m nexel_agent.players --pick gatsu0,senku0  # --list shows the roster (src/nexel_agent/personas.json)
-python -m nexel_agent.players --body rl --policy <weights.npz>    # the body learned in the sim acts, the model chats
+python -m nexel_agent.players --body rl --policy <weights.npz> --model 30b   # the learned body acts; the model talks and plans
 python -m nexel_agent.bots --n 8 --minutes 30       # scripted bots, no model
 ```
 
 `players.py` starts the shared model server on :8080 (or reuses one answering there), then the players a few seconds
 apart; logs go to `agents/<name>.log`. Ctrl-C stops them all and the model server it started. RAM: about 3 GB for 4b,
 5 GB for 8b, 9 GB for 14b, 17 GB for 30b, plus ~100 MB a player; one model serves the players in turn, so keep N
-small (2 to 4) on a laptop. A world that asks who players are lets programs on its machine in with its key:
+small (2 to 4) on a laptop. For the rl body, serve Qwen3-30B-A3B-Instruct-2507 (4-bit, `--model 30b`): measured with
+training running, it replies fastest (p90 0.6 s) and stays on topic; on a Mac with less than ~20 GB free use `4b`
+(`rl/voice.py` MODEL, FALLBACK_MODEL). A world that asks who players are lets programs on its machine in with its key:
 `MEGASTRUCTURE_AGENT_KEY=$(cat <game>/saves/default/agent.key)`.
 
 Tools: `tools/ai_players.sh` (= `players`), `tools/llm_bench.py` (model call timings on real observations),

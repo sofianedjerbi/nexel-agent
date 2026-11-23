@@ -10,7 +10,10 @@ import numpy as np
 
 from .vec import EVAL0, PipeVecEnv
 
+TICK_HZ = 10                     # (the game's; this module runs in the trainer, without the game)
+
 EVAL_SEEDS = tuple(range(EVAL0, EVAL0 + 48))
+LIVE_LIKE_SEEDS = tuple(range(EVAL0 + 5000, EVAL0 + 5024))     # the second held-out set: starts laid out like the live save
 NAMES: list = []                  # the achievements (rl/achieve.py, game side): the workers send the list (spec)
 
 
@@ -71,6 +74,11 @@ def metrics(eps: list) -> dict:
             "fights": f"{sum(e['won'] for e in eps)}W/{sum(e['lost'] for e in eps)}L/{sum(e['fled'] for e in eps)}F of {attacked}",
             "hits": sum(e["hits"] for e in eps), "hit_neighbour": sum(e.get("hit_neighbour", 0) for e in eps),
             "hit_neighbour_unprovoked": sum(e.get("hit_neighbour_unprovoked", 0) for e in eps),
+            "first_strikes": sum(e.get("first_strikes", 0) for e in eps),
+            "near_min": round(sum(e.get("near_ticks", 0) for e in eps) / TICK_HZ / 60, 1),       # (all episodes)
+            "fs_per_near_min": round(sum(e.get("first_strikes", 0) for e in eps)
+                                     / max(1e-9, sum(e.get("near_ticks", 0) for e in eps) / TICK_HZ / 60), 3),
+            "picks": f"back {sum(e.get('pick_back', 0) for e in eps)} / slot {sum(e.get('pick_slot', 0) for e in eps)}",
             "said": round(float(np.mean([e.get("said", 0) for e in eps])), 1),
             "top": {a: round(r, 2) for a, r in sorted(rates.items(), key=lambda kv: -kv[1]) if r > 0}}
 

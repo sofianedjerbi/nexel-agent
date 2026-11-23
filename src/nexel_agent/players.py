@@ -33,7 +33,7 @@ MODELS = {
     "14b": "mlx-community/Qwen3-14B-4bit",
     "30b": "mlx-community/Qwen3-30B-A3B-Instruct-2507-4bit",
 }
-DEFAULT_MODEL = "auto"    # 30b when the Mac has room for it, else 8b (soaks 2026-11-23: the 30B plans and talks best)
+DEFAULT_MODEL = "auto"    # 30b when the Mac has room for it, else 4b (bench 2026-11-23: the 30B talks and plans best; the 8B breaks the planner's JSON)
 AUTO_FREE_PCT = 70        # free memory before loading the 30B (~17 GB of 32): what stays free is then about 20%
 SRC = str(Path(__file__).resolve().parent.parent)    # so children find the package without an install
 
@@ -68,7 +68,7 @@ def free_pct(run=subprocess.run) -> int | None:
 def model_name(m: str, free=None) -> str:
     if m.lower() == "auto":
         f = free_pct() if free is None else free
-        return MODELS["30b" if f is not None and f >= AUTO_FREE_PCT else "8b"]
+        return MODELS["30b" if f is not None and f >= AUTO_FREE_PCT else "4b"]
     return MODELS.get(m.lower(), m)
 
 

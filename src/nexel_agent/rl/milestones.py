@@ -6,7 +6,10 @@ a foe that came close and did no harm. What happened, never how."""
 import math
 
 from megastructure.gen import CHUNK
+from megastructure.tiles import DIRS
 from .achieve import HOSTILE
+
+ROOM_PIECES = ("wood_wall", "stone_wall", "door", "gate", "fence")
 
 EVADE_TICKS = 100          # a foe within 2 tiles, and 10 s later no blow taken since
 
@@ -20,6 +23,28 @@ class Milestones:
         self.swim_from = None
         self.near_since, self.last_hit = None, -10 ** 9
         self.been = set()          # cave, depth_5, depth_10: been there, not yet back up in the open
+
+    def room(self, most=60):
+        """The space round the player closed off by walls, doors and gates (the game's ENCLOSE), small and compact
+        (as the game's own rooms): (the tiles inside, the pieces round it), or None."""
+        sim, a = self.sim, self.a
+        seen, edge, stack = {(a.x, a.y)}, set(), [(a.x, a.y)]
+        while stack:
+            cx, cy = stack.pop()
+            if len(seen) > most:
+                return None
+            for dx, dy in DIRS.values():
+                n = (cx + dx, cy + dy)
+                if n in seen or n in edge:
+                    continue
+                if sim.world.block(*n) in sim.ENCLOSE:
+                    edge.add(n)
+                elif not sim.world.passable(*n) and sim.world.block(*n) not in ("bed", "chair", "table", "chest", "workbench", "campfire"):
+                    return None                           # (a cliff or a rock is not a wall it built)
+                else:
+                    seen.add(n)
+                    stack.append(n)
+        return seen, edge
 
     def update(self, L, hurt: bool, died: bool) -> float:
         sim, a = self.sim, self.a
@@ -42,6 +67,13 @@ class Milestones:
                 r += u("light_shelter")
             if {"door", "bed"} <= L.placed and sim.near_block(a, "door", 6) and sim.near_block(a, "bed", 6):
                 r += u("house")
+            room = self.room() if L.placed & set(ROOM_PIECES) else None
+            if room is not None:                          # (walled all round: not just walls beside it)
+                inside, edge = room
+                r += u("room_built")
+                r += u("roofed_room") if sim.world.roof(a.x, a.y) else 0
+                r += u("room_with_door") if any(sim.world.block(*p) in ("door", "gate") for p in edge) else 0
+                r += u("bed_in_room") if any(sim.world.block(*p) == "bed" for p in inside) else 0
         if a.count("axe") and a.count("pickaxe") and a.count("hoe") and (a.count("spear") or a.count("sword")):
             r += u("toolkit")
         if sim.swimming(a):

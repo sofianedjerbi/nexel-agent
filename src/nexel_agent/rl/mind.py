@@ -15,7 +15,7 @@ from ..chat import CHAT_STYLE
 from megastructure.tiles import RECIPES
 from .goals import KINDS, Goal
 
-THINK_S = 20.0
+THINK_S = 20.0             # (the model it asks: rl/voice.py MODEL, the same server as the words)
 SALIENT = ("say", "shout", "give", "attack")
 GOALS_DOC = ("Goals: gather (an item), craft (an item), give (an item, to a person), ask (a person, for an item), "
              "stay (with a person), help (a person, in a fight), avoid (a person), free (no goal)")
@@ -31,6 +31,9 @@ class Mind:
         self.to_say: str | None = None
         self.names: dict = {}
         self.deeds = ""                  # what the body did lately (the live body says: rl/live.py)
+        self.asks = ""                   # an ask open now, with what it carries of that item
+        self.log = self.path.with_name("mind.jsonl")   # each thought: the facts it got, what it answered
+        self.voice = None                                 # (rl/voice.py: the one model, chat lines first)
         self.stats = {"thoughts": 0, "said": 0, "errors": 0, "goals": {}}
 
     def see(self, obs: dict):
@@ -38,7 +41,7 @@ class Mind:
         for e in obs.get("events", []):
             t, who = e.get("type"), e.get("from") or e.get("attacker")
             if t in ("say", "shout") and who and who != me:
-                self.note(who, f'said "{str(e.get("text", ""))[:80]}"')
+                self.note(who, f'said "{str(e.get("text", ""))[:80]}"', salient=self.voice is None)   # (voice.py answers it)
             elif t == "give" and e.get("to") == me and who:
                 self.note(who, f"gave you {e.get('items')}")
             elif t == "give" and who == me:
@@ -75,6 +78,8 @@ class Mind:
             lines.append("Things you could make with a little more: " + "; ".join(close) + ".")
         if self.deeds:
             lines.append("What you did lately: " + self.deeds + ".")
+        if self.asks:
+            lines.append(self.asks + ".")
         people = [e for e in obs.get("entities", []) if e.get("kind") == "agent"]
         self.names = {str(p.get("name", "")).lower(): p.get("name") for p in people} | {n.lower(): n for n in self.relations}
         for p in people:
@@ -102,9 +107,14 @@ class Mind:
     async def think(self, obs: dict):
         self.busy, self.salient, self.last = True, False, time.monotonic()
         try:
-            r = await self.http.post(self.url, timeout=40, json={"model": "default_model", "messages": self.messages(obs),
-                                                                 "max_tokens": 160, "temperature": 0.7})
-            out = r.json()["choices"][0]["message"]["content"] or ""
+            if self.voice is not None:
+                out, timing = await self.voice.post(self.messages(obs), 100, words=False)
+            else:
+                r = await self.http.post(self.url, timeout=40, json={"model": "default_model", "messages": self.messages(obs),
+                                                                     "max_tokens": 100, "temperature": 0.7})
+                out, timing = r.json()["choices"][0]["message"]["content"] or "", {}
+            with open(self.log, "a") as f:
+                f.write(json.dumps({"t": round(time.time(), 1), "facts": self.facts(obs), "reply": out, **timing}) + "\n")
             self.apply(json.loads(re.search(r"\{.*\}", re.sub(r"<think>.*?</think>", "", out, flags=re.S), re.S).group(0)))
             self.stats["thoughts"] += 1
         except Exception:
@@ -125,7 +135,7 @@ class Mind:
         self.to_say = say[:120] or None
         for who, upd in (d.get("relation_update") or {}).items():
             who = self.names.get(str(who).lower(), who)
-            if isinstance(upd, dict) and who and who.lower() not in ("no_one", "nobody", "none", "someone"):
+            if isinstance(upd, dict) and who and who.lower() not in ("no_one", "nobody", "none", "someone", "person", "a name you see"):
                 rel = self.relations.setdefault(who, {})
                 if "ally" in upd:
                     rel["ally"] = bool(upd["ally"])

@@ -25,6 +25,7 @@ class SocialMemory:
         self.hit_me: dict = {}                # who hit me, when
         self.i_hit: dict = {}                 # whom I hit, when
         self.my_last = -10 ** 9               # when I last said something
+        self.last_hit = (None, None, -10 ** 9)   # who hit me last: (name, id, tick)
 
     def see(self, obs: dict):
         tick = obs["tick"]
@@ -42,6 +43,7 @@ class SocialMemory:
             elif e.get("type") == "attack":
                 if e.get("target") == self.me and e.get("attacker"):
                     self.hit_me[e["attacker"]] = e.get("tick", tick)
+                    self.last_hit = (e["attacker"], e.get("id"), e.get("tick", tick))      # (a creature's blow says its id)
                 elif e.get("attacker") == self.me and e.get("target"):
                     self.i_hit[e["target"]] = e.get("tick", tick)
             elif e.get("type") == "give" and e.get("to") == self.me and who:
@@ -63,6 +65,17 @@ class SocialMemory:
             out += [float(bool(name) and tick - self.hit_me.get(name, -10 ** 9) <= HIT_S),
                     float(bool(name) and tick - self.i_hit.get(name, -10 ** 9) <= HIT_S)]
         return out + [0.0] * (2 * n - len(out))
+
+    def hit_me_lately(self, name, tick) -> bool:
+        return bool(name) and tick - self.hit_me.get(name, -10 ** 9) <= HIT_S
+
+    def hitter(self, obs: dict):
+        """The being that hit me last (HIT_S ago at most), if it is in view."""
+        name, cid, t = self.last_hit
+        if obs["tick"] - t > HIT_S:
+            return None
+        return next((e for e in obs.get("entities", []) if (cid is not None and e.get("id") == cid)
+                     or (e.get("kind") == "agent" and e.get("name") == name)), None)
 
     def ask_open(self, tick) -> str | None:
         return self.asked if self.asked and tick - self.asked_at <= ASKED_S else None

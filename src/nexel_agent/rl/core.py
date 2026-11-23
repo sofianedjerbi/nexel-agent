@@ -26,12 +26,14 @@ FIGHT = 12                          # attack: swings at one target, till it fall
 def split(cmd) -> list:
     """The tool calls of one action: itself; or, climb, the game's own way up a step: the block over your head dug
     (if any), the land in front at head height (if any), then a jump that way; or, attack, a fight: swings at that
-    target one after the other (a swing that misses ends it)."""
+    target one after the other (a swing that misses ends it) - at whoever hit it lately; at anyone else, one swing."""
     tool, args = cmd
     if tool == "climb":
         return [("dig", {"dir": "up"}), ("dig", {"dir": args["dir"], "z": args["z"]}), ("jump", {"dir": args["dir"]})]
-    if tool == "attack":
+    if tool == "attack" and args.get("fight"):
         return [cmd] * FIGHT
+    if tool == "attack":                 # (at someone who has not hit it: a single swing; the fight is attack_back's)
+        return [cmd]
     return [cmd]
 
 DECIDE = 5                          # ticks: an idle noop waits this long
@@ -45,12 +47,15 @@ OUTCOME = {"won": "defeat_player", "fled": "escape_attack", "endured": "survive_
 
 class SimEnv:
     def __init__(self, ep_ticks: int = EP_TICKS, decide: int = DECIDE, rivals: int = 1, roam: int = 1,
-                 live_seed: int = -1, live_pct: int = 0, folk: int = 2, goals: int = 1, death_ends: int = 1):
+                 live_seed: int = -1, live_pct: int = 0, folk: int = 2, goals: int = 1, death_ends: int = 1,
+                 shadow_pct: int = 30, thin_pct: int = 0):
         """rivals: a sparring partner (rl/rival.py); roam: start anywhere on the land within 400 tiles, not at the
         world's spawn; live_seed/live_pct: that share of the episodes in the live world's seed (its land, unaltered)."""
         self.ep_ticks, self.decide, self.rivals, self.roam = ep_ticks, decide, rivals, roam
         self.live_seed, self.live_pct, self.n_folk, self.use_goals = live_seed, live_pct, folk, goals
         self.death_ends = death_ends      # 0: as live, a death drops the pack and you wake at your spawn; the episode goes on
+        self.shadow_pct = shadow_pct      # the share of episodes a neighbour stays right beside the player all along
+        self.thin_pct = thin_pct          # the share of starts laid out like the live save near its players (thin_land)
         self.sim = None
 
     def reset(self, seed: int):
@@ -60,6 +65,8 @@ class SimEnv:
         self.a = self.sim.login("Learner", "rl-token")
         if self.roam:
             self.start_somewhere(rng)
+        if rng.random() * 100 < self.thin_pct:
+            self.thin_land(rng)
         self.sim.tick = self.sim.tick // DAY_TICKS * DAY_TICKS + int(START * DAY_TICKS)
         self.rng = random.Random(seed * 13 + 1)
         self.rival = Rival(self.sim, self.a, seed, pick=self.pick_target) if self.rivals else None
@@ -68,8 +75,10 @@ class SimEnv:
         town: list = []
         self.folk = [Folk(self.sim, self.a, seed + k, f"Neighbour{k}", town) for k in range(self.n_folk)]
         town += self.folk
+        if self.folk and rng.random() * 100 < self.shadow_pct:
+            self.folk[0].shadow()
         self.social = SocialMemory(self.a.name, ITEMS)
-        self.piles, self.taken = {}, {}           # packs dropped by people who died here, what it picked up of them
+        self.piles, self.taken, self.struck = {}, {}, {}           # packs dropped by people who died here, what it picked up of them
         self.sim.listeners.append(self.on_event)
         self.t0 = self.sim.tick
         self.ledger = Ledger()
@@ -91,6 +100,9 @@ class SimEnv:
         sim, a, L = self.sim, self.a, self.ledger
         cmd = to_command(i, self.obs, self.facing, self.social, self.goals.goal if self.goals else None)
         kind = ACTIONS[i][0]
+        if kind == "attack":                                # (which attack it picks: back at its hitter, or a slot)
+            k = "pick_back" if ACTIONS[i][2] == "back" else "pick_slot"
+            L.counts[k] = L.counts.get(k, 0) + 1
         if self.just_hit:
             self.reactions[kind] = self.reactions.get(kind, 0) + 1
             self.just_hit = False
@@ -118,6 +130,8 @@ class SimEnv:
             for f in self.folk:
                 f.set_upon = bool(self.rival and self.rival.on and self.rival.p is f.a)
                 f.tick()
+            if any(max(abs(f.a.x - a.x), abs(f.a.y - a.y)) <= 2 for f in self.folk if f.a.online):
+                L.counts["near_ticks"] = L.counts.get("near_ticks", 0) + 1      # (time a neighbour is within reach)
             if a.deaths > deaths0 or (a.hp < hp0 and not self.fighting()):
                 break                                   # hurt: decide now (in a fight, it goes on: timing only)
             busy = a.action is not None or a.aside is not None
@@ -150,6 +164,9 @@ class SimEnv:
                 L.counts["hit_neighbour"] = L.counts.get("hit_neighbour", 0) + 1               # (every blow)
                 if sim.tick - self.social.hit_me.get(hit.a.name, -10 ** 9) > HIT_S:          # (it had not hit me lately)
                     L.counts["hit_neighbour_unprovoked"] = L.counts.get("hit_neighbour_unprovoked", 0) + 1
+                    if sim.tick - self.struck.get(hit.a.name, -10 ** 9) > HIT_S:             # (a new incident: a first strike)
+                        L.counts["first_strikes"] = L.counts.get("first_strikes", 0) + 1
+                self.struck[hit.a.name] = sim.tick
             if p[1] == "say" and res.get("ok"):
                 L.counts["said"] = L.counts.get("said", 0) + 1
             r += L.result(p[1], p[2], res, p[3], a.hp)
@@ -223,6 +240,24 @@ class SimEnv:
                 if t:
                     pile[k] -= t
                     self.taken[k] = self.taken.get(k, 0) + t
+
+    def thin_land(self, rng, r=40):
+        """Land as players leave it near them (the live save): most trees round the start felled, and a few thickets
+        and rocks spread out, so wood, fiber and stone take travelling for."""
+        sim, a = self.sim, self.a
+        for dy in range(-r, r + 1):
+            for dx in range(-r, r + 1):
+                if sim.world.block(a.x + dx, a.y + dy) in ("tree", "fruit_tree") and rng.random() < 0.9:
+                    sim.world.set(a.x + dx, a.y + dy, block="none")
+        for block, n in (("thicket", rng.randint(3, 6)), ("rock", rng.randint(2, 4)), ("tree", rng.randint(3, 8))):
+            for _ in range(n * 10):
+                d, ang = rng.uniform(12, r), rng.uniform(0, 6.283)
+                x, y = a.x + round(d * math.cos(ang)), a.y + round(d * math.sin(ang))
+                if sim.world.block(x, y) == "none" and sim.world.ground(x, y) in ("grass", "dirt"):
+                    sim.world.set(x, y, block=block)
+                    n -= 1
+                    if n <= 0:
+                        break
 
     def pick_target(self):
         """Whom the rival goes for: now and then a neighbour near the player, else the player."""

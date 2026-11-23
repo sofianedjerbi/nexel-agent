@@ -51,7 +51,7 @@ def test_arg_defaults_and_choice():
     assert (a.n, a.port, a.game, a.minutes) == (2, 8080, "ws://127.0.0.1:7777/agent", None)
     assert a.model == "auto"
     assert players.model_name(a.model, free=80) == "mlx-community/Qwen3-30B-A3B-Instruct-2507-4bit"
-    assert players.model_name(a.model, free=40) == "mlx-community/Qwen3-8B-4bit"
+    assert players.model_name(a.model, free=40) == "mlx-community/Qwen3-4B-Instruct-2507-4bit"
     assert players.model_name("4b") == "mlx-community/Qwen3-4B-Instruct-2507-4bit"
     roster = players.load_roster()
     assert len({p["name"] for p in players.choose(roster, 6, None, seed=1)}) == 6

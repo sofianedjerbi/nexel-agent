@@ -58,10 +58,17 @@ class Check(BaseCallback):
         self.log(f"[check] step={self.num_timesteps} min={(time.time() - self.t0) / 60:.0f} sps={sps:.0f} "
                  f"score={m['score']} r6set={m['score_r6set']} (random {self.base['random']['score']}, legal random {self.base.get('random_legal', {}).get('score')}, noop {self.base['noop']['score']}) "
                  f"ach={m['ach']} ticks={m['ticks']} deaths={m['deaths']}/{m['n']} crafts_distinct={m['crafts_distinct']} "
-                 f"places={m['places']} places_distinct={m['places_distinct']} nights={m['nights']} chunks={m['chunks']} fail%={m['fail_pct']} fights={m['fights']} rival={m['visits']} social={m['social']}/6 hit_neighbour={m['hit_neighbour']} unprovoked={m['hit_neighbour_unprovoked']} said/ep={m['said']} goals=[{m['goals']}] hits={m['hits']} "
+                 f"places={m['places']} places_distinct={m['places_distinct']} nights={m['nights']} chunks={m['chunks']} fail%={m['fail_pct']} fights={m['fights']} rival={m['visits']} social={m['social']}/6 hit_neighbour={m['hit_neighbour']} unprovoked={m['hit_neighbour_unprovoked']} first_strikes={m['first_strikes']} near_min={m['near_min']} fs/near_min={m['fs_per_near_min']} attack_picks=[{m['picks']}] said/ep={m['said']} goals=[{m['goals']}] hits={m['hits']} "
                  f"train_score={tr.get('score')} train_ach={tr.get('ach')}")
         self.log("        top: " + json.dumps(m["top"]))
         self.log("        social: " + json.dumps(m["social_kinds"]))
+        if getattr(ev, "live_like", None) is not None:
+            from .evaluate import LIVE_LIKE_SEEDS
+            lk = metrics(run(ev.live_like, lambda o: pol.predict(o, deterministic=False, action_masks=np.stack(ev.live_like.masks))[0],
+                            LIVE_LIKE_SEEDS))
+            self.log(f"[live-like] score={lk['score']} ach={lk['ach']} deaths={lk['deaths']}/{lk['n']} crafts_distinct={lk['crafts_distinct']} "
+                     f"first_strikes={lk['first_strikes']} near_min={lk['near_min']} fs/near_min={lk['fs_per_near_min']} fail%={lk['fail_pct']} gear={lk['top'].get('craft_spear', 0)}/"
+                     f"{lk['top'].get('craft_axe', 0)}/{lk['top'].get('fought_armed', 0)}/{lk['top'].get('wear_armor', 0)}")
         if m["score"] > self.best:
             self.best, self.flat = m["score"], 0
             self.model.save(self.out / "best.zip")
@@ -77,7 +84,7 @@ class Check(BaseCallback):
         return True
 
 
-def init_from(model, path, algo):
+def init_from(model, path, algo, copy=(), names=()):
     """An older checkpoint's weights (as ~/minish-rl does): inputs that grew keep the old columns, the new ones start
     at zero; new actions get zero weights and a bias under every old one (rare at first, but tried)."""
     old = algo.load(path, device="cpu").policy.state_dict()
@@ -97,6 +104,11 @@ def init_from(model, path, algo):
                 grown[v.shape[0]:] = v.min() - 1.0
             new[k] = grown
         print(f"init_from: {k} {tuple(v.shape)} -> {tuple(new[k].shape)}")
+    for pair in copy:                                     # a new action that starts as an old one: same row of the head
+        to, frm = (names.index(n) for n in pair.split("="))
+        for k in ("action_net.weight", "action_net.bias"):
+            new[k][to] = new[k][frm]
+        print(f"init_from: {pair} (row {frm} -> {to})")
     model.policy.load_state_dict(new)
 
 
@@ -110,6 +122,8 @@ def main():
     p.add_argument("--patience", type=int, default=3)
     p.add_argument("--hours", type=float, default=2.0)
     p.add_argument("--resume", default="")
+    p.add_argument("--copy-rows", nargs="*", default=[], help="NEW=OLD action names: the new action starts as the old one")
+    p.add_argument("--value-warmup", type=int, default=0, help="train only the value head this many steps first")
     p.add_argument("--eval-first", type=int, default=0, help="1: a [check] before any training (the starting policy in this env)")
     p.add_argument("--init", default="", help="start from an older checkpoint whose obs vector or action set was smaller (init_from)")
     p.add_argument("--ent", type=float, default=0.01)
@@ -118,6 +132,7 @@ def main():
     p.add_argument("--ent-end", type=float, default=None, help="the entropy bonus falls linearly to this by --steps")
     p.add_argument("--live-seed", type=int, default=-1, help="the live world's seed: --live-pct of the train episodes there")
     p.add_argument("--live-pct", type=int, default=20)
+    p.add_argument("--thin-pct", type=int, default=50, help="the share of train starts laid out like the live save")
     p.add_argument("--death-ends", type=int, default=1, help="0: as live, a death drops the pack and the episode goes on")
     p.add_argument("--gamma", type=float, default=0.995)
     p.add_argument("--days", type=float, default=0.75, help="episode length in days (from the morning): 0.75 is one night, 2.75 three")
@@ -128,8 +143,9 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     ep = [f"ep_ticks={int(a.days * 12000)}", f"death_ends={a.death_ends}"]
     live = [f"live_seed={a.live_seed}", f"live_pct={a.live_pct}"] if a.live_seed >= 0 else []
-    env = PipeVecEnv(a.envs, rng_seed=hash(a.run) % 1000, env_args=ep + live)        # (eval: held-out seeds only)
-    ev = PipeVecEnv(a.eval_envs, env_args=ep)
+    env = PipeVecEnv(a.envs, rng_seed=hash(a.run) % 1000, env_args=ep + live + [f"thin_pct={a.thin_pct}"])
+    ev = PipeVecEnv(a.eval_envs, env_args=ep)                                       # (held-out worlds as they are)
+    ev.live_like = PipeVecEnv(a.eval_envs, env_args=ep + ["thin_pct=100"]) if a.thin_pct else None
     names_from(ev)
     bfile = ROOT / f"baselines_{a.days:g}d.json"
     base = json.loads(bfile.read_text()) if bfile.exists() else {}
@@ -145,14 +161,24 @@ def main():
                     learning_rate=lr, ent_coef=a.ent, clip_range=0.2, device="cpu", verbose=0,
                     policy_kwargs=dict(features_extractor_class=GridVec, net_arch=dict(pi=[256], vf=[256])))
     if a.init:
-        init_from(model, a.init, algo)
+        init_from(model, a.init, algo, a.copy_rows, env.spec["names"])
     cb = Check(a, out, ev, base)
     cb.log(f"[start] run={a.run} envs={a.envs} actions={env.spec['n_actions']} random={base['random']['score']} noop={base['noop']['score']}")
     try:
-        model.learn(total_timesteps=a.steps, callback=cb, reset_num_timesteps=not a.resume)
+        if a.value_warmup:                        # (the critic first, policy frozen: after an env change it is stale)
+            keep = [(n, p) for n, p in model.policy.named_parameters() if not n.startswith(("mlp_extractor.value_net", "value_net"))]
+            for _, p in keep:
+                p.requires_grad_(False)
+            model.learn(total_timesteps=a.value_warmup, reset_num_timesteps=not a.resume)
+            for _, p in keep:
+                p.requires_grad_(True)
+            cb.log(f"[warmup] value head trained {a.value_warmup} steps, policy frozen")
+        model.learn(total_timesteps=a.steps, callback=cb, reset_num_timesteps=not a.resume and not a.value_warmup)
     finally:
         env.close()
         ev.close()
+        if getattr(ev, "live_like", None) is not None:
+            ev.live_like.close()
 
 
 if __name__ == "__main__":

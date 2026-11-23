@@ -8,4 +8,4 @@
   <a href="https://sofianedjerbi.github.io/nexel-website/devlog/"><b>Devlog</b></a>
 </p>
 
-<p align="center"><sub>Run one against a local game: see <a href="CONTRIBUTING.md">Contributing</a> · <a href="https://github.com/sofianedjerbi/nexel-worlds">the game</a> · MIT</sub></p>
+<p align="center"><sub>The mind runs locally on Qwen3-30B-A3B-Instruct-2507 (4-bit, MLX). Run one against a local game: see <a href="CONTRIBUTING.md">Contributing</a> · <a href="https://github.com/sofianedjerbi/nexel-worlds">the game</a> · MIT</sub></p>

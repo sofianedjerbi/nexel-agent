@@ -39,6 +39,7 @@ def _actions():
     acts += [("say", None, None), ("give", None, None)]     # (appended: a policy trained before them keeps its indices)
     acts += [("ask", None, None), ("approach", None, None)]
     acts += [("attack", None, k) for k in (1, 2)]     # attack the 2nd, 3rd nearest being (the obs's slots); plain attack: the 1st
+    acts += [("attack", None, "back")]                # attack whoever hit me last (rl/social.py)
     return tuple(acts)
 
 
@@ -104,9 +105,13 @@ def to_command(i: int, obs: dict, facing: str, social=None, goal=None):
         return kind, {}
     if kind == "attack":                                  # (the being in that slot of the obs: nearest first)
         ents = obs.get("entities", [])
-        e = ents[arg or 0] if len(ents) > (arg or 0) else None
+        if arg == "back":
+            e = social.hitter(obs) if social else None
+        else:
+            e = ents[arg or 0] if len(ents) > (arg or 0) else None
         w = max((w for w in WEAPONS if inv.get(w)), key=lambda w: WEAPONS[w], default=None)
-        return "attack", {"target": e["id"] if e else -1, **({"with": w} if w else {})}
+        fight = arg == "back" or bool(e and social and e.get("kind") == "agent" and social.hit_me_lately(e.get("name"), obs["tick"]))
+        return "attack", {"target": e["id"] if e else -1, **({"with": w} if w else {}), **({"fight": True} if fight else {})}
     if kind == "water":
         return "water", {"dir": facing, "with": "watering_can"}
     if kind == "sleep":
@@ -191,8 +196,8 @@ def legal(obs: dict, facing: str = "S", social=None, goal=None) -> np.ndarray:
                 m[i] = arg != "hoe" and not (BLOCK_NAME.get(ch) == "ore" and arg != "pickaxe")
         elif kind == "attack":
             ents = obs.get("entities", [])
-            if len(ents) > (arg or 0) and ents[arg or 0].get("kind") != "wisp":
-                e = ents[arg or 0]
+            e = (social.hitter(obs) if social else None) if arg == "back" else (ents[arg or 0] if len(ents) > (arg or 0) else None)
+            if e is not None and e.get("kind") != "wisp":
                 dz = (LEVEL.get(hs[VIEW_R + e["dy"]][VIEW_R + e["dx"]], 0) - LEVEL.get(hs[VIEW_R][VIEW_R], 0)) if hs and abs(e["dx"]) <= VIEW_R and abs(e["dy"]) <= VIEW_R else 0
                 m[i] = math.hypot(e["dx"], e["dy"], dz * LAYER) <= REACH.get(weapon, REACH[None])
             else:

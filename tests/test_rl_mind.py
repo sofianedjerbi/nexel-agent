@@ -46,3 +46,45 @@ def test_a_bad_reply_keeps_the_goal(tmp_path):
     m = Mind("Rook", "", "http://x", FakeHTTP("no json here"), tmp_path / "m.json")
     asyncio.run(m.think(OBS))
     assert m.goal.kind == "free" and m.stats["errors"] == 1 and not m.busy
+
+
+def test_voice_lines_timed_and_silence_kept(tmp_path):
+    from nexel_agent.rl.voice import Voice
+    me = {"hp": 20, "hunger": 18, "inventory": {"wood": 3}}
+    v = Voice("Rook", "quiet", "http://x", FakeHTTP("sure, here"), tmp_path / "lat.jsonl")
+    assert asyncio.run(v.line("Mira", "can i have wood?", me, "")) == "sure, here"
+    v.http = FakeHTTP("nothing")
+    assert asyncio.run(v.line("Mira", "hey", me, "")) == ""              # (it chose to say nothing)
+    recs = [json.loads(x) for x in (tmp_path / "lat.jsonl").read_text().splitlines()]
+    assert len(recs) == 2 and "llm_s" in recs[0] and recs[0]["heard"] == "can i have wood?"
+
+
+def test_places_are_only_real_ones():
+    from nexel_agent.rl.voice import places
+    obs = {"self": {"x": 0, "y": 0, "spawn": [0, 20], "in_cave": False}, "grid": ["~T.", ".@."],
+           "legend": {"~": "water", "T": "tree", ".": "grass", "@": "you"}}
+    assert places(obs, {(5, -5): "mira's camp"}) == 'a sign "mira\'s camp" 5 tiles NE; your spawn point 20 tiles S; in sight: water, tree'
+    assert places({"self": {"x": 0, "y": 0}, "grid": ["."], "legend": {".": "grass"}}, {}) == "none"
+
+
+def test_chat_lines_go_before_thoughts(tmp_path):
+    from nexel_agent.rl.voice import Voice
+    order = []
+
+    class Slow(FakeHTTP):
+        async def post(self, url, timeout, json):
+            order.append(json["max_tokens"])
+            await asyncio.sleep(0.05)
+            return await super().post(url, timeout, json)
+
+    v = Voice("Rook", "", "http://x", Slow("ok"), tmp_path / "l.jsonl")
+
+    async def both():
+        v.words_waiting += 1                                            # (a chat line is waiting)
+        thought = asyncio.create_task(v.post([], 100, words=False))
+        await asyncio.sleep(0.02)
+        v.words_waiting -= 1
+        await v.post([], 30, words=True)
+        await thought
+    asyncio.run(both())
+    assert order[0] == 30

@@ -21,7 +21,8 @@ MILESTONES = ("till", "plant", "water_crop", "feed_animal", "milk_cow", "sleep_b
               "place_5_kinds", "place_10_kinds", "shelter", "light_shelter", "house", "toolkit",
               "survive_night", "survive_2_nights", "survive_3_nights", "hale_day", "swim_across",
               "chunks_4", "chunks_9", "chunks_16", "enter_cave", "depth_5", "depth_10",
-              "win_hurt", "evade_foe", "defeat_player", "survive_attack", "escape_attack")
+              "win_hurt", "evade_foe", "defeat_player", "survive_attack", "escape_attack", "fought_armed",
+              "room_built", "roofed_room", "room_with_door", "bed_in_room")
 ACHIEVEMENTS = tuple([f"collect_{x}" for x in COLLECT] + [f"craft_{x}" for x in CRAFTS] + [f"place_{x}" for x in PLACE]
                      + [f"eat_{x}" for x in EATS] + [f"defeat_{x}" for x in DEFEATS] + list(MILESTONES) + list(SOCIAL))
 
@@ -65,6 +66,11 @@ class Ledger:
             r += self.unlock("place_10_kinds") if len(self.placed) >= 10 else 0
         elif tool == "eat":
             r += self.unlock(f"eat_{args.get('item')}")
+        elif tool == "attack" and args.get("with"):
+            r += self.unlock("fought_armed")                     # (a blow struck with a weapon in hand)
+            if res.get("killed"):
+                self.killed.add(int(args.get("target", -1)))
+                r += self.unlock(f"defeat_{kind}") + (self.unlock("win_hurt") if kind in HOSTILE and hp <= 10 else 0)
         elif tool == "attack" and res.get("killed"):
             self.killed.add(int(args.get("target", -1)))
             r += self.unlock(f"defeat_{kind}") + (self.unlock("win_hurt") if kind in HOSTILE and hp <= 10 else 0)
