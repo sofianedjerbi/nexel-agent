@@ -12,6 +12,7 @@ import time
 import httpx
 
 from .cards import Cards, card_request, parse_cards
+from .planner import by_id
 from .plans import parse_command
 from .senses import rules_text
 from .sim.entities import CREATURES
@@ -48,7 +49,7 @@ class React:
                            sorted({(h[1] or {}).get("kind", "agent") for h in hits}), "hit")
 
     def fire(self, i, card, cmds, obs, t_seen, hits):
-        parsed = [c for c in map(parse_command, cmds) if c]
+        parsed = [c for c in (parse_command(by_id(x, obs)) for x in cmds) if c]
         if not parsed:
             return
         self.cards.fired_now(i)

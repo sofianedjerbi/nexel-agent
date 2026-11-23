@@ -43,7 +43,10 @@ def valid(card) -> dict | None:
     for k in ("being", "hit_by"):
         if k in when:
             when[k] = str(when[k]).lower().removeprefix("a ").strip()
-    do = [d.strip()[:80] for d in do[:3] if runs(fill(d.strip(), {"id": 1, "name": "x", "x": 0, "y": 0}, {"x": 0, "y": 0}))]
+    probe = lambda d: runs(fill(d.strip(), {"id": 1, "name": "x", "x": 0, "y": 0}, {"x": 0, "y": 0}))
+    if not all(probe(d) for d in do) and probe(" ".join(do)):
+        do = [" ".join(d.strip() for d in do)]       # (["attack", "pincer"]: one command written in pieces)
+    do = [d.strip()[:80] for d in do[:3] if probe(d)]
     if not do:
         return None                                   # (no command in it that runs)
     return {"when": when, "do": do, "why": str(card.get("why", ""))[:120]}
@@ -181,5 +184,8 @@ def parse_cards(text: str) -> list:
 def runs(cmd) -> bool:
     """A whole command: it parses, and a tool that takes arguments got some ("say" alone is not one)."""
     from .plans import SPECS
+    w = cmd.split()
+    if len(w) >= 2 and w[0] in ("attack", "give", "feed", "milk") and not w[1].lstrip("#-").isdigit():
+        cmd = " ".join([w[0], "1"] + w[2:])          # (a being named by kind or name: its id when it fires)
     c = parse_command(cmd)
     return bool(c) and (bool(c[1]) or not SPECS[c[0]]["args"])
