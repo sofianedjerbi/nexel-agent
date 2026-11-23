@@ -13,9 +13,13 @@ from collections import Counter, deque
 from itertools import groupby
 from pathlib import Path
 
-from ..chat import CHAT_STYLE
-from ..fastprompt import chat_parse
 from .achieve import HOSTILE
+
+# (one style for every line it says: the words here, the planner's line in rl/mind.py)
+CHAT_STYLE = ("Type the way people really type in a game chat: mostly lowercase, capitals only now and then, short "
+              "(often a few words, at most 15), fragments are fine, light punctuation, no exclamation spam, no emoji, "
+              "never formal or robotic. You have your own things going on: friendly and easy, but not needy, you never "
+              "fish for attention or keep the talk going for its own sake.")
 
 WORDS_TOKENS, THOUGHT_TOKENS = 30, 100
 # The model to serve for the words and the planner (rl_runs/bench, 2026-11-23, with training at 4 envs): the 30B-A3B
@@ -257,8 +261,11 @@ class Voice:
         except Exception as e:
             out, t = "", {"error": repr(e)[:80]}
         out = re.sub(r"<think>.*?</think>", "", out, flags=re.S).strip()
-        if out.startswith("{"):
-            out = chat_parse(out)[0]
+        if out.startswith("{"):                      # (asked for a line, it answered in JSON: its "say")
+            try:
+                out = str(json.loads(out).get("say") or "")
+            except (ValueError, AttributeError):
+                pass
         out = next((ln.strip() for ln in out.splitlines() if ln.strip()), "").strip('"')[:120]     # (one line)
         if out.lower() in ("", "nothing", "(nothing)", "...", "-"):
             out = ""

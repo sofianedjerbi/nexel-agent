@@ -65,20 +65,22 @@ def test_arg_defaults_and_choice():
 def test_game_url_and_log_parsing():
     assert players.game_http("ws://127.0.0.1:7781/agent") == "http://127.0.0.1:7781/"
     assert players.game_http("wss://x.org/agent") == "https://x.org/"
-    log = ("2026-11-22 19:40:01,000 gatsu0 joined\n"
-           "2026-11-22 19:40:05,000 gatsu0 [model 3.2s] get wood | dig N: ok, +1 wood\n")
-    assert players.last_event(log) == "model 3.2s: dig N: ok, +1 wood"
-    assert players.last_event(log.splitlines()[0]) == "joined"
-    assert players.last_event("") is None
+    log = ('{"t": 1.0, "pos": [3, 4], "hp": 18, "act": "dig_N", "hurt": 0}\n'
+           '{"t": 61.0, "decisions": 200, "fail_pct": 4.0}\n')
+    assert players.last_event(log) == "dig_N at (3, 4), health 18"
+    assert players.last_event("not json\n") is None and players.last_event("") is None
 
 
-def test_thinker_command_carries_persona_and_model():
+def test_player_command_is_the_trained_player_with_its_persona_and_the_model_server():
     a = players.parse_args(["--minutes", "1", "--port", "8099"])
     p = players.load_roster()[0]
-    cmd = players.Launcher(a).thinker_cmd(p)
+    cmd = players.Launcher(a).player_cmd(p)
+    assert cmd[1:3] == ["-m", "nexel_agent.rl.live"] and "--policy" not in cmd      # (the shipped body by default)
     assert cmd[cmd.index("--persona") + 1] == p["persona"]
-    assert cmd[cmd.index("--model") + 1] == "default_model"
     assert "http://127.0.0.1:8099/v1/chat/completions" in cmd and cmd[-2:] == ["--minutes", "1.0"]
+    a = players.parse_args(["--policy", "other.npz"])
+    cmd = players.Launcher(a).player_cmd(p)
+    assert cmd[cmd.index("--policy") + 1] == "other.npz"
 
 
 def test_refuses_without_game_server(tmp_path, monkeypatch):
@@ -123,4 +125,4 @@ def test_reused_model_server_is_left_alone(tmp_path, monkeypatch):
     ln = players.Launcher(a, popen=lambda cmd, **kw: made.append(FakeProc(cmd)) or made[-1], out=lambda s: None)
     ln._sleep_watching = lambda s: [p.terminate() for p in made]      # the player finishes
     assert ln.run(players.choose(players.load_roster(), 1, "luffy0")) == 0
-    assert len(made) == 1 and "nexel_agent.thinker" in made[0].cmd
+    assert len(made) == 1 and "nexel_agent.rl.live" in made[0].cmd

@@ -5,7 +5,8 @@ the policy chooses when to speak (say) and what to hand over (give); with --mode
 (rl/voice.py), else a plain short line. The model to serve there: voice.MODEL (Qwen3-30B-A3B-Instruct-2507, 4-bit), or
 voice.FALLBACK_MODEL (the 4B) on a Mac with less than ~20 GB free.
     python -m mlx_lm.server --model mlx-community/Qwen3-30B-A3B-Instruct-2507-4bit --port 8080
-    python -m nexel_agent.rl.live --name Rook          # the shipped models/rook.npz, the game at :7777, words from :8080"""
+    nexel-agent --name Rook          # the shipped models/rook.npz, the game at :7777, words from :8080
+(`python -m nexel_agent` and `python -m nexel_agent.rl.live` are the same command.)"""
 
 import argparse
 import asyncio
@@ -81,7 +82,7 @@ class LiveBody:
         for step in split(cmd):
             if self.fighting and r is not None and not r.get("ok"):
                 break                                  # (the fight is over: the target fell or got away)
-            if step[0] == "say":                       # the words: the LLM's (chat.py's prompt), or the plain line
+            if step[0] == "say":                       # the words: the LLM's (rl/voice.py), or the plain line
                 step = ("say", {"text": await self.words(step[1].get("ask"), step[1]["text"])})
                 if not step[1]["text"]:
                     continue                           # (it chose to say nothing)
@@ -244,7 +245,7 @@ class LiveBody:
 
 
 def main():
-    p = argparse.ArgumentParser()
+    p = argparse.ArgumentParser(prog="nexel-agent", description="The AI player of Nexel Worlds: a trained body, a local model for its plans and words.")
     p.add_argument("--name", default="Rook")
     p.add_argument("--persona", default="a quiet player who learned the world by living in it; wants a house of its own with "
                    "a bed and a door, and good tools, and gets what it lacks from other players by asking or trading")

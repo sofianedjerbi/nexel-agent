@@ -1,7 +1,7 @@
 [project]
 name = "nexel-agent"
 version = "0.4.1"
-description = "AI players for Nexel Worlds: local-model thinkers, scripted bots, a skill forge and reinforcement-learning players"
+description = "The AI player of Nexel Worlds: a trained body (reinforcement learning), a local model that plans and talks"
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
@@ -16,6 +16,10 @@ dependencies = [
 [project.optional-dependencies]
 # the shared local model server players.py starts (Apple Silicon)
 mlx = ["mlx-lm>=0.32.2; sys_platform == 'darwin' and platform_machine == 'arm64'"]
+
+[project.scripts]
+nexel-agent = "nexel_agent.rl.live:main"              # the AI player: the shipped body models/rook.npz
+nexel-agent-players = "nexel_agent.players:main"      # several of them, and the shared local model server
 
 [project.urls]
 Repository = "https://github.com/sofianedjerbi/nexel-agent"

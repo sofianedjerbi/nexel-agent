@@ -12,10 +12,9 @@ import re
 import time
 from pathlib import Path
 
-from ..chat import CHAT_STYLE
 from megastructure.tiles import RECIPES
 from .goals import KINDS, Goal
-from .voice import Now
+from .voice import CHAT_STYLE, Now
 
 THINK_S = 20.0             # (the model it asks: rl/voice.py MODEL, the same server as the words)
 GOALS_DOC = ("Goals: gather (an item), craft (an item), give (an item, to a person), ask (a person, for an item), "

@@ -1,7 +1,7 @@
 # models/rook.npz
 
 The learned body of the shipped AI player, as numpy weights (`nexel_agent/rl/npolicy.py` loads it; no torch needed).
-`python -m nexel_agent.rl.live --name Rook` uses it by default.
+`nexel-agent` uses it by default.
 
 | | |
 |---|---|

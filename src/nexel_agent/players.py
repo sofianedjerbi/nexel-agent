@@ -1,13 +1,14 @@
-"""One command for AI players: the shared local model server plus N thinkers, each with a persona.
+"""One command for several AI players: the shared local model server plus N trained players (rl/live.py: the
+shipped body models/rook.npz acts, the model plans and talks), each with a persona.
 
-    python -m nexel_agent.players                      # 2 players, Qwen3-4B, the local game at :7777
-    python -m nexel_agent.players --n 8 --model 30b
-    python -m nexel_agent.players --pick gatsu0,senku0 --minutes 30
-    python -m nexel_agent.players --list               # the roster
+    nexel-agent-players                      # 2 players, the local game at :7777
+    nexel-agent-players --n 4 --model 30b
+    nexel-agent-players --pick gatsu0,senku0 --minutes 30
+    nexel-agent-players --list               # the roster
 
 Starts mlx_lm.server on --port (or reuses one already answering there), waits until it answers, then
-starts the thinkers a few seconds apart, each logging to <data>/<name>.log. Prints one line per player
-when it joins or acts. Ctrl-C / SIGTERM / a crash stop every child and the model server it started:
+starts the players a few seconds apart, each logging to <data>/<name>.log and <data>/<name>.rl.jsonl. Prints
+one line per player as it acts. Ctrl-C / SIGTERM / a crash stop every child and the model server it started:
 nothing is left holding RAM.
 """
 
@@ -73,7 +74,7 @@ def model_name(m: str, free=None) -> str:
 
 
 def parse_args(argv=None) -> argparse.Namespace:
-    p = argparse.ArgumentParser(prog="python -m nexel_agent.players", description=__doc__.split("\n")[0])
+    p = argparse.ArgumentParser(prog="nexel-agent-players", description=__doc__.split("\n")[0])
     p.add_argument("--n", type=int, default=2, help="how many players (ignored with --pick); each one is a Python process and the one model server serves them in turn: more than ~4 loads this Mac hard")
     p.add_argument("--pick", help="comma-separated roster names, e.g. gatsu0,senku0")
     p.add_argument("--game", default="ws://127.0.0.1:7777/agent", help="the game's agent websocket")
@@ -85,9 +86,7 @@ def parse_args(argv=None) -> argparse.Namespace:
     p.add_argument("--data", default="agents", help="where notepads and logs go")
     p.add_argument("--seed", type=int, default=None, help="random pick seed")
     p.add_argument("--list", action="store_true", help="print the roster and exit")
-    p.add_argument("--body", choices=("llm", "rl"), default="llm",
-                   help="llm: the thinker plans; rl: the policy learned in the sim acts (rl/live.py), the model only chats")
-    p.add_argument("--policy", default="", help="--body rl: the policy's weights (.npz from rl/export.py)")
+    p.add_argument("--policy", default="", help="the body's weights (.npz from rl/export.py; default: the shipped models/rook.npz)")
     return p.parse_args(argv)
 
 
@@ -112,17 +111,16 @@ def model_up(port: int) -> bool:
         return False
 
 
-LINE = re.compile(r"^\S+ \S+ (\S+) \[(\w+) ([\d.]+)s\] (.*?) \| (.*)$")
-
-
 def last_event(log_text: str) -> str | None:
-    """The newest thing worth showing from a thinker log: its last action, else 'joined'."""
-    lines = log_text.splitlines()[-200:]
-    for line in reversed(lines):
-        m = LINE.match(line)
-        if m:
-            return f"{m[2]} {m[3]}s: {m[5][:90]}"
-    return "joined" if any(line.endswith(" joined") for line in lines) else None
+    """The newest thing worth showing from a player's log (rl/live.py: a JSON line per decision): what it did, where."""
+    for line in reversed(log_text.splitlines()[-50:]):
+        try:
+            d = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(d, dict) and "act" in d:
+            return f"{d['act']} at {tuple(d.get('pos') or ())}, health {d.get('hp')}"
+    return None
 
 
 class Launcher:
@@ -164,23 +162,16 @@ class Launcher:
         except httpx.HTTPError:
             pass
 
-    def thinker_cmd(self, p: dict) -> list[str]:
-        if getattr(self.a, "body", "llm") == "rl":
-            cmd = [sys.executable, "-m", "nexel_agent.rl.live", "--name", p["name"], "--persona", p["persona"],
-                   "--game", self.a.game, "--model-url", f"http://127.0.0.1:{self.a.port}/v1/chat/completions",
-                   "--log", str(self.data / f"{p['name']}.rl.jsonl"), *(["--policy", self.a.policy] if self.a.policy else [])]
-            return cmd + (["--minutes", str(self.a.minutes)] if self.a.minutes else [])
-        cmd = [sys.executable, "-m", "nexel_agent.thinker", "--name", p["name"], "--persona", p["persona"],
+    def player_cmd(self, p: dict) -> list[str]:
+        cmd = [sys.executable, "-m", "nexel_agent.rl.live", "--name", p["name"], "--persona", p["persona"],
                "--game", self.a.game, "--model-url", f"http://127.0.0.1:{self.a.port}/v1/chat/completions",
-               "--model", "default_model", "--data", str(self.data)]
-        if self.a.minutes:
-            cmd += ["--minutes", str(self.a.minutes)]
-        return cmd
+               "--log", str(self.data / f"{p['name']}.rl.jsonl"), *(["--policy", self.a.policy] if self.a.policy else [])]
+        return cmd + (["--minutes", str(self.a.minutes)] if self.a.minutes else [])
 
     def start_player(self, p: dict) -> None:
         env = dict(os.environ, PYTHONPATH=os.pathsep.join(filter(None, [SRC, os.environ.get("PYTHONPATH")])))
         log = open(self.data / f"{p['name']}.log", "a")
-        self.players[p["name"]] = self.popen(self.thinker_cmd(p), stdout=log, stderr=subprocess.STDOUT,
+        self.players[p["name"]] = self.popen(self.player_cmd(p), stdout=log, stderr=subprocess.STDOUT,
                                              stdin=subprocess.DEVNULL, env=env, start_new_session=True)
         self.out(f"{p['name']:<12} starting ({p['role']}: {p['ref']})")
 
@@ -193,7 +184,7 @@ class Launcher:
                 tail = f.read_text(errors="replace").strip().splitlines()[-1:] if f.exists() else []
                 msg = f"exited ({code})" + (f": {tail[0][-100:]}" if code and tail else "")
             else:
-                f = self.data / f"{name}.log"
+                f = self.data / f"{name}.rl.jsonl"
                 msg = last_event(f.read_text(errors="replace")) if f.exists() else None
             if msg and self.shown.get(name) != msg:
                 self.shown[name] = msg
