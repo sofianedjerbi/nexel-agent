@@ -36,6 +36,7 @@ class LiveBody:
         self.social, self.social_done, self.heard, self.http = SocialMemory(a.name, ITEMS), set(), None, None
         self.stats.update(said=0, gave=0)
         self.tick, self.me, self.obs_entities, self.fighting = 0, {}, [], False
+        self.mind = None                                    # (the LLM planner that sets goals: rl/mind.py)
         self.log = open(a.log, "a") if a.log else None
 
     def done(self, tool, args, r):
@@ -72,8 +73,8 @@ class LiveBody:
         for step in split(cmd):
             if self.fighting and r is not None and not r.get("ok"):
                 break                                  # (the fight is over: the target fell or got away)
-            if step[0] == "say":                       # the words: the LLM's (chat.py's prompt), or a plain hello
-                step = ("say", {"text": await self.words()})
+            if step[0] == "say":                       # the words: the LLM's (chat.py's prompt), or the plain line
+                step = ("say", {"text": await self.words(step[1].get("ask"), step[1]["text"])})
             r = await game.act(step[0], **step[1])
             self.done(step[0], step[1], r)
         self.fighting = False
@@ -99,12 +100,14 @@ class LiveBody:
                 return obs
             await asyncio.sleep(POLL_S)
 
-    async def words(self) -> str:
-        """The policy chose to speak; what to say is the LLM's: an answer to the last line heard, or a hello."""
+    async def words(self, ask=None, plain="hey") -> str:
+        """The policy chose to speak (or to ask for something); the words are the LLM's, from facts: the last line
+        heard, and what it is after."""
         speaker, text = self.heard or ("someone", "(nobody has said anything yet)")
         if not self.http:
-            return "hey"
-        msgs = chat_messages(self.a.name, self.a.persona, "", speaker, text, me=self.me)
+            return plain if ask else "hey"
+        busy = f"you want some {ask}" if ask else (self.goal_text() or "")
+        msgs = chat_messages(self.a.name, self.a.persona, busy, speaker, text, me=self.me)
         try:
             r = await self.http.post(self.a.model_url, timeout=30, json={"model": "default_model", "messages": msgs,
                                                                          "max_tokens": 80, "temperature": 0.8})
@@ -114,10 +117,17 @@ class LiveBody:
             line = ""
         return (line or "hey")[:120]
 
+    def goal_text(self) -> str:
+        g = self.mind.goal if self.mind else None
+        return "" if g is None or g.kind == "free" else " ".join(str(p) for p in (g.kind, g.item, g.person and f"with {g.person}") if p)
+
     async def play(self):
         if self.a.model_url:
             import httpx
+            from .mind import Mind
             self.http = httpx.AsyncClient()
+            self.mind = Mind(self.a.name, self.a.persona, self.a.model_url, self.http,
+                             Path(self.a.memory or f"agents/{self.a.name}/memory.json"))
         t_end = time.monotonic() + self.a.minutes * 60 if self.a.minutes else math.inf
         async with Client(self.a.game) as game:
             await game.hello(self.a.name, f"rl-{self.a.name}", self.a.persona)
@@ -128,6 +138,14 @@ class LiveBody:
                 me = self.me = obs["self"]
                 self.tick = obs["tick"]
                 self.social.see(obs)
+                if self.mind:
+                    self.mind.see(obs)
+                    if self.mind.due():
+                        asyncio.create_task(self.mind.think(obs))
+                    if self.mind.to_say:                 # (the planner's own line, once)
+                        line, self.mind.to_say = self.mind.to_say, None
+                        asyncio.create_task(game.act("say", text=line))
+                        self.stats["said"] += 1
                 for e in obs.get("events", []):
                     if e.get("type") in ("say", "shout") and e.get("from") != self.a.name:
                         self.heard = (e.get("from"), str(e.get("text", ""))[:200])
@@ -142,15 +160,16 @@ class LiveBody:
                     if foe:
                         self.foes[foe["id"]] = foe["kind"]
                 hp, deaths = me["hp"], me["deaths"]
-                enc = encode(obs, self.facing, self.last, self.last_ok, self.hurt, self.social.flags(obs))
-                i = self.pol.act(enc, self.rng, legal(obs) if self.a.mask else None)
+                goal = self.mind.goal if self.mind else None
+                enc = encode(obs, self.facing, self.last, self.last_ok, self.hurt, self.social.flags(obs), goal)
+                i = self.pol.act(enc, self.rng, legal(obs, self.facing, self.social, goal) if self.a.mask else None)
                 kind = ACTIONS[i][0]
                 if self.hurt > 0:
                     self.reactions[kind] = self.reactions.get(kind, 0) + 1
                 if kind in ("step", "jump", "dig", "dig_at", "climb") and ACTIONS[i][1]:
                     self.facing = ACTIONS[i][1]
                 self.stats["decisions"] += 1
-                cmd = to_command(i, obs, self.facing, self.social)
+                cmd = to_command(i, obs, self.facing, self.social, goal)
                 t0, self.last_ok = time.monotonic(), 0.0        # (as in the env: how the actions that end in this wait went)
                 if cmd is not None and running and running[0] == cmd and not running[1].done():
                     cmd = None                                  # the same action again, still under way: it goes on
@@ -183,6 +202,9 @@ class LiveBody:
         s = dict(self.stats)
         s["distinct_crafts"] = sorted(self.crafts)
         s["social"] = sorted(self.social_done)
+        if self.mind:
+            s["mind"] = dict(self.mind.stats, goal=[self.mind.goal.kind, self.mind.goal.item, self.mind.goal.person],
+                             allies=sorted(n for n, r in self.mind.relations.items() if r.get("ally")))
         s["fail_pct"] = round(100 * s["fails"] / max(1, s["acts"]), 1)
         s["idle_pct"] = round(100 * s["idle"] / max(1, s["decisions"]), 1)
         return {"t": time.time(), **s, "reactions": self.reactions, "fails_by": self.fails_by,
@@ -200,6 +222,7 @@ def main():
     p.add_argument("--log", default="")
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--mask", type=int, default=1, help="the policy was trained with the legal-action mask")
+    p.add_argument("--memory", default="", help="where the LLM layer keeps its notes on people (memory.json)")
     a = p.parse_args()
     print(json.dumps(asyncio.run(LiveBody(a).play())))
 

@@ -25,6 +25,7 @@ class Folk:
         self.next = sim.tick + self.rng.randint(*EVERY)
         self.until = self.act = 0
         self.owed = False                       # given something by the player: it may give back
+        self.asked, self.proposed = None, False  # asked by the player for something it said yes to; asked to team up
 
     @property
     def on(self) -> bool:
@@ -46,11 +47,26 @@ class Folk:
         for e in a.events:
             if e.get("type") == "give" and e.get("to") == a.name:
                 self.owed = True
+            elif e.get("type") == "say" and e.get("from") == self.p.name:          # asked for something?
+                text = str(e.get("text", "")).replace(" ", "_")
+                it = next((k for k in sorted(a.inventory, key=len, reverse=True) if k in text), None)
+                if it and self.rng.random() < 0.6:
+                    self.asked = it
+                elif it or "spare" in text:
+                    sim.submit(a, "say", {"text": self.rng.choice(("sorry, need it", "no, can't", "not now"))})
         a.events = []
         if sim.tick < self.act or a.action is not None:
             return
         self.act = sim.tick + self.rng.randint(*ACT)
         d, r = self.dist(), self.rng.random()
+        if self.asked:                                   # (said yes: it brings it over)
+            if d <= 2:
+                item, self.asked = self.asked, None
+                return sim.submit(a, "give", {"target": self.p.id, "item": item, "n": 1})
+            return sim.submit(a, "move_to", {"x": self.p.x + 1, "y": self.p.y})
+        if not self.proposed and r < 0.05:
+            self.proposed = True
+            return sim.submit(a, "say", {"text": self.rng.choice(("want to team up?", "we could work together", "stick with me?"))})
         if self.owed and d <= 2 and r < 0.6:
             self.owed = False
             return self.give()
@@ -88,3 +104,4 @@ class Folk:
         a.x, a.y, a.z, a.hp, a.online = x, y, 99, 20, True
         a.events = []
         self.until, self.act, self.owed = sim.tick + self.rng.randint(*STAY), sim.tick + sec(2), False
+        self.asked, self.proposed = None, False

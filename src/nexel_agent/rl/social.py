@@ -19,10 +19,11 @@ class SocialMemory:
         self.got_from: set[str] = set()       # who gave me something
         self.gave_to: set[str] = set()        # who I gave something to
         self.got_now: dict = {}               # what was given to me since the last look (not "collected")
+        self.got_by: dict = {}                # the same, by giver
 
     def see(self, obs: dict):
         tick = obs["tick"]
-        self.got_now = {}
+        self.got_now, self.got_by = {}, {}
         for e in obs.get("events", []):
             who = e.get("from")
             if e.get("type") in ("say", "shout") and who and who != self.me:
@@ -35,6 +36,7 @@ class SocialMemory:
                 self.got_from.add(who)
                 for k, n in (e.get("items") or {}).items():
                     self.got_now[k] = self.got_now.get(k, 0) + n
+                    self.got_by.setdefault(who, {})[k] = self.got_by.get(who, {}).get(k, 0) + n
 
     def ask_open(self, tick) -> str | None:
         return self.asked if self.asked and tick - self.asked_at <= ASKED_S else None

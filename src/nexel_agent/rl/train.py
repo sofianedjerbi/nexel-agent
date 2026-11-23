@@ -34,6 +34,8 @@ class Check(BaseCallback):
 
     def _on_training_start(self):
         self.s0, self.next = self.num_timesteps, self.num_timesteps + self.a.check     # (resumed: counted from here)
+        if self.a.eval_first:
+            self.next = self.num_timesteps
 
     def _on_step(self) -> bool:
         for d, info in zip(self.locals["dones"], self.locals["infos"]):
@@ -56,7 +58,7 @@ class Check(BaseCallback):
         self.log(f"[check] step={self.num_timesteps} min={(time.time() - self.t0) / 60:.0f} sps={sps:.0f} "
                  f"score={m['score']} r6set={m['score_r6set']} (random {self.base['random']['score']}, legal random {self.base.get('random_legal', {}).get('score')}, noop {self.base['noop']['score']}) "
                  f"ach={m['ach']} ticks={m['ticks']} deaths={m['deaths']}/{m['n']} crafts_distinct={m['crafts_distinct']} "
-                 f"places={m['places']} places_distinct={m['places_distinct']} nights={m['nights']} chunks={m['chunks']} fail%={m['fail_pct']} fights={m['fights']} rival={m['visits']} social={m['social']}/6 hits={m['hits']} "
+                 f"places={m['places']} places_distinct={m['places_distinct']} nights={m['nights']} chunks={m['chunks']} fail%={m['fail_pct']} fights={m['fights']} rival={m['visits']} social={m['social']}/6 goals=[{m['goals']}] hits={m['hits']} "
                  f"train_score={tr.get('score')} train_ach={tr.get('ach')}")
         self.log("        top: " + json.dumps(m["top"]))
         self.log("        social: " + json.dumps(m["social_kinds"]))
@@ -108,6 +110,7 @@ def main():
     p.add_argument("--patience", type=int, default=3)
     p.add_argument("--hours", type=float, default=2.0)
     p.add_argument("--resume", default="")
+    p.add_argument("--eval-first", type=int, default=0, help="1: a [check] before any training (the starting policy in this env)")
     p.add_argument("--init", default="", help="start from an older checkpoint whose obs vector or action set was smaller (init_from)")
     p.add_argument("--ent", type=float, default=0.01)
     p.add_argument("--lr", type=float, default=3e-4)

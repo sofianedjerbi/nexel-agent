@@ -15,6 +15,7 @@ from .achieve import HOSTILE, Ledger
 from .encode import ACTIONS, ITEMS, encode, legal, to_command
 from .milestones import Milestones
 from .folk import Folk
+from .goals import Goals
 from .rival import Rival
 from .social import SOCIAL, SocialMemory
 
@@ -44,11 +45,11 @@ OUTCOME = {"won": "defeat_player", "fled": "escape_attack", "endured": "survive_
 
 class SimEnv:
     def __init__(self, ep_ticks: int = EP_TICKS, decide: int = DECIDE, rivals: int = 1, roam: int = 1,
-                 live_seed: int = -1, live_pct: int = 0, folk: int = 1):
+                 live_seed: int = -1, live_pct: int = 0, folk: int = 1, goals: int = 1):
         """rivals: a sparring partner (rl/rival.py); roam: start anywhere on the land within 400 tiles, not at the
         world's spawn; live_seed/live_pct: that share of the episodes in the live world's seed (its land, unaltered)."""
         self.ep_ticks, self.decide, self.rivals, self.roam = ep_ticks, decide, rivals, roam
-        self.live_seed, self.live_pct, self.n_folk = live_seed, live_pct, folk
+        self.live_seed, self.live_pct, self.n_folk, self.use_goals = live_seed, live_pct, folk, goals
         self.sim = None
 
     def reset(self, seed: int):
@@ -59,7 +60,10 @@ class SimEnv:
         if self.roam:
             self.start_somewhere(rng)
         self.sim.tick = self.sim.tick // DAY_TICKS * DAY_TICKS + int(START * DAY_TICKS)
-        self.rival = Rival(self.sim, self.a, seed) if self.rivals else None
+        self.rng = random.Random(seed * 13 + 1)
+        self.rival = Rival(self.sim, self.a, seed, pick=self.pick_target) if self.rivals else None
+        self.rival_on = False
+        self.goals = Goals(self.sim, self.a, random.Random(seed * 7 + 5)) if self.use_goals else None
         self.folk = [Folk(self.sim, self.a, seed + k, f"Neighbour{k}") for k in range(self.n_folk)]
         self.social = SocialMemory(self.a.name, ITEMS)
         self.t0 = self.sim.tick
@@ -73,12 +77,13 @@ class SimEnv:
         return self.encoded()
 
     def encoded(self):
-        return {**encode(self.obs, self.facing, self.last, self.last_ok, self.hurt, self.social.flags(self.obs)),
-                "mask": legal(self.obs)}
+        goal = self.goals.goal if self.goals else None
+        return {**encode(self.obs, self.facing, self.last, self.last_ok, self.hurt, self.social.flags(self.obs), goal),
+                "mask": legal(self.obs, self.facing, self.social, goal)}
 
     def step(self, i: int):
         sim, a, L = self.sim, self.a, self.ledger
-        cmd = to_command(i, self.obs, self.facing, self.social)
+        cmd = to_command(i, self.obs, self.facing, self.social, self.goals.goal if self.goals else None)
         kind = ACTIONS[i][0]
         if self.just_hit:
             self.reactions[kind] = self.reactions.get(kind, 0) + 1
@@ -101,6 +106,9 @@ class SimEnv:
             sim.step()
             if self.rival:
                 self.rival.tick()
+                if self.rival.on and not self.rival_on and self.rival.p is not a and self.goals and self.rng.random() < 0.7:
+                    self.goals.draw(forced_person=self.rival.p.name)      # (a neighbour is set upon: help them)
+                self.rival_on = self.rival.on
             for f in self.folk:
                 f.tick()
             if a.deaths > deaths0 or (a.hp < hp0 and not self.fighting()):
@@ -122,9 +130,11 @@ class SimEnv:
         self.social.see(self.obs)
         made.update(self.social.got_now)                 # (given: not collected)
         near = min((math.dist((o.x, o.y), (a.x, a.y)) for o in sim.agents.values() if o is not a and o.online), default=99)
+        results = []
         for p in [p for p in self.pending if p[0].result is not None]:
             self.pending.remove(p)
             res = p[0].result
+            results.append((p[1], p[2], res))
             r += L.result(p[1], p[2], res, p[3], a.hp)
             for k in self.social.achieved(p[1], p[2], bool(res.get("ok")), sim.tick, near, res.get("to")):
                 r += L.unlock(k)
@@ -145,14 +155,17 @@ class SimEnv:
                       key=lambda c: math.dist((c.x, c.y), (a.x, a.y)), default=None)
             if foe is not None:
                 L.foes[foe.id] = foe.kind
-            elif self.rival and self.rival.on and self.rival.dist() <= 4:
+            elif self.rival and self.rival.on and math.dist((self.rival.a.x, self.rival.a.y), (a.x, a.y)) <= 4:
                 L.foes[self.rival.a.id] = "player"
         elif not died and a.hp > hp0:
             r += HURT * (a.hp - hp0)                     # (health back: eating keeps it coming)
+        if self.goals:
+            r += self.goals.step(results, self.social.got_by, self.rival)
         if self.rival and self.rival.outcome:
             if self.rival.outcome == "won":
                 L.killed.add(self.rival.a.id)
-            r += L.unlock(OUTCOME[self.rival.outcome]) if not died else 0
+            mine = self.rival.p is a or self.rival.outcome == "won"
+            r += L.unlock(OUTCOME[self.rival.outcome]) if not died and mine else 0
             L.counts["visit_" + self.rival.outcome] = L.counts.get("visit_" + self.rival.outcome, 0) + 1
             self.rival.outcome = None
         r += self.marks.update(L, lost > 0, died)
@@ -173,6 +186,11 @@ class SimEnv:
         self.then = then
         self.pending.append((act, tool, args, target.kind if target else ""))
         return act
+
+    def pick_target(self):
+        """Whom the rival goes for: now and then a neighbour near the player, else the player."""
+        near = [f.a for f in self.folk if f.on and f.dist() <= 8]
+        return near[0] if near and self.rng.random() < 0.4 else self.a
 
     def fighting(self) -> bool:
         return bool(self.running) and self.running[0][0] == "attack" and (bool(self.then) or self.running[1].result is None)
@@ -196,4 +214,5 @@ class SimEnv:
         return {"achievements": sorted(self.ledger.done), "ticks": self.sim.tick - self.t0, "died": died,
                 "distinct_crafts": len(self.ledger.crafted), "distinct_places": len(self.ledger.placed),
                 "nights": self.marks.nights, "chunks": len(self.marks.chunks),
-                "social": sorted(self.ledger.done & set(SOCIAL)), **c, "reactions": dict(self.reactions)}
+                "social": sorted(self.ledger.done & set(SOCIAL)),
+                "goals": self.goals.counts if self.goals else {}, **c, "reactions": dict(self.reactions)}

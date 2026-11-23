@@ -15,6 +15,12 @@ from .fastprompt import chat_parse
 log = logging.getLogger("thinker")
 
 
+CHAT_STYLE = ("Type the way people really type in a game chat: mostly lowercase, capitals only now and then, short "
+              "(often a few words, at most 15), fragments are fine, light punctuation, no exclamation spam, no emoji, "
+              "never formal or robotic. You have your own things going on: friendly and easy, but not needy, you never "
+              "fish for attention or keep the talk going for its own sake.")      # (one style for every line it says: rl/mind.py too)
+
+
 def chat_messages(name: str, persona: str, goal: str, speaker: str, text: str, recent=(), me=None, person="",
                   memories=(), said=()) -> list[dict]:
     """A player talks to you: answer them like a person in a game chat who remembers them (person: what you know of
@@ -22,11 +28,8 @@ def chat_messages(name: str, persona: str, goal: str, speaker: str, text: str, r
     me = me or {}
     inv = ", ".join(f"{k} {v}" for k, v in sorted((me.get("inventory") or {}).items(), key=lambda kv: -kv[1])[:6]) or "nothing"
     sys_ = (f"You are {name}, a player in a survival sandbox game. Your character: {persona}\n"
-            "Another player is talking to you in the local chat. Type the way people really type in a game chat: "
-            "mostly lowercase, capitals only now and then, short (often a few words, at most 15), fragments are fine, "
-            "light punctuation, no exclamation spam, no emoji, never formal or robotic. You have your own things going "
-            "on: friendly and easy, but not needy, you never fish for attention or keep the talk going for its own "
-            "sake. Your character shows in your attitude, not in theatre. Answer questions truthfully from the facts given; never "
+            "Another player is talking to you in the local chat. " + CHAT_STYLE + " "
+            "Your character shows in your attitude, not in theatre. Answer questions truthfully from the facts given; never "
             "cryptic, no coordinates unless asked. If you talked before, carry on the conversation (no new hello). "
             "If they hurt you, you remember it and it shows. Asked about the past (what they said, asked, did), answer with "
             "those facts, plainly. Never repeat a line you already said.\n"
