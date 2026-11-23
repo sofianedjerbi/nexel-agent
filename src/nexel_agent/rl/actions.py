@@ -10,6 +10,7 @@ import math
 import numpy as np
 
 from megastructure.sim.constants import FOOD_MAX, LAYER, VIEW_R
+from . import ring
 from megastructure.tiles import ARMOR, BLOCKS, FEED, FILLERS, FOOD, GROUNDS, PLACEABLE, RECIPES, REACH, USE_R, WEAPONS, WEAR
 
 DIRS = ("N", "E", "S", "W")
@@ -40,6 +41,7 @@ def _actions():
     acts += [("ask", None, None), ("approach", None, None)]
     acts += [("attack", None, k) for k in (1, 2)]     # attack the 2nd, 3rd nearest being (the obs's slots); plain attack: the 1st
     acts += [("attack", None, "back")]                # attack whoever hit me last (rl/social.py)
+    acts += [("ring", None, None)]                    # walls round me from the pack (rl/ring.py)
     return tuple(acts)
 
 
@@ -125,6 +127,9 @@ def to_command(i: int, obs: dict, facing: str, social=None, goal=None):
         return "wear", {"item": next((w for w in WEAR_ORDER if inv.get(w) and w not in worn), "")}
     if kind == "place":
         return "place", {"dir": facing, "item": arg}
+    if kind == "ring":
+        p = ring.plan(obs, GROUND_CH, BLOCK_NAME) or []
+        return "ring", {"pieces": [(me["x"] + dx, me["y"] + dy, it) for dx, dy, it in p]}
     if kind == "say":
         return "say", {"text": "hi"}
     if kind == "ask":
@@ -204,6 +209,8 @@ def legal(obs: dict, facing: str = "S", social=None, goal=None) -> np.ndarray:
                 m[i] = False
         elif kind == "pick_up":
             m[i] = any(it["dx"] == 0 and it["dy"] == 0 for it in obs.get("items", []))
+        elif kind == "ring":
+            m[i] = ring.plan(obs, GROUND_CH, BLOCK_NAME) is not None
         elif kind == "place":
             m[i] = bool(inv.get(arg)) and not frim and (fch in GROUND_CH or BLOCK_NAME.get(fch) == "flower")
             if arg in ("stairs", "ladder"):

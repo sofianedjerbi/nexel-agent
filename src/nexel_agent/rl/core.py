@@ -30,6 +30,8 @@ def split(cmd) -> list:
     tool, args = cmd
     if tool == "climb":
         return [("dig", {"dir": "up"}), ("dig", {"dir": args["dir"], "z": args["z"]}), ("jump", {"dir": args["dir"]})]
+    if tool == "ring":                   # (walls round it: one place after another, rl/ring.py)
+        return [("place", {"x": x, "y": y, "item": it}) for x, y, it in args["pieces"]] or [("noop", {})]
     if tool == "attack" and args.get("fight"):
         return [cmd] * FIGHT
     if tool == "attack":                 # (at someone who has not hit it: a single swing; the fight is attack_back's)
