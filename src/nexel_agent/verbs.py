@@ -44,6 +44,19 @@ def locate(obs, target: str) -> list[tuple]:
     return sorted(set(out), key=lambda p: math.dist(p, (me["x"], me["y"])))
 
 
+def note_seen(obs, seen: dict) -> dict:
+    """The map memory: for each kind of thing in view, where the nearest one is (absolute x, y)."""
+    g, r, me = obs["grid"], len(obs["grid"]) // 2, obs["self"]
+    best: dict = {}
+    for j, row in enumerate(g):
+        for i, ch in enumerate(row):
+            if ch in "TMbvHQF*&^~" and (ch not in best or abs(i - r) + abs(j - r) < best[ch][0]):
+                best[ch] = (abs(i - r) + abs(j - r), (me["x"] - r + i, me["y"] - r + j))
+    for ch, (_, p) in best.items():
+        seen[LEGEND.get(ch, ch).split(" (")[0].replace("_", " ")] = p
+    return seen
+
+
 def split_with(text: str) -> tuple[str, str | None]:
     w = text.split()
     if len(w) >= 2 and w[-2].lower() == "with":

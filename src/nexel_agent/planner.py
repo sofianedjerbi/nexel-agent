@@ -22,6 +22,7 @@ from .plans import LOCAL_SPECS, PlanStream, command_text, parse_command
 from .prompts import summarize_result
 from .senses import danger_lines
 from .sim.specs import LEGEND
+from .verbs import note_seen
 
 log = logging.getLogger("thinker")
 MAX_PLAN = 6                                     # commands taken from one answer
@@ -47,6 +48,8 @@ class Planner(Chat, GoalMind):
             recall = [f"diary: {diary[:160]}"] + recall
         if known := self.known_places(obs):
             recall = [known] + recall
+        if skills := self.skill_lines():
+            recall = [f"your skills (they run to their end): {skills}"] + recall
         user = compact_obs(obs, goal=self.goal, record=self.record, heard=list(self.heard)[-2:], history=list(self.history),
                            pending=list(pending), notes=" ".join(filter(None, [self.mem.notes_text(),
                            (f"Your cards: {cards}" if (cards := self.cards.text(2)) else "")])), lessons="",
@@ -58,12 +61,7 @@ class Planner(Chat, GoalMind):
     def look_around(self, obs) -> dict:
         """Where each kind of thing was last seen (from every view and look_far): the player's own map memory."""
         seen = self.memory["seen"] = self.mem.places         # (kept in memory.json: it survives a restart)
-        g, r, me = obs["grid"], len(obs["grid"]) // 2, obs["self"]
-        for j, row in enumerate(g):
-            for i, ch in enumerate(row):
-                if ch in "TMbvHQF*&^~":
-                    seen[LEGEND.get(ch, ch).split(" (")[0].replace("_", " ")] = (me["x"] - r + i, me["y"] - r + j)
-        return seen
+        return note_seen(obs, seen)
 
     def known_places(self, obs) -> str:
         """Things not in view now and where they were last seen (the view, look_far), nearest first."""

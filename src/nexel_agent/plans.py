@@ -11,7 +11,8 @@ import re
 from .sim.specs import TOOL_SPECS
 
 DIR_WORDS = {"N", "E", "S", "W", "up"}
-LOCAL_SPECS = {"remember": {"args": {"text": "str"}}, "forget": {"args": {"n": "int"}}, "drop_card": {"args": {"n": "int"}}}   # the player's own memory
+LOCAL_SPECS = {"remember": {"args": {"text": "str"}}, "forget": {"args": {"n": "int"}}, "drop_card": {"args": {"n": "int"}},
+               "skill": {"args": {"text": "str"}}}   # the player's own memory
 from .verbs import VERB_SPECS  # noqa: E402
 SPECS = {**TOOL_SPECS, **LOCAL_SPECS, **VERB_SPECS}
 FILLER_WORDS = {"with", "the", "a", "to", "at", "using", "x", "y", "dir", "facing"}   # "dig N with pickaxe", "move_to x 3 y 4"

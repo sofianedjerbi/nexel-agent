@@ -16,6 +16,7 @@ from .planner import by_id
 from .plans import parse_command
 from .senses import rules_text
 from .sim.entities import CREATURES
+from .watchdog import stall_line
 
 log = logging.getLogger("thinker")
 SENSE_S = 0.2                                     # a look this often while an action runs
@@ -53,6 +54,7 @@ class React:
         if not parsed:
             return
         self.cards.fired_now(i)
+        self.skill_stop = True                         # (a skill running stops at its next command)
         self.abort(f"your card fired: when {card['when']} do {card['do']}", tell=False, soft=True)   # (the plan streaming goes on after it)
         items = [self.item(*c, "card", f"card: {card['why'] or card['when']}") for c in parsed]   # (the new epoch)
         ages = [(obs["tick"] - e.get("tick", obs["tick"])) / 10 for e in obs["events"] if e.get("type") == "attack"]
@@ -114,6 +116,14 @@ class React:
         if isinstance(n, int) and self.mem.forget(n):
             return {"ok": True, "result": {"ticks": 0, "changed": {}, "text": f"forgot [{n}]"}}
         return {"ok": False, "error": "no_note", "detail": f"no note [{n}]; your notes: {self.mem.notes_text() or 'none'}"}
+
+    def on_stall(self, stall):
+        """Nothing moved or changed for WINDOW_S: the model is told (what to do about it is its own choice)."""
+        self.stats["stalls"] += 1
+        self.memory["no_path"] = 0
+        self.tell(stall_line(stall))
+        self.decision_log.write(json.dumps({"kind": "stall", **stall}) + "\n")
+        log.info("%s [stall] %s", self.name, stall_line(stall))
 
     async def sense_loop(self, game):
         """While an action runs, look anyway (cards are checked on every look)."""

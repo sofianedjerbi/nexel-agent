@@ -35,7 +35,8 @@ from .plans import command_text, parse_plan  # noqa: F401  (parse_plan: tools, t
 from .playstats import summary
 from .policy import feedback
 from .senses import Body
-from .watchdog import Watchdog, stall_line
+from .skills.play import Skills
+from .watchdog import Watchdog
 
 log = logging.getLogger("thinker")
 MODEL_URL = "http://127.0.0.1:8080/v1/chat/completions"
@@ -44,7 +45,7 @@ SAID_S = 120.0                                    # the very same line is not sa
 IDLE_WAIT_S = 0.5                                 # nothing queued: look again this often while the model thinks
 
 
-class Thinker(Planner, React, Verbs):
+class Thinker(Planner, React, Verbs, Skills):
     def __init__(self, name, persona, token=None, game_url="ws://127.0.0.1:7777/agent", model_url=MODEL_URL,
                  model="default_model", data_dir=Path("agents"), temperature=0.3, max_tokens=120, refill_at=1,
                  chat=True, decision_log=None):
@@ -81,6 +82,7 @@ class Thinker(Planner, React, Verbs):
         self.calls: list[dict] = []
         self.busy: list[tuple[float, float, str]] = []      # (start, end, source) of every action on the server
         self.react_init(Path(data_dir))
+        self.skills_init(Path(data_dir))
 
     # ------------------------------------------------------------ notes (the model's "note" field)
     def add_note(self, line: str):
@@ -195,21 +197,15 @@ class Thinker(Planner, React, Verbs):
                     raise
                 self.stats["preempted"] += 1          # a card fired: its commands are first in the queue
 
-    def on_stall(self, stall):
-        """Nothing moved or changed for WINDOW_S: the model is told (what to do about it is its own choice)."""
-        self.stats["stalls"] += 1
-        self.memory["no_path"] = 0
-        self.tell(stall_line(stall))
-        self.decision_log.write(json.dumps({"kind": "stall", **stall}) + "\n")
-        log.info("%s [stall] %s", self.name, stall_line(stall))
-
     async def execute(self, game, item: Item, obs):
         t0 = time.monotonic()
         self.current = item if item.source == "model" else None
         self.current_source = item.source
         if item.source == "card":
             self.card_sent(item)
-        if item.tool in LOCAL:
+        if item.tool == "skill":
+            reply = await self.run_skill(game, item)
+        elif item.tool in LOCAL:
             reply = self.local(item, obs)
         elif item.tool in VERBS:
             reply = await self.verb(game, item.tool, item.args)
