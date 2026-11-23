@@ -103,6 +103,18 @@ def test_ledger_and_score():
     assert len(set(ACTIONS)) == N_ACTIONS
 
 
+def test_the_same_action_again_goes_on():
+    env = SimEnv(ep_ticks=10 ** 6)
+    env.reset(5)
+    a = env.a
+    env.sim.set_tile(a.x + 1, a.y, block="tree")
+    for _ in range(40):                          # chopping by hand takes ~5 s: asked again each 0.5 s, it is not started over
+        env.step(idx("dig_E"))
+        if a.count("wood"):
+            break
+    assert a.count("wood") and "collect_wood" in env.ledger.done
+
+
 def test_legal_mask_follows_the_rules():
     from megastructure.rl.encode import legal
     env = SimEnv(ep_ticks=10 ** 6)

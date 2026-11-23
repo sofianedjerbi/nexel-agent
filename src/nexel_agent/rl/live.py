@@ -74,7 +74,7 @@ class LiveBody:
         async with Client(self.a.game) as game:
             await game.hello(self.a.name, f"rl-{self.a.name}", self.a.persona)
             obs = await game.observe()
-            hp, deaths, task, t_report = obs["self"]["hp"], obs["self"]["deaths"], None, time.monotonic()
+            hp, deaths, task, running, t_report = obs["self"]["hp"], obs["self"]["deaths"], None, None, time.monotonic()
             while time.monotonic() < t_end:
                 me = obs["self"]
                 for e in obs.get("events", []):
@@ -99,14 +99,16 @@ class LiveBody:
                     self.facing = ACTIONS[i][1]
                 self.stats["decisions"] += 1
                 cmd = to_command(i, obs, self.facing)
-                t0 = time.monotonic()
+                t0, self.last_ok = time.monotonic(), 0.0        # (as in the env: how the actions that end in this wait went)
+                if cmd is not None and running and running[0] == cmd and not running[1].done():
+                    cmd = None                                  # the same action again, still under way: it goes on
                 if cmd is None:
                     self.stats["idle"] += me.get("action") is None
                 else:
                     tool, args = cmd
                     task = asyncio.create_task(game.act(tool, **args))
                     task.add_done_callback(lambda t, tool=tool, args=args: self.done(tool, args, "", t))
-                    self.last_ok = 0.0
+                    running = (cmd, task)
                 await asyncio.sleep(MIN_S)
                 if task is not None and not task.done():
                     await asyncio.wait([task], timeout=MAX_S - (time.monotonic() - t0))

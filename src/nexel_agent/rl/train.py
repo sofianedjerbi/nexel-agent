@@ -79,6 +79,7 @@ def main():
     p.add_argument("--hours", type=float, default=2.0)
     p.add_argument("--resume", default="")
     p.add_argument("--ent", type=float, default=0.01)
+    p.add_argument("--gamma", type=float, default=0.995)
     p.add_argument("--mask", type=int, default=1, help="1: MaskablePPO with the legal-action mask")
     a = p.parse_args()
     torch.set_num_threads(2)
@@ -94,7 +95,7 @@ def main():
     if a.resume:
         model = algo.load(a.resume, env=env, device="cpu")
     else:
-        model = algo("MultiInputPolicy", env, n_steps=512, batch_size=1024, n_epochs=4, gamma=0.99, gae_lambda=0.95,
+        model = algo("MultiInputPolicy", env, n_steps=512, batch_size=1024, n_epochs=4, gamma=a.gamma, gae_lambda=0.95,
                     learning_rate=3e-4, ent_coef=a.ent, clip_range=0.2, device="cpu", verbose=0,
                     policy_kwargs=dict(features_extractor_class=GridVec, net_arch=dict(pi=[256], vf=[256])))
     cb = Check(a, out, ev, base)

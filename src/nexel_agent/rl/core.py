@@ -31,7 +31,7 @@ class SimEnv:
         self.t0 = self.sim.tick
         self.ledger = Ledger()
         self.facing, self.last, self.last_ok, self.hurt = "S", 0, 0.0, 0.0
-        self.pending = []
+        self.pending, self.running = [], None
         self.night = self.sim.is_night()
         self.just_hit = False
         self.reactions = {}
@@ -52,12 +52,15 @@ class SimEnv:
             self.facing = ACTIONS[i][1]
         inv0, hp0, deaths0 = dict(a.inventory), a.hp, a.deaths
         act = None
+        if cmd is not None and self.running and self.running[0] == cmd and self.running[1].result is None:
+            cmd = None                      # the same action again, still under way: it goes on (not started over)
         if cmd is None:
             L.counts["idle"] += a.action is None
         else:
             tool, args = cmd
             target = sim.creatures.get(args.get("target")) if tool == "attack" else None
             act = sim.submit(a, tool, args)
+            self.running = (cmd, act)
             self.pending.append((act, tool, args, target.kind if target else ""))
         for t in range(self.decide):
             sim.step()
