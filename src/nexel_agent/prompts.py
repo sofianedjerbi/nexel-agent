@@ -39,6 +39,7 @@ World facts:
   snaps if you stand next to it. A strawman (scarecrow) walks toward you at night and fears firelight.
 - You can swim on any water at walking speed (a boat is faster). Water has depth: ~ shallow, ( deeper, = deep, ) deepest.
   Digging at water takes its bottom a layer down and gives dirt; dirt put in water brings it back up.
+  Water runs: a hole dug beside it floods, running water pushes you along, any block put in it dams it.
 - Old Mossback is a giant tortoise that sleeps as a hill with a tree on it. Hit it and it wakes: far too strong to fight alone.
 - Death drops everything you carry where you fell. You come back, empty-handed, somewhere else.
 - Everyone sees what you say nearby; shouting carries far but is tiring.
