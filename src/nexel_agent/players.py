@@ -33,7 +33,8 @@ MODELS = {
     "14b": "mlx-community/Qwen3-14B-4bit",
     "30b": "mlx-community/Qwen3-30B-A3B-Instruct-2507-4bit",
 }
-DEFAULT_MODEL = "4b"      # (real-time play: the fastest model that still plans sensibly, 2026-11-22)
+DEFAULT_MODEL = "auto"    # 30b when the Mac has room for it, else 8b (soaks 2026-11-23: the 30B plans and talks best)
+AUTO_FREE_PCT = 70        # free memory before loading the 30B (~17 GB of 32): what stays free is then about 20%
 SRC = str(Path(__file__).resolve().parent.parent)    # so children find the package without an install
 
 
@@ -55,7 +56,19 @@ def choose(roster: list[dict], n: int, pick: str | None, seed: int | None = None
     return random.Random(seed).sample(roster, n)
 
 
-def model_name(m: str) -> str:
+def free_pct(run=subprocess.run) -> int | None:
+    """The system's free memory in % (macOS memory_pressure), or None when it cannot be read."""
+    try:
+        out = run(["memory_pressure"], capture_output=True, text=True, timeout=10).stdout
+        return int(re.search(r"free percentage:\s*(\d+)%", out).group(1))
+    except (OSError, subprocess.SubprocessError, AttributeError, ValueError):
+        return None
+
+
+def model_name(m: str, free=None) -> str:
+    if m.lower() == "auto":
+        f = free_pct() if free is None else free
+        return MODELS["30b" if f is not None and f >= AUTO_FREE_PCT else "8b"]
     return MODELS.get(m.lower(), m)
 
 
