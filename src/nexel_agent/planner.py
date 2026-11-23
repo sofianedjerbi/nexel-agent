@@ -26,6 +26,19 @@ MAX_PLAN = 6                                     # commands taken from one answe
 LOCAL = set(LOCAL_SPECS)                         # remember / forget: the harness keeps them, the game never sees them
 
 
+def by_id(raw, obs):
+    """'attack Mira' / 'give tusker ...': a name or kind in view stands for its id (the nearest one)."""
+    if not isinstance(raw, str) or not obs:
+        return raw
+    w = raw.split()
+    if len(w) >= 2 and w[0].lower() in ("attack", "give", "feed", "milk", "name") and not w[1].lstrip("#-").isdigit():
+        who = w[1].lstrip("#").lower()
+        e = next((e for e in obs.get("entities", []) if who in (str(e.get("name", "")).lower(), e["kind"])), None)
+        if e:
+            return " ".join([w[0], str(e["id"])] + w[2:])
+    return raw
+
+
 @dataclass
 class Item:
     tool: str
@@ -130,7 +143,7 @@ class Planner(Chat):
 
         def take(raw):
             nonlocal at, n_ok, n_bad, first_cmd, stale
-            c = parse_command(raw)
+            c = parse_command(by_id(raw, self.obs))
             if c is None:
                 n_bad += 1
                 return

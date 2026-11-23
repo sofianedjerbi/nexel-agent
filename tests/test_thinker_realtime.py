@@ -221,3 +221,12 @@ def test_goal_names_what_its_recipe_still_lacks():
     line = needs_for("get pickaxe", {"wood": 14}, grid)
     assert "2 wood (have 14)" in line and "3 stone (have 0)" in line and "workbench within 2 tiles (none)" in line
     assert needs_for("get wood", {}, grid) == "" and needs_for("make torches", {}, grid).startswith("torch needs")
+
+
+def test_attack_by_a_name_or_kind_in_view_means_its_id():
+    from megastructure.planner import by_id
+    obs = fake_obs((0, 0))
+    obs["entities"] = [{"id": 12, "kind": "agent", "name": "Mira", "dx": 1, "dy": 0}, {"id": 30, "kind": "tusker", "dx": 3, "dy": 0}]
+    assert parse_command(by_id("attack Mira with fists", obs)) == ("attack", {"target": 12, "with": "fists"})
+    assert parse_command(by_id("attack tusker", obs)) == ("attack", {"target": 30})
+    assert by_id("attack Bob", obs) == "attack Bob"
