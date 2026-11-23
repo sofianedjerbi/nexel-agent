@@ -4,9 +4,8 @@ ends (0.2 s at the soonest), at once when hurt or someone comes into view, or af
 the policy chooses when to speak (say) and what to hand over (give); with --model-url the local model writes the words
 (rl/voice.py), else a plain short line. The model to serve there: voice.MODEL (Qwen3-30B-A3B-Instruct-2507, 4-bit), or
 voice.FALLBACK_MODEL (the 4B) on a Mac with less than ~20 GB free.
-    python -m mlx_lm.server --model mlx-community/Qwen3-30B-A3B-Instruct-2507-4bit --port 8081
-    python -m nexel_agent.rl.live --name Rook --policy rl_runs/r1/policy.npz --game ws://127.0.0.1:7790/agent \
-        --model-url http://127.0.0.1:8081/v1/chat/completions"""
+    python -m mlx_lm.server --model mlx-community/Qwen3-30B-A3B-Instruct-2507-4bit --port 8080
+    python -m nexel_agent.rl.live --name Rook          # the shipped models/rook.npz, the game at :7777, words from :8080"""
 
 import argparse
 import asyncio
@@ -24,6 +23,9 @@ from .core import split
 from .encode import ACTIONS, ITEMS, N_NEAR, action_name, encode, legal, to_command
 from .social import SocialMemory
 from .voice import Voice, places
+
+POLICY = Path(__file__).resolve().parents[3] / "models/rook.npz"     # (the shipped body: models/README.md)
+MODEL_URL = "http://127.0.0.1:8080/v1/chat/completions"             # (the shared local model server, as players.py starts it)
 
 MIN_S, IDLE_S, WAIT_MAX_S, POLL_S = 0.2, 0.5, 5.0, 0.25
 
@@ -272,10 +274,11 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("--name", default="Rook")
     p.add_argument("--persona", default="a quiet player who learned the world by living in it")
-    p.add_argument("--policy", default=str(Path(__file__).resolve().parents[3] / "rl_runs/policy.npz"))
+    p.add_argument("--policy", default=str(POLICY), help="the learned body (default: the shipped models/rook.npz)")
     p.add_argument("--game", default="ws://127.0.0.1:7777/agent")
-    p.add_argument("--model-url", default="", help="a local model server for the words and the planner (none: it does not "
-                   "talk); serve voice.MODEL there (Qwen3-30B-A3B-Instruct-2507 4-bit), or voice.FALLBACK_MODEL")
+    p.add_argument("--model-url", default=MODEL_URL, help="a local model server for the words and the planner (none: it does not "
+                   "talk; if nothing answers there it plays on in silence); serve voice.MODEL there (Qwen3-30B-A3B-Instruct-2507 "
+                   "4-bit), or voice.FALLBACK_MODEL")
     p.add_argument("--minutes", type=float, default=None)
     p.add_argument("--log", default="")
     p.add_argument("--seed", type=int, default=0)

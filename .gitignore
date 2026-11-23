@@ -8,9 +8,12 @@ dist/
 agents/
 saves/
 logs/
-models/
+models/*
 rl_runs/
 *.gguf
 *.safetensors
 *.npz
 *.zip
+# the shipped body (small, ~5 MB): the one model file kept in git
+!models/rook.npz
+!models/README.md

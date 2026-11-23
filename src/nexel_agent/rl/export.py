@@ -25,12 +25,13 @@ def export(src: str, dst: str):
     npol, worst = NumpyPolicy(dst), 0.0
     for _ in range(20):
         with torch.no_grad():
-            t_obs = {k: torch.as_tensor(o) for k, o in obs.items()}
+            width = model.observation_space["vec"].shape[0]            # (a policy from before the vector grew: its part)
+            t_obs = {k: torch.as_tensor(o[:, :width] if k == "vec" else o) for k, o in obs.items()}
             dist = model.policy.get_distribution(t_obs)
             ref = dist.distribution.logits[0].numpy()
-        mine = npol.logits({k: o[0] for k, o in obs.items()})
+        mine = npol.logits({k: o[0] for k, o in obs.items()})[:len(ref)]
         worst = max(worst, float(np.abs((mine - mine.max()) - (ref - ref.max())).max()))
-        obs, *_ = v.step(np.array([int(ref.argmax())]))
+        obs, *_ = v.step(np.array([int(ref.argmax())]))           # (an old policy's indices are the same actions)
     v.close()
     assert worst < 1e-3, worst
     print(f"exported {len(sd)} tensors to {dst}; numpy vs torch logits within {worst:.2e}")

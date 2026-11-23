@@ -85,6 +85,7 @@ python -m nexel_agent.players                       # 2 players on Qwen3-8B, the
 python -m nexel_agent.players --n 8 --model 30b --minutes 60      # models: 4b 8b 14b 30b
 python -m nexel_agent.players --pick gatsu0,senku0  # --list shows the roster (src/nexel_agent/personas.json)
 python -m nexel_agent.players --body rl --policy <weights.npz> --model 30b   # the learned body acts; the model talks and plans
+python -m nexel_agent.rl.live --name Rook           # the shipped body (models/rook.npz) alone; words from a model on :8080
 python -m nexel_agent.bots --n 8 --minutes 30       # scripted bots, no model
 ```
 

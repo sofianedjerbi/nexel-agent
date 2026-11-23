@@ -24,6 +24,7 @@ GOALS_DOC = ("Goals: gather (an item), craft (an item), give (an item, to a pers
 class Mind:
     def __init__(self, name: str, persona: str, model_url: str, http, path: Path):
         self.name, self.persona, self.url, self.http, self.path = name, persona, model_url, http, Path(path)
+        self.path.parent.mkdir(parents=True, exist_ok=True)      # (its notes, thoughts and timings go there)
         self.relations = json.loads(self.path.read_text()) if self.path.exists() else {}     # name: {ally, notes}
         self.seen: dict = {}              # name: recent things they did (this session)
         self.goal, self.goal_at = Goal(), time.monotonic()
