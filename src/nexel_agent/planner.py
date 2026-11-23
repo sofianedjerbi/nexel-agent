@@ -177,6 +177,16 @@ class Planner:
                  " (dropped: stale)" if stale else "")
 
     # --------------------------------------------------------------- chat
+    def on_hit(self, e, me):
+        """Hit: the plan stops and the next one is made knowing it (who, with what, how hurt you are). What to do about
+        it is the model's: hit back, run, talk ("do not hardcode response logic ... hit him he should hit back or run
+        away"). Not a scripted line."""
+        who, dmg = str(e.get("attacker")), e.get("damage")
+        b = next((x for x in (self.obs or {}).get("entities", []) if x.get("name") == who), None)
+        tag = f" #{b['id']}" if b else ""
+        self.heard.append(f"{who}{tag} just hit you with {e.get('weapon') or 'a bite'}: -{dmg} health, you have {me['hp']}/20")
+        self.abort(f"{who} hit you")
+
     def on_chat(self, speaker, text, at=None):
         if self.chat_task and not self.chat_task.done():
             self.chat_next = (speaker, text, at)
