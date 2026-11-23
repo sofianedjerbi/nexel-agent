@@ -80,9 +80,9 @@ class Planner(Chat):
             recall = [f"diary: {diary[:160]}"] + recall
         if known := self.known_places(obs):
             recall = [known] + recall
-        user = compact_obs(obs, goal=self.goal, record=self.record, heard=list(self.heard)[-3:], history=list(self.history),
+        user = compact_obs(obs, goal=self.goal, record=self.record, heard=list(self.heard)[-2:], history=list(self.history),
                            pending=list(pending), notes=" ".join(filter(None, [self.mem.notes_text(),
-                           (f"Your cards: {cards}" if (cards := self.cards.text(2)) else "")])), lessons=" | ".join(f[:90] for f in fails[-2:]),
+                           (f"Your cards: {cards}" if (cards := self.cards.text(2)) else "")])), lessons="",
                            danger=danger_lines(obs, self.body), recall=people + recall, goal_line=self.goal_line(obs),
                            habit=" ".join(filter(None, [stuck(obs, self.memory) and stuck_line(obs), self.fail_facts(),
                                                         f"Of your last 20 commands: {', '.join(habit)}." if habit else ""])))
@@ -103,7 +103,7 @@ class Planner(Chat):
         me, view = obs["self"], {LEGEND.get(c, c).split(" (")[0].replace("_", " ") for row in obs["grid"] for c in row}
         far = sorted((abs(p[0] - me["x"]) + abs(p[1] - me["y"]), k, p) for k, p in self.mem.places.items()
                      if k not in view and k in KNOWN)
-        return ("seen before, out of view: " + ", ".join(f"{k} ({p[0]},{p[1]}) {d} tiles" for d, k, p in far[:5])) if far else ""
+        return ("seen before, out of view: " + ", ".join(f"{k} ({p[0]},{p[1]}) {d} tiles" for d, k, p in far[:3])) if far else ""
 
     def item(self, tool, args, source, why="") -> Item:
         return Item(tool, args, source, why, None, self.epoch)
@@ -136,6 +136,8 @@ class Planner(Chat):
 
     def set_goal(self, goal, test):
         """A new goal and its own success test (goals.py), checked after every action."""
+        if goal == self.goal and clean(test) == getattr(self, "goal_test", None):
+            return                                   # (the same goal asked again: its clock and its count go on)
         if goal != self.goal and getattr(self, "goal_test", None):
             self.mem.add("goal", f"goal '{self.goal}' dropped for '{goal}'")
         self.goal, self.goal_test = goal, clean(test)

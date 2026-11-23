@@ -75,7 +75,7 @@ class Memory:
 
     def promise(self, name, text):
         p = self.person(name)
-        p["promised"] = (p["promised"] + [text[:80]])[-3:]
+        p["promised"] = ([x for x in p["promised"] if x != text[:80]] + [text[:80]])[-2:]
         self.save()
 
     def hit_by(self, name, damage, weapon, at=None, when="", hp=None):
@@ -141,9 +141,9 @@ class Memory:
             return f"You have not met {name} before."
         bits = [f"met {int((self.now() - p['first']) // 60)} min ago"]
         if p["said"]:
-            bits.append("they said: " + " / ".join(f'"{s}"' for s in p["said"][-3:]))
+            bits.append("they said: " + " / ".join(f'"{s[:60]}"' for s in p["said"][-2:]))
         if p["you_said"]:
-            bits.append("you said: " + " / ".join(f'"{s}"' for s in p["you_said"][-3:]))
+            bits.append("you said: " + " / ".join(f'"{s[:60]}"' for s in p["you_said"][-2:]))
         if p["hit_you"]:
             bits.append(f"they hit you {p['hit_you']}x")
         if p["you_hit"]:

@@ -154,6 +154,11 @@ def test_what_was_seen_before_is_remembered_where_it_was(tmp_path):
     assert Memory(tmp_path / "Vex" / "memory.json").places["tree"] == (0, -2)            # (kept across a restart)
 
 
+def test_a_workbench_goal_says_whether_one_is_placed_in_reach():
+    line = " ".join(progress_lines(world({"wood": 22}, [("&", 0, -1)]), "place workbench", None))
+    assert "a placed workbench within 2 tiles: yes" in line
+
+
 def test_the_curriculum_is_what_was_not_made_yet():
     rec = Record()
     rec.seen({"workbench": 1, "wood": 2})

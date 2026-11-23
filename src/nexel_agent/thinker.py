@@ -227,7 +227,7 @@ class Thinker(Planner, React, Verbs):
             self.said[str(item.args.get("text", "")).strip().lower()] = t1
         if item.source == "model":
             self.recent.append(command_text(item.tool, item.args))
-        self.history.append(line[:130])
+        self.history.append(line[:120])
         note_outcome(self.memory, obs, item, reply, t1)
         if not ok and reply.get("error") != "interrupted":
             self.abort(f"{command_text(item.tool, item.args)} failed: {reply.get('error')}", tell=False, soft=True)

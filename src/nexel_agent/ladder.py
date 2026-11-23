@@ -227,7 +227,8 @@ def progress_lines(obs, goal, rec: Record | None) -> list[str]:
         out.append(not_made_line(obs, rec))
     name = goal_recipe(goal)
     if name in RECIPES:
-        out.append("For your goal: " + "; ".join(recipe_facts(name, inv, obs)) + ".")
+        extra = [station_fact(name, inv, obs)] if name in STATION_CH else []    # (a workbench there already, or not)
+        out.append("For your goal: " + "; ".join(recipe_facts(name, inv, obs) + extra) + ".")
     elif name:
         out.append("For your goal: " + source_fact(name, obs, inv) + ".")
     return out

@@ -81,7 +81,7 @@ def craftable(inv: dict, grid: list[str]) -> list[str]:
         if all(inv.get(k, 0) >= n for k, n in rec.inputs.items()):
             st = rec.station
             out.append(name if not st or STATIONS.get(st) in near else f"{name}(@{st})")
-    return out[:7]
+    return out[:5]
 
 
 def _via(obs, reach, tx, ty):
@@ -158,7 +158,7 @@ def compact_obs(obs, goal=None, heard=(), history=(), pending=(), notes="", less
              + (", " + ", ".join(flags) if flags else "") + f". Health {me['hp']}/20, food {me['hunger']}/20.",
              *danger,
              "Carry: " + (", ".join(f"{k} {v}" for k, v in inv.items()) or "nothing") + ".",
-             "Can craft now: " + (", ".join(craftable(inv, grid)) or "nothing") + ".",
+             *([f"Can craft now: {', '.join(c)}."] if (c := craftable(inv, grid)) else []),
              *([goal_line] if goal_line else []),
              *progress_lines(obs, goal, record),
              f"Map (@ = you; rows y{me['y'] - VIEW}..{me['y'] + VIEW}, columns x{me['x'] - VIEW}..{me['x'] + VIEW}):",

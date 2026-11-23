@@ -137,7 +137,8 @@ class Cards:
         self.save()
 
     def text(self, k=4) -> str:
-        return " | ".join(f"[{i}] when {c['when']} do {c['do']} (fired {c.get('fired', 0)}x)" for i, c in self.usable()[:k])
+        return " | ".join(f"[{i}] {json.dumps(c['when'], separators=(',', ':'))} -> {'; '.join(c['do'])} ({c.get('fired', 0)}x)"
+                          for i, c in self.usable()[:k])
 
     def drop(self, i) -> bool:
         """The player stops using card i (its own goes out of the shared file too)."""
