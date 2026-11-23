@@ -102,7 +102,6 @@ def danger_lines(obs, body: Body | None = None, now=None) -> list[str]:
 def rules_text() -> str:
     """For the stable prefix: what kills, what heals, how fights go."""
     weapons = ", ".join(f"{k} {v}" for k, v in WEAPONS.items())
-    return (f"Survival: health 0 = you die and drop your whole pack. You heal while food is 9+; food 0 hurts. Eat to raise "
-            f"food. Fight: attack ID [with WEAPON] hits within 3 tiles (fists {FIST_DAMAGE}; {weapons}); a being dies at "
-            "hp 0 and drops what it carries. Run: move_to a spot 8+ tiles away, opposite the danger. Falling down a "
-            "cliff hurts. People can be friends or enemies: you choose.")
+    return (f"Survival: at health 0 you die and drop your pack. You heal while food is 9+; food 0 hurts; eat ITEM. "
+            f"Fight: attack ID [with WEAPON], within 3 tiles (fists {FIST_DAMAGE}; {weapons}). Run: move_to 8+ tiles "
+            "away from the danger. People can be friends or enemies: you choose.")

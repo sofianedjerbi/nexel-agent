@@ -10,11 +10,12 @@ from .policy import DIRS, reachable
 from .plans import _kind, _optional
 from .senses import rules_text
 from .sim.specs import LEGEND, TOOL_SPECS
-from .tiles import FOOD, RECIPES
+from .tiles import RECIPES
 
 CORE_RECIPES = ("workbench", "plank", "campfire", "torch", "rope", "axe", "pickaxe", "hoe", "spear", "chest", "bed",
                 "fence", "door", "wood_wall", "stone_wall", "roof", "path", "cooked_meat", "bread", "ingot", "sword", "boat")
-EVERYDAY_FOOD = ("berries", "mushroom", "egg", "fruit", "milk", "meat", "cooked_meat", "bread")
+PREFIX_RECIPES = ("workbench", "campfire", "axe", "pickaxe", "hoe", "wood_wall", "door", "roof", "chest", "bed",
+                  "ingot", "sword", "cooked_meat")   # (the rest: "Can craft now" and "next" in the view)
 STATIONS = {"workbench": "&", "campfire": "^"}
 GROUNDS_SKIP = set(".,o_'nu-:")            # plain ground: not worth a line in "Near"
 HARVEST = set("TbM*HQFvUtw")                # what digging gathers (trees, bushes, rocks, ore, mushrooms, ripe crops)
@@ -32,9 +33,7 @@ def signature(tool: str) -> str:
 TOOL_HINTS = {
     "move_to": "walk there (finds the way)", "dig": "harvest/dig the thing next to you that way (with: axe, pickaxe, hoe)",
     "place": "put down a thing you carry next to you, e.g. place S workbench (things, not wood or stone)", "craft": "make a recipe", "attack": "hit within 3 tiles",
-    "say": "talk to people near", "pick_up": "items on your tile", "store": "into a chest", "take": "from a chest",
-    "sleep": "in a bed next to you", "jump": "onto a step 1 higher", "walk": "keep going that way",
-    "look_far": "see 48 tiles that way", "eat": "eat food you carry",
+    "say": "talk to people near", "jump": "onto a step 1 higher", "look_far": "see 48 tiles that way",
 }
 
 
@@ -47,13 +46,11 @@ def stable_prefix(name: str, persona: str) -> str:
     tools += "\n- also: " + "; ".join(signature(t) for t in TOOL_SPECS if t not in TOOL_HINTS and t not in RARE)
     tools += "; remember TEXT; forget N"
     recipes = " ".join(f"{'By hand' if not st else '@' + st}: " + "; ".join(
-        f"{n}=" + "+".join(f"{c} {k}" for k, c in RECIPES[n].inputs.items()) for n in CORE_RECIPES
+        f"{n}=" + "+".join(f"{c} {k}" for k, c in RECIPES[n].inputs.items()) for n in PREFIX_RECIPES
         if n in RECIPES and RECIPES[n].station == st) + "." for st in (None, "workbench", "campfire"))
-    food = ", ".join(f"{k} +{v}" for k, v in FOOD.items() if k in EVERYDAY_FOOD)
     return f"""You are {name}, living in a wild island world with no laws. Who you are: {persona}
 You play in real time: answer with a short plan; it runs at once while you think of the next one.
-World: top-down grid, north is up (y-1), coordinates are absolute (x,y). Health 0-20, food 0-20 (walking and
-work use food; 0 hurts). Eat: {food}.
+World: top-down grid, north is up (y-1), coordinates are absolute (x,y). Health 0-20, food 0-20 (work uses food).
 To gather, stand next to a thing and dig toward it: tree -> wood, berry_bush -> berries + seed, bare_bush -> fiber,
 rock -> stone (slow by hand), ore -> ore (pickaxe). Items next to you come to you. Wood and stone are materials,
 not things to place. @workbench crafts need a workbench PLACED within 2 tiles: craft it, place it, stay by it. Seeds go in tilled soil (dig ground with a hoe). Water: you swim. A step one

@@ -53,8 +53,8 @@ def test_milestones_fall_in_order_and_persist(tmp_path):
     rec.did("place", {"dir": "S", "item": "wood"}, False, 21.0)       # a failure is no progress
     rec.seen({"stone": 3, "fiber": 1, "axe": 1, "pickaxe": 1, "hoe": 1}, 30.0)
     again = Record(tmp_path / "progress.json")
-    assert again.reached == {"wood": 10.0, "workbench placed": 20.0, "stone + fiber": 30.0, "tools: axe, pickaxe, hoe": 30.0}
-    assert again.next_milestone() == "food + campfire" and "wood" not in again.placed
+    assert again.reached == {"wood": 10.0, "workbench placed": 20.0, "stone + fiber": 30.0, "axe, pickaxe, hoe": 30.0}
+    assert again.next_milestone() == "campfire" and "wood" not in again.placed
 
 
 def test_failures_say_what_would_work():

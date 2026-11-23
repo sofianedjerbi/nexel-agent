@@ -21,19 +21,19 @@ MILESTONES = (                            # (short name, done?) over the record:
     ("wood", lambda s: s.ever.get("wood", 0) >= 8),
     ("workbench placed", lambda s: "workbench" in s.placed),
     ("stone + fiber", lambda s: "stone" in s.ever and "fiber" in s.ever),
-    ("tools: axe, pickaxe, hoe", lambda s: all(t in s.ever for t in TOOLS)),
-    ("food + campfire", lambda s: "campfire" in s.placed or "cooked_meat" in s.ever),
-    ("shelter: walls, door, roof", lambda s: s.placed.get("wood_wall", 0) + s.placed.get("stone_wall", 0) >= 4
+    ("axe, pickaxe, hoe", lambda s: all(t in s.ever for t in TOOLS)),
+    ("campfire", lambda s: "campfire" in s.placed or "cooked_meat" in s.ever),
+    ("shelter: walls+door", lambda s: s.placed.get("wood_wall", 0) + s.placed.get("stone_wall", 0) >= 4
      and "door" in s.placed),
-    ("farm: till, plant seed", lambda s: "seed" in s.placed),
-    ("chest + bed placed", lambda s: "chest" in s.placed and "bed" in s.placed),
+    ("farm: seed in tilled soil", lambda s: "seed" in s.placed),
+    ("chest + bed", lambda s: "chest" in s.placed and "bed" in s.placed),
     ("sword", lambda s: "sword" in s.ever),
-    ("trade/talk with people", lambda s: s.social > 0),
+    ("talk/trade", lambda s: s.social > 0),
 )
 TARGETS = {"wood": ["wood"], "workbench placed": ["workbench"], "stone + fiber": ["stone", "fiber"],
-           "tools: axe, pickaxe, hoe": list(TOOLS), "food + campfire": ["campfire"],
-           "shelter: walls, door, roof": ["wood_wall", "door", "roof"], "farm: till, plant seed": ["hoe", "seed"],
-           "chest + bed placed": ["chest", "bed"], "sword": ["sword"], "trade/talk with people": []}
+           "axe, pickaxe, hoe": list(TOOLS), "campfire": ["campfire"],
+           "shelter: walls+door": ["wood_wall", "door", "roof"], "farm: seed in tilled soil": ["hoe", "seed"],
+           "chest + bed": ["chest", "bed"], "sword": ["sword"], "talk/trade": []}
 
 
 def _sources() -> dict:
@@ -173,7 +173,7 @@ def gather_step(item, short, obs, have, depth=0) -> list[str]:
     chars = "".join(c for c, _ in srcs if not NEEDS_TOOL.get(c) or have.get(NEEDS_TOOL[c]))
     near = _nearest(obs, chars) or _nearest(obs, "".join(c for c, _ in srcs))
     if not near:
-        return [f"get {short} {item}: no {' or '.join(n for _, n in srcs)} in view: look_far or walk to the map's edge"]
+        return [f"get {short} {item}: none in view, explore (look_far D, walk D)"]
     tool = NEEDS_TOOL.get(near[3])
     name = dict(srcs)[near[3]]
     if tool and not have.get(tool) and depth < 3:
@@ -242,7 +242,7 @@ def progress_lines(obs, goal, rec: Record | None) -> list[str]:
             steps = steps_for(name, dict(inv), obs)
         else:
             steps = gather_step(name, max(1, 10 - inv.get(name, 0)), obs, dict(inv))
-        out.append(f"{why}: next " + " > ".join(f"{i + 1}) {s}" for i, s in enumerate(steps[:5])) + ".")
+        out.append(f"{why}: next " + " > ".join(f"{i + 1}) {s}" for i, s in enumerate(steps[:4])) + ".")
     plenty = [f"{k} {v}" for k, v in inv.items() if v >= PLENTY and k in SOURCES]
     if plenty:
         out.append(f"Plenty of {', '.join(plenty)}: stop gathering that, use it.")
