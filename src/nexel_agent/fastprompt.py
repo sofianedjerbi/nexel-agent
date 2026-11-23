@@ -46,7 +46,7 @@ def stable_prefix(name: str, persona: str) -> str:
     tools = "\n".join(f"- {signature(t)}: {TOOL_HINTS[t]}" for t in TOOL_SPECS if t in TOOL_HINTS)
     tools += "\n- also: " + "; ".join(signature(t) for t in TOOL_SPECS if t not in TOOL_HINTS and t not in RARE)
     tools += "; remember TEXT; forget N; drop_card N"
-    tools += ("\n- verbs (one intent, the actions it takes): dig_at TARGET [with T]; go_next_to TARGET; move_away TARGET [N];"
+    tools += ("\n- verbs (one intent, the actions it takes): dig_at TARGET [with T]; fight TARGET [with W]; go_next_to TARGET; move_away TARGET [N];"
               " place_near ITEM; craft_here RECIPE [N]; where TARGET. TARGET: x y, #id, a name or a kind (tree, rock, Ana)")
     recipes = " ".join(f"{'By hand' if not st else '@' + st}: " + "; ".join(
         f"{n}=" + "+".join(f"{c} {k}" for k, c in RECIPES[n].inputs.items()) for n in PREFIX_RECIPES

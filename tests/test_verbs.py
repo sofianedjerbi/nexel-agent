@@ -61,6 +61,15 @@ def test_move_away_gets_that_far_from_the_being(tmp_path):
     assert math.dist((a.x, a.y), (c.x, c.y)) >= 5
 
 
+def test_fight_walks_up_to_the_being_and_hits_it(tmp_path):
+    sim, a, game, t = setup(tmp_path)
+    c = Creature(id=901, kind="cow", x=a.x + 5, y=a.y, hp=6)
+    sim.creatures[c.id] = c
+    r = asyncio.run(t.verb(game, "fight", {"text": "cow"}))
+    assert r.get("ok"), r
+    assert c.hp < 6
+
+
 def test_place_near_and_craft_here_walk_to_the_station(tmp_path):
     sim, a, game, t = setup(tmp_path)
     a.inventory.update({"workbench": 1, "wood": 2, "stone": 1})

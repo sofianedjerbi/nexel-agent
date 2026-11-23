@@ -4,6 +4,7 @@ plays plain game actions for it, like move_to's pathfinding does:
     go_next_to TARGET      walk to a free side of it; says which way it is      (TARGET: "x y", a name, a kind or #id)
     dig_at TARGET [with T] go next to it (however far: in view, or where it was last seen) and dig it
     move_away TARGET [N]   walk to a reachable spot at least N tiles (default 8) from it
+    fight TARGET [with W]  go next to a being and attack it
     place_near ITEM        put ITEM on a free flat side of you, or of the nearest reachable tile that has one
     craft_here RECIPE [N]  craft; with its station placed in view or seen before but not within 2 tiles, walk to it first
     where TARGET / find NAME   where something is (no action)
@@ -19,7 +20,7 @@ from .sim.specs import LEGEND
 from .tiles import DIRS, RECIPES, TILL_TOOL
 
 VERB_SPECS = {v: {"args": {"text": "str"}} for v in ("go_next_to", "dig_at", "move_away", "place_near", "craft_here",
-                                                     "where", "find")}
+                                                     "where", "find", "fight")}
 TOOLS = {"axe", "pickaxe", "hoe", "spear", "sword", "watering_can", TILL_TOOL}
 
 
@@ -81,7 +82,7 @@ class Verbs:
                     if not r.get("ok"):
                         return r
             return await game.act("craft", recipe=name, n=n)
-        target, tool_in_hand = split_with(text) if tool == "dig_at" else (text, None)
+        target, tool_in_hand = split_with(text) if tool in ("dig_at", "fight") else (text, None)
         dist = 8
         if tool == "move_away":
             w = target.split()
@@ -96,6 +97,14 @@ class Verbs:
         r = await self.travel(game, obs, spots[0])
         if not r.get("ok") or tool == "go_next_to":
             return r
+        if tool == "fight":
+            obs = await self.observe(game)
+            me, name = obs["self"], target.lstrip("#").lower()
+            e = min((e for e in obs["entities"] if name in (str(e["id"]), e["kind"], str(e.get("name", "")).lower())),
+                    key=lambda e: abs(e["dx"]) + abs(e["dy"]), default=None)
+            if not e:
+                return fail("not_found", f"no {target!r} in view any more")
+            return await game.act("attack", target=e["id"], **({"with": tool_in_hand} if tool_in_hand else {}))
         args = {"dir": r["result"]["dir"], **({"with": tool_in_hand} if tool_in_hand else {})}
         return await game.act("dig", **args)
 
