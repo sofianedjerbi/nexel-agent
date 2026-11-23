@@ -48,6 +48,14 @@ def test_reference_skills_pass_in_a_simulated_world():
     assert F.passes(body, {"placed": "workbench"})
 
 
+def test_a_library_skill_called_returns_whether_its_test_holds():
+    body = SimBody(7)
+    lying = 'def get_wood(n):\n    """x"""\n    act("dig_at tree")\n    act("dig_at tree")\n    return False\n'
+    caller = 'def f():\n    return get_wood(4)\n'
+    run = Sandbox(body.do, body.observe, tests={"get_wood": {"have": {"wood": 99}}}).run("f", caller, (), {"get_wood": lying})
+    assert run["value"] is True
+
+
 def test_the_forge_keeps_a_skill_that_passes_and_retries_one_that_fails(tmp_path, monkeypatch):
     answers = iter(["```text\nnaive\n```\n```python\ndef get_wood(n):\n    \"\"\"x\"\"\"\n    return False\n```",
                     f"```text\nfixed: dig trees\n```\n```python{GET_WOOD}```"])

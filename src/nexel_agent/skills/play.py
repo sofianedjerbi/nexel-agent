@@ -38,7 +38,8 @@ class Skills:
 
         def observe():
             return asyncio.run_coroutine_threadsafe(self.observe(game), loop).result(timeout=30)
-        box = Sandbox(do, observe, max_actions=300, max_s=MAX_S, stop=lambda: self.skill_stop)
+        box = Sandbox(do, observe, max_actions=300, max_s=MAX_S, stop=lambda: self.skill_stop,
+                      tests={n: m.get("done_when") or {} for n, m in self.lib.index.items()})
         run = await asyncio.to_thread(box.run, name, src[name], args, src)
         obs = await self.observe(game)
         test = self.lib.index[name].get("done_when") or {}

@@ -44,7 +44,7 @@ Python function. It may use only these (no imports, no files):
   me() -> dict            look()["self"]
   have(item) -> int       how many of item you carry
   find(name) -> [(x, y)]  where things of that name are in view (21x21 around you), nearest first: find("tree")
-  math, and the library skills listed below (call them by name).
+  math, and the library skills listed below (call them by name; each returns whether its own test holds after it).
 Commands for act (verbs do the walking for you):
   "dig_at tree" / "dig_at rock" / "dig_at bare_bush" / "dig_at x y" [+ " with axe"]: walk next to the nearest one
       (in view, or where one was last seen) and dig it. One dig takes a whole tree (3 wood), rock (2 stone), bush.
@@ -93,12 +93,12 @@ def passes(body, test) -> bool:
     return not missing(test, body.observe())
 
 
-def trial(name, src, args, test, library, seeds=None):
+def trial(name, src, args, test, library, seeds=None, tests=None):
     """Run the skill in each world; [(seed, ok, run, state)]."""
     out = []
     for s in seeds or SEEDS:
         body = SimBody(s)
-        run = Sandbox(body.do, body.observe, max_actions=300, max_s=60).run(name, src, args, library)
+        run = Sandbox(body.do, body.observe, max_actions=300, max_s=60, tests=tests).run(name, src, args, library)
         out.append((s, passes(body, test), run, state(body)))
         body.close()
     return out
@@ -129,7 +129,7 @@ def forge(url, lib: Library, tries=4, only=None, author="forge", log=print, redo
         for k in range(tries):
             text, gen_s = ask(url, msgs)
             src = code_of(text, name)
-            res = trial(name, src, args, test, have)
+            res = trial(name, src, args, test, have, tests={n: lib.index[n]["done_when"] for n in have})
             ok = sum(r[1] for r in res)
             row["attempts"].append({"gen_s": round(gen_s, 1), "pass": f"{ok}/{len(res)}", "src": src,
                                     "errors": [r[2]["error"] for r in res]})

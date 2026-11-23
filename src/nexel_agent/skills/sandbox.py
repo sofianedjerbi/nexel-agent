@@ -52,8 +52,9 @@ def check(name, src) -> str | None:
 class Sandbox:
     """do(command) -> reply and observe() -> obs are the body's (in-process sim for the forge, the live game in play)."""
 
-    def __init__(self, do, observe, max_actions=300, max_s=120.0, stop=lambda: False):
+    def __init__(self, do, observe, max_actions=300, max_s=120.0, stop=lambda: False, tests=None):
         self.do, self.observe = do, observe
+        self.tests = tests or {}                      # library skill -> its done_when: what a call to it returns
         self.max_actions, self.max_s, self.stop = max_actions, max_s, stop
         self.trace: list[str] = []
 
@@ -85,7 +86,21 @@ class Sandbox:
              "have": lambda item: self.observe()["self"]["inventory"].get(str(item), 0), "find": self._find, "math": math}
         for src in library.values():
             exec(compile(src, "<library>", "exec"), g)
+        for n in library:                             # (a library skill called says whether its own test holds after it)
+            if n in g and n in self.tests:
+                g[n] = self._judged(g[n], self.tests[n])
         return g
+
+    def _judged(self, fn, test):
+        from .library import holds
+
+        def call(*a, **k):
+            fn(*a, **k)
+            t = test
+            if a and isinstance(a[0], int) and len(test.get("have", {})) == 1:
+                t = {"have": {next(iter(test["have"])): a[0]}}     # (get_wood(2): 2 wood, whatever the forge asked)
+            return holds(t, self.observe())
+        return call
 
     def run(self, name, src, args=(), library=None) -> dict:
         """Run skill `name` (src, plus the library). {value, error, trace, seconds}."""

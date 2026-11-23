@@ -9,6 +9,16 @@ from pathlib import Path
 DEMOTE_AFTER, DEMOTE_BELOW = 10, 0.5               # in play: at least this many runs, under this win rate: not offered
 
 
+def holds(test: dict, obs) -> bool:
+    """A skill's done_when on what the player sees now (placed: one within 3 tiles)."""
+    from ..goals import missing
+    from ..verbs import locate
+    me = obs["self"]
+    if "placed" in test:
+        return any(max(abs(p[0] - me["x"]), abs(p[1] - me["y"])) <= 3 for p in locate(obs, str(test["placed"])))
+    return not missing(test, obs)
+
+
 class Library:
     def __init__(self, path: Path):
         self.path = Path(path)
