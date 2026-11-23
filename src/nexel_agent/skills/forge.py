@@ -18,7 +18,7 @@ import httpx
 from ..goals import missing
 from ..tiles import RECIPES
 from .library import Library
-from .sandbox import Sandbox
+from .sandbox import Sandbox, check
 from .simworld import SimBody
 
 SEEDS = (1, 5, 7, 9, 10)                     # generated worlds with trees and rocks within 40 tiles of the spawn
@@ -73,8 +73,9 @@ def code_of(text, name="") -> str:
     """The code block of the answer (the last fenced block that defines the function; never the reasoning)."""
     blocks = re.findall(r"```[a-zA-Z]*[ \t]*\n(.*?)(?:```|$)", text, re.S)
     with_def = [b for b in blocks if f"def {name}" in b] or [b for b in blocks if "def " in b]
-    if with_def:
-        return with_def[-1].strip()
+    runs = [b for b in with_def if check(name, b.strip()) is None]
+    if runs or with_def:
+        return (runs or with_def)[-1].strip()
     i = text.find(f"def {name}")
     return text[i:].strip() if i != -1 else ""
 
