@@ -162,7 +162,13 @@ def test_farming_and_depth_milestones():
     assert {"till", "plant", "water_crop", "place_seed"} <= env.ledger.done, env.ledger.done
     for _ in range(6):
         env.step(idx("dig_down"))
-    assert env.sim.height(a) <= -5 and "depth_5" in env.ledger.done
+    assert env.sim.height(a) <= -5 and "depth_5" not in env.ledger.done      # (counted once back up)
+    for _ in range(40):
+        env.step(idx("climb_N") if env.encoded()["mask"][idx("climb_N")] else idx("step_N"))
+        if env.sim.height(a) >= 0 and not env.sim.in_cave(a):
+            break
+    env.step(0)
+    assert "depth_5" in env.ledger.done, env.sim.height(a)
 
 
 def test_climb_out_of_a_deep_pit():

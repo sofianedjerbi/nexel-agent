@@ -14,13 +14,25 @@ EVAL_SEEDS = tuple(range(EVAL0, EVAL0 + 24))
 NAMES: list = []                  # the achievements (rl/achieve.py, game side): the workers send the list (spec)
 
 
+# r6's 66 achievements (the first set), to compare runs across the widening
+R6_SET = tuple([f"collect_{x}" for x in ("wood", "fiber", "stone", "stone_block", "dirt", "berries", "seed", "fruit", "flower",
+                                          "mushroom", "ore", "meat", "wheat", "egg", "milk", "hay")]
+               + [f"craft_{x}" for x in ("workbench", "plank", "stone", "campfire", "torch", "rope", "axe", "pickaxe", "hoe",
+                                         "spear", "cooked_meat", "bread", "ingot", "sword", "door", "fence", "chest",
+                                         "wood_wall", "stone_wall", "bed", "ladder", "stairs", "path")]
+               + [f"place_{x}" for x in ("workbench", "campfire", "chest", "bed", "door", "fence", "wood_wall", "stone_wall",
+                                         "dirt", "stone_block", "plank", "path", "torch")]
+               + [f"eat_{x}" for x in ("berries", "fruit", "meat", "cooked_meat", "mushroom", "bread", "egg", "milk")]
+               + [f"defeat_{x}" for x in ("tusker", "pincer", "strawman", "chicken", "cow", "sporeling")] + ["survive_night"])
+
+
 def names_from(venv: PipeVecEnv):
     NAMES[:] = venv.spec["achievements"]
 
 
-def crafter_score(rates: dict) -> float:
+def crafter_score(rates: dict, names=None) -> float:
     """Crafter's score: the geometric mean of the success rates (in %), each plus one."""
-    xs = [rates.get(a, 0.0) * 100 for a in NAMES]
+    xs = [rates.get(a, 0.0) * 100 for a in (names or NAMES)]
     return math.exp(sum(math.log(1 + x) for x in xs) / len(xs)) - 1
 
 
@@ -39,9 +51,9 @@ def run(venv: PipeVecEnv, act, seeds=EVAL_SEEDS) -> dict:
 
 def metrics(eps: list) -> dict:
     n = len(eps)
-    rates = {a: sum(a in e["achievements"] for e in eps) / n for a in NAMES}
+    rates = {a: sum(a in e["achievements"] for e in eps) / n for a in set(NAMES) | set(R6_SET)}
     attacked = sum(e["won"] + e["lost"] + e["fled"] for e in eps)
-    return {"score": round(crafter_score(rates), 3), "n": n,
+    return {"score": round(crafter_score(rates), 3), "score_r6set": round(crafter_score(rates, R6_SET), 3), "n": n,
             "ach": round(float(np.mean([len(e["achievements"]) for e in eps])), 2),
             "ticks": int(np.mean([e["ticks"] for e in eps])), "deaths": sum(e["died"] for e in eps),
             "crafts_distinct": round(float(np.mean([e["distinct_crafts"] for e in eps])), 2),

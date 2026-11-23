@@ -48,7 +48,7 @@ class Check(BaseCallback):
         tr = metrics(list(self.train_eps)) if self.train_eps else {}
         sps = self.num_timesteps / (time.time() - self.t0)
         self.log(f"[check] step={self.num_timesteps} min={(time.time() - self.t0) / 60:.0f} sps={sps:.0f} "
-                 f"score={m['score']} (random {self.base['random']['score']}, legal random {self.base.get('random_legal', {}).get('score')}, noop {self.base['noop']['score']}) "
+                 f"score={m['score']} r6set={m['score_r6set']} (random {self.base['random']['score']}, legal random {self.base.get('random_legal', {}).get('score')}, noop {self.base['noop']['score']}) "
                  f"ach={m['ach']} ticks={m['ticks']} deaths={m['deaths']}/{m['n']} crafts_distinct={m['crafts_distinct']} "
                  f"places={m['places']} places_distinct={m['places_distinct']} nights={m['nights']} chunks={m['chunks']} fail%={m['fail_pct']} fights={m['fights']} hits={m['hits']} "
                  f"train_score={tr.get('score')} train_ach={tr.get('ach')}")
@@ -80,14 +80,16 @@ def main():
     p.add_argument("--resume", default="")
     p.add_argument("--ent", type=float, default=0.01)
     p.add_argument("--gamma", type=float, default=0.995)
+    p.add_argument("--days", type=float, default=0.75, help="episode length in days (from the morning): 0.75 is one night, 2.75 three")
     p.add_argument("--mask", type=int, default=1, help="1: MaskablePPO with the legal-action mask")
     a = p.parse_args()
     torch.set_num_threads(2)
     out = ROOT / a.run
     out.mkdir(parents=True, exist_ok=True)
-    env, ev = PipeVecEnv(a.envs, rng_seed=hash(a.run) % 1000), PipeVecEnv(a.eval_envs)
+    ep = [f"ep_ticks={int(a.days * 12000)}"]
+    env, ev = PipeVecEnv(a.envs, rng_seed=hash(a.run) % 1000, env_args=ep), PipeVecEnv(a.eval_envs, env_args=ep)
     names_from(ev)
-    bfile = ROOT / "baselines.json"
+    bfile = ROOT / f"baselines_{a.days:g}d.json"
     base = json.loads(bfile.read_text()) if bfile.exists() else {}
     if "random_legal" not in base:
         base = baselines(ev, ev.spec["n_actions"])

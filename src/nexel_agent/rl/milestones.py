@@ -1,5 +1,5 @@
 """The achievements read from the world after each decision (rl/achieve.py has the list): where the player has
-been (chunks, a cave, the deep), whether it stands in a shelter it built (the game's own `sheltered`), a lit one, a
+been (chunks; a cave and the deep, counted once back up in the open), whether it stands in a shelter it built (the game's own `sheltered`), a lit one, a
 house (a door and a bed it placed, near), the nights lived through, a day never under half health, a swim across,
 a foe that came close and did no harm. What happened, never how."""
 
@@ -19,6 +19,7 @@ class Milestones:
         self.day_min, self.full_day = a.hp, False
         self.swim_from = None
         self.near_since, self.last_hit = None, -10 ** 9
+        self.been = set()          # cave, depth_5, depth_10: been there, not yet back up in the open
 
     def update(self, L, hurt: bool, died: bool) -> float:
         sim, a = self.sim, self.a
@@ -31,7 +32,10 @@ class Milestones:
             r += u(f"chunks_{n}") if len(self.chunks) >= n else 0
         cave = sim.in_cave(a)
         z = sim.height(a)
-        r += (u("enter_cave") if cave else 0) + (u("depth_5") if z <= -5 else 0) + (u("depth_10") if z <= -10 else 0)
+        self.been |= {k for k, at in (("enter_cave", cave), ("depth_5", z <= -5), ("depth_10", z <= -10)) if at}
+        if self.been and not cave and z >= 0 and not died:       # (a trip down counts once you are back up)
+            r += sum(u(k) for k in self.been)
+            self.been = set()
         if L.placed and not cave and sim.sheltered(a.x, a.y):
             r += u("shelter")
             if sim.near_block(a, "campfire", 3):
