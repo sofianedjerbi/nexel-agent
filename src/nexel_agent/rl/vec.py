@@ -69,6 +69,7 @@ class PipeVecEnv(VecEnv):
         return self.seeds.pop(0) if self.seeds else EVAL0 - 1          # (spent: a world never scored)
 
     def _stack(self, obs_list):
+        self.masks = [o.pop("mask") for o in obs_list]               # (legal actions: action_masks, not an input)
         return {k: np.stack([o[k] for o in obs_list]) for k in obs_list[0]}
 
     def reset(self):
@@ -85,6 +86,7 @@ class PipeVecEnv(VecEnv):
         out = [list(w.recv()) for w in self.workers]
         for i, o in enumerate(out):
             if o[2] or o[3]:                                   # the episode ended: on to the next world
+                o[0].pop("mask", None)
                 o[4]["terminal_observation"], o[4]["seed"] = o[0], self.playing[i]
                 self.playing[i] = self.next_seed()
                 self.workers[i].send("reset", self.playing[i])
@@ -111,7 +113,12 @@ class PipeVecEnv(VecEnv):
         pass
 
     def env_method(self, method_name, *method_args, indices=None, **method_kwargs):
+        if method_name == "action_masks":
+            return list(self.masks)
         return [None] * self.num_envs
+
+    def has_attr(self, attr_name):
+        return attr_name == "action_masks"
 
     def env_is_wrapped(self, wrapper_class, indices=None):
         return [False] * self.num_envs

@@ -14,7 +14,7 @@ import torch
 from stable_baselines3.common.callbacks import BaseCallback
 
 from .evaluate import baselines, metrics, run
-from .net import GridVec, HybridPPO
+from .net import GridVec, HybridMaskablePPO, HybridPPO
 from .vec import PipeVecEnv
 
 ROOT = Path(__file__).resolve().parents[3] / "rl_runs"
@@ -40,11 +40,15 @@ class Check(BaseCallback):
             return True
         self.next += self.a.check
         pol = self.model.policy
-        m = metrics(run(self.eval_env, lambda o: pol.predict(o, deterministic=False)[0]))
+        ev = self.eval_env
+        if self.a.mask:
+            m = metrics(run(ev, lambda o: pol.predict(o, deterministic=False, action_masks=np.stack(ev.masks))[0]))
+        else:
+            m = metrics(run(ev, lambda o: pol.predict(o, deterministic=False)[0]))
         tr = metrics(list(self.train_eps)) if self.train_eps else {}
         sps = self.num_timesteps / (time.time() - self.t0)
         self.log(f"[check] step={self.num_timesteps} min={(time.time() - self.t0) / 60:.0f} sps={sps:.0f} "
-                 f"score={m['score']} (random {self.base['random']['score']}, noop {self.base['noop']['score']}) "
+                 f"score={m['score']} (random {self.base['random']['score']}, legal random {self.base.get('random_legal', {}).get('score')}, noop {self.base['noop']['score']}) "
                  f"ach={m['ach']} ticks={m['ticks']} deaths={m['deaths']}/{m['n']} crafts_distinct={m['crafts_distinct']} "
                  f"places={m['places']} fail%={m['fail_pct']} fights={m['fights']} hits={m['hits']} "
                  f"train_score={tr.get('score')} train_ach={tr.get('ach')}")
@@ -75,18 +79,22 @@ def main():
     p.add_argument("--hours", type=float, default=2.0)
     p.add_argument("--resume", default="")
     p.add_argument("--ent", type=float, default=0.01)
+    p.add_argument("--mask", type=int, default=1, help="1: MaskablePPO with the legal-action mask")
     a = p.parse_args()
     torch.set_num_threads(2)
     out = ROOT / a.run
     out.mkdir(parents=True, exist_ok=True)
     env, ev = PipeVecEnv(a.envs, rng_seed=hash(a.run) % 1000), PipeVecEnv(a.eval_envs)
     bfile = ROOT / "baselines.json"
-    base = json.loads(bfile.read_text()) if bfile.exists() else baselines(ev, ev.spec["n_actions"])
+    base = json.loads(bfile.read_text()) if bfile.exists() else {}
+    if "random_legal" not in base:
+        base = baselines(ev, ev.spec["n_actions"])
     bfile.write_text(json.dumps(base, indent=1))
+    algo = HybridMaskablePPO if a.mask else HybridPPO
     if a.resume:
-        model = HybridPPO.load(a.resume, env=env, device="cpu")
+        model = algo.load(a.resume, env=env, device="cpu")
     else:
-        model = HybridPPO("MultiInputPolicy", env, n_steps=512, batch_size=1024, n_epochs=4, gamma=0.99, gae_lambda=0.95,
+        model = algo("MultiInputPolicy", env, n_steps=512, batch_size=1024, n_epochs=4, gamma=0.99, gae_lambda=0.95,
                     learning_rate=3e-4, ent_coef=a.ent, clip_range=0.2, device="cpu", verbose=0,
                     policy_kwargs=dict(features_extractor_class=GridVec, net_arch=dict(pi=[256], vf=[256])))
     cb = Check(a, out, ev, base)

@@ -42,10 +42,15 @@ def metrics(eps: list) -> dict:
             "top": {a: round(r, 2) for a, r in sorted(rates.items(), key=lambda kv: -kv[1]) if r > 0}}
 
 
+def legal_random(venv, rng):
+    return np.array([rng.choice(np.flatnonzero(m)) for m in venv.masks])
+
+
 def baselines(venv: PipeVecEnv, n_actions: int, seed=0) -> dict:
     rng = np.random.default_rng(seed)
     t = time.time()
     out = {"random": metrics(run(venv, lambda o: rng.integers(0, n_actions, venv.num_envs))),
+           "random_legal": metrics(run(venv, lambda o: legal_random(venv, rng))),
            "noop": metrics(run(venv, lambda o: np.zeros(venv.num_envs, int)))}
     out["secs"] = round(time.time() - t)
     return out

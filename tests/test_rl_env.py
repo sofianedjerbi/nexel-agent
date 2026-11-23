@@ -101,3 +101,15 @@ def test_ledger_and_score():
     assert crafter_score({}) == 0.0
     assert abs(crafter_score({a: 1.0 for a in ACHIEVEMENTS}) - 100) < 1e-9
     assert len(set(ACTIONS)) == N_ACTIONS
+
+
+def test_legal_mask_follows_the_rules():
+    from megastructure.rl.encode import legal
+    env = SimEnv(ep_ticks=10 ** 6)
+    o = env.reset(5)
+    assert o["mask"].shape == (N_ACTIONS,) and o["mask"][0]           # noop is always there
+    env.a.inventory.update({"wood": 4, "stone": 3, "fiber": 1, "berries": 1})
+    m = legal(env.sim.observe(env.a))
+    assert m[idx("craft_workbench")] and m[idx("eat_berries")] and not m[idx("eat_meat")]
+    assert not m[idx("craft_axe")]                                    # (no workbench within reach)
+    assert not m[idx("dig_N_axe")] and m[idx("dig_N")]

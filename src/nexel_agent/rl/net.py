@@ -2,6 +2,7 @@
 map as one more channel; the body/pack vector through an MLP. One network for every player: what one learns, all have."""
 
 import torch
+from sb3_contrib import MaskablePPO
 from stable_baselines3 import PPO
 from gymnasium import spaces
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
@@ -38,7 +39,7 @@ def _move_optimizer(optimizer, device):
                 state[k] = v.to(device)
 
 
-class HybridPPO(PPO):
+class OnMPS:
     """Acts on the CPU (one small batch a step), trains on MPS (batched backprop): as in ~/minish-rl."""
 
     train_device = torch.device("mps") if torch.backends.mps.is_available() else torch.device("cpu")
@@ -54,3 +55,11 @@ class HybridPPO(PPO):
             self.policy.to(cpu)
             _move_optimizer(self.policy.optimizer, cpu)
             self.device = self.rollout_buffer.device = cpu
+
+
+class HybridPPO(OnMPS, PPO):
+    pass
+
+
+class HybridMaskablePPO(OnMPS, MaskablePPO):
+    """With the legal-action mask (encode.legal): the game's refusals are never sampled."""

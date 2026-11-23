@@ -85,6 +85,9 @@ def parse_args(argv=None) -> argparse.Namespace:
     p.add_argument("--data", default="agents", help="where notepads and logs go")
     p.add_argument("--seed", type=int, default=None, help="random pick seed")
     p.add_argument("--list", action="store_true", help="print the roster and exit")
+    p.add_argument("--body", choices=("llm", "rl"), default="llm",
+                   help="llm: the thinker plans; rl: the policy learned in the sim acts (rl/live.py), the model only chats")
+    p.add_argument("--policy", default="", help="--body rl: the policy's weights (.npz from rl/export.py)")
     return p.parse_args(argv)
 
 
@@ -162,6 +165,11 @@ class Launcher:
             pass
 
     def thinker_cmd(self, p: dict) -> list[str]:
+        if getattr(self.a, "body", "llm") == "rl":
+            cmd = [sys.executable, "-m", "megastructure.rl.live", "--name", p["name"], "--persona", p["persona"],
+                   "--game", self.a.game, "--model-url", f"http://127.0.0.1:{self.a.port}/v1/chat/completions",
+                   "--log", str(self.data / f"{p['name']}.rl.jsonl"), *(["--policy", self.a.policy] if self.a.policy else [])]
+            return cmd + (["--minutes", str(self.a.minutes)] if self.a.minutes else [])
         cmd = [sys.executable, "-m", "megastructure.thinker", "--name", p["name"], "--persona", p["persona"],
                "--game", self.a.game, "--model-url", f"http://127.0.0.1:{self.a.port}/v1/chat/completions",
                "--model", "default_model", "--data", str(self.data)]

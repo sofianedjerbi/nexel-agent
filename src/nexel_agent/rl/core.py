@@ -10,7 +10,7 @@ from pathlib import Path
 from ..sim import Simulation
 from ..sim.constants import DAY_TICKS
 from .achieve import HOSTILE, Ledger
-from .encode import ACTIONS, encode, to_command
+from .encode import ACTIONS, encode, legal, to_command
 
 DECIDE = 5                          # ticks: the longest a decision waits
 MIN_TICKS = 2                       # and the shortest (0.2 s: a step), unless hurt
@@ -39,7 +39,7 @@ class SimEnv:
         return self.encoded()
 
     def encoded(self):
-        return encode(self.obs, self.facing, self.last, self.last_ok, self.hurt)
+        return {**encode(self.obs, self.facing, self.last, self.last_ok, self.hurt), "mask": legal(self.obs)}
 
     def step(self, i: int):
         sim, a, L = self.sim, self.a, self.ledger

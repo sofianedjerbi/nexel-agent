@@ -10,7 +10,7 @@ import numpy as np
 
 from ..sim.constants import DAY_TICKS, VIEW_R
 from ..sim.specs import LEGEND
-from ..tiles import FOOD, WEAPONS
+from ..tiles import BLOCKS, FOOD, RECIPES, USE_R, WEAPONS
 
 SIDE = 2 * VIEW_R + 1
 DIRS = ("N", "E", "S", "W")
@@ -137,3 +137,26 @@ def encode(obs: dict, facing: str = "S", last_action: int = 0, last_ok: float = 
 
 
 FOODS = tuple(FOOD)
+_STATION_CH = {b.name: b.char for b in BLOCKS}
+
+
+def legal(obs: dict) -> np.ndarray:
+    """Which actions the game would not refuse outright (what you carry, a station within reach, a being in view):
+    the rules' own preconditions, never a preference among the legal ones."""
+    me = obs["self"]
+    inv = me.get("inventory", {})
+    near = {ch for row in obs["grid"][VIEW_R - USE_R:VIEW_R + USE_R + 1] for ch in row[VIEW_R - USE_R:VIEW_R + USE_R + 1]}
+    m = np.ones(N_ACTIONS, bool)
+    for i, (kind, d, arg) in enumerate(ACTIONS):
+        if kind == "dig" and arg:
+            m[i] = bool(inv.get(arg))
+        elif kind == "attack":
+            m[i] = any(e.get("kind") != "wisp" and abs(e["dx"]) <= 4 and abs(e["dy"]) <= 4 for e in obs.get("entities", []))
+        elif kind == "pick_up":
+            m[i] = any(it["dx"] == 0 and it["dy"] == 0 for it in obs.get("items", []))
+        elif kind in ("place", "eat"):
+            m[i] = bool(inv.get(arg))
+        elif kind == "craft":
+            r = RECIPES[arg]
+            m[i] = all(inv.get(k, 0) >= n for k, n in r.inputs.items()) and (not r.station or _STATION_CH[r.station] in near)
+    return m
