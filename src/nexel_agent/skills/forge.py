@@ -58,7 +58,7 @@ Commands for act (verbs do the walking for you):
   A start may have no tree or rock in view: the world is large, things are found by looking and walking.
 Facts: {recipes}. A craft marked @workbench needs a placed workbench within 2 tiles of you; craft_here walks there
 if one is in view. Wood and stone cannot be placed. Bare bushes and thickets give fiber. Ore needs a pickaxe.
-Answer: first your reasoning in a ```text block (the steps, what can go wrong, how you check), then the code in one
+Answer: first your reasoning in a ```text block (at most 10 short lines: the steps, what can go wrong), then the code in one
 ```python block: def <name>(...): with a one-line docstring; check replies and look again after acting; return True
 when done, False when it cannot be done. Never call a variable act, look, me, have or find."""
 
@@ -102,7 +102,7 @@ def trial(name, src, args, test, library, seeds=None):
     return out
 
 
-def ask(url, msgs, max_tokens=1800) -> tuple[str, float]:
+def ask(url, msgs, max_tokens=3000) -> tuple[str, float]:
     t0 = time.monotonic()
     r = httpx.post(url, timeout=600, json={"model": "default_model", "messages": msgs, "max_tokens": max_tokens,
                                            "temperature": 0.3, "chat_template_kwargs": {"enable_thinking": False}})
@@ -136,7 +136,7 @@ def forge(url, lib: Library, tries=4, only=None, author="forge", log=print, redo
                 lib.add(name, src, ",".join("n" for _ in args), test, author, f"{ok}/{len(res)}", gen_s)
                 break
             bad = next(r for r in res if not r[1])
-            msgs += [{"role": "assistant", "content": text},
+            msgs = msgs[:2] + [{"role": "assistant", "content": f"```python\n{src}\n```"},   # (only the last try: a short context)
                      {"role": "user", "content": f"It passed in {ok} of {len(res)} worlds. In world {bad[0]}: "
                       + (f"error: {bad[2]['error']}. " if bad[2]["error"] else f"it returned {bad[2]['value']!r}. ")
                       + "Last actions:\n" + "\n".join(bad[2]["trace"][-12:]) + f"\nAt the end: {state_from(bad)}. "
