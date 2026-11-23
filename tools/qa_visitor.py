@@ -40,6 +40,11 @@ async def main():
             if pos:
                 await g.request("dev_teleport", x=pos[0] + 2, y=pos[1])
             obs = await g.observe()
+            them = next((e for e in obs["entities"] if e.get("name") == a.target), None)
+            if them and abs(them["dx"]) + abs(them["dy"]) > 2:          # (the log lags: stand right beside them)
+                me = obs["self"]
+                await g.request("dev_teleport", x=me["x"] + them["dx"] + 1, y=me["y"] + them["dy"])
+                obs = await g.observe()
             if what == "hit":
                 tid = next((e["id"] for e in obs["entities"] if e.get("name") == a.target), None)
                 for _ in range(arg):
