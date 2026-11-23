@@ -107,7 +107,8 @@ class Verbs:
             return fail("not_found", f"no {target!r} in view, and none seen before")
         if tool == "move_away":
             return await self.move_away(game, obs, spots[0], dist)
-        r = await self.travel(game, obs, spots[0])
+        named = not all(p.lstrip("-").isdigit() for p in target.replace(",", " ").split()[:2])
+        r = await self.travel(game, obs, spots[0], target if named else None)
         if not r.get("ok") or tool == "go_next_to":
             return r
         if tool == "fight":
@@ -130,12 +131,20 @@ class Verbs:
         key = target.lstrip("#").lower().replace("_", " ")
         return [tuple(seen[key])] if key in seen else []
 
-    async def travel(self, game, obs, spot, legs=6) -> dict:
-        """Next to spot, however far: walk legs toward it (pathfinding on each) until it is in view, then beside it."""
+    async def travel(self, game, obs, spot, kind=None, legs=6) -> dict:
+        """Next to spot, however far: walk legs toward it (pathfinding on each) until it is in view, then beside it.
+        With kind (a remembered tree...): in view, the nearest one there now (what was remembered may be gone)."""
         for _ in range(legs):
             me = obs["self"]
             r = len(obs["grid"]) // 2
+            if kind:
+                here = locate(obs, kind)
+                if here and math.dist(here[0], (me["x"], me["y"])) <= math.dist(spot, (me["x"], me["y"])):
+                    spot = here[0]
             if abs(spot[0] - me["x"]) <= r - 1 and abs(spot[1] - me["y"]) <= r - 1:
+                if kind and spot not in locate(obs, kind):
+                    self.memory.get("seen", {}).pop(kind.lower().replace("_", " "), None)
+                    return fail("not_found", f"the {kind} seen at ({spot[0]},{spot[1]}) is not there any more")
                 return await self.go_next_to(game, obs, spot)
             reach = reachable(obs)
             q = min(reach, key=lambda q: math.dist((me["x"] + q[0], me["y"] + q[1]), spot))

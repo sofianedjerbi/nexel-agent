@@ -68,9 +68,14 @@ def recipes_text():
                      + (f" @{RECIPES[n].station}" if RECIPES[n].station else "") for n in names)
 
 
-def code_of(text) -> str:
-    blocks = re.findall(r"```python\s*\n(.*?)(?:```|$)", text, re.S)
-    return (blocks[-1] if blocks else text).strip()
+def code_of(text, name="") -> str:
+    """The code block of the answer (the last fenced block that defines the function; never the reasoning)."""
+    blocks = re.findall(r"```[a-zA-Z]*[ \t]*\n(.*?)(?:```|$)", text, re.S)
+    with_def = [b for b in blocks if f"def {name}" in b] or [b for b in blocks if "def " in b]
+    if with_def:
+        return with_def[-1].strip()
+    i = text.find(f"def {name}")
+    return text[i:].strip() if i != -1 else ""
 
 
 def state(body) -> str:
@@ -119,7 +124,7 @@ def forge(url, lib: Library, tries=4, only=None, author="forge", log=print):
         row = {"skill": name, "attempts": []}
         for k in range(tries):
             text, gen_s = ask(url, msgs)
-            src = code_of(text)
+            src = code_of(text, name)
             res = trial(name, src, args, test, have)
             ok = sum(r[1] for r in res)
             row["attempts"].append({"gen_s": round(gen_s, 1), "pass": f"{ok}/{len(res)}", "src": src,

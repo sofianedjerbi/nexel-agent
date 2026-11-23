@@ -67,6 +67,24 @@ def test_the_forge_keeps_a_skill_that_passes_and_retries_one_that_fails(tmp_path
     json.loads((tmp_path / "_skills" / "forge_log.json").read_text())
 
 
+def test_the_code_is_the_block_that_defines_the_function():
+    text = "```text\nI will — carefully — dig\n```\n```py\ndef get_wood(n):\n    return True\n```"
+    assert F.code_of(text, "get_wood") == "def get_wood(n):\n    return True"
+    assert F.code_of("Reasoning first.\ndef get_wood(n):\n    return 1", "get_wood").startswith("def get_wood")
+
+
+def test_a_remembered_tree_that_is_gone_is_said_so_not_dug_as_ground(tmp_path):
+    body = SimBody(1)
+    me = body.observe()["self"]
+    body.host.memory["seen"]["tree"] = (me["x"] + 3, me["y"])              # (nothing there now)
+    for dx in range(-8, 9):
+        for dy in range(-8, 9):
+            if body.sim.world.block(me["x"] + dx, me["y"] + dy) == "tree":
+                body.sim.world.set(me["x"] + dx, me["y"] + dy, block="none")
+    r = body.do("dig_at tree")
+    assert r["error"] == "not_found" and "not there any more" in r["detail"] and "tree" not in body.host.memory["seen"]
+
+
 def test_a_skill_that_keeps_losing_in_play_is_no_longer_offered(tmp_path):
     lib = Library(tmp_path)
     lib.add("get_wood", GET_WOOD, "n", {"have": {"wood": 6}}, "test", "5/5")
