@@ -32,13 +32,16 @@ class Check(BaseCallback):
         with open(self.out / "checks.log", "a") as f:
             f.write(line + "\n")
 
+    def _on_training_start(self):
+        self.s0, self.next = self.num_timesteps, self.num_timesteps + self.a.check     # (resumed: counted from here)
+
     def _on_step(self) -> bool:
         for d, info in zip(self.locals["dones"], self.locals["infos"]):
             if d and "achievements" in info:
                 self.train_eps.append(info)
         if self.num_timesteps < self.next:
             return True
-        self.next += self.a.check
+        self.next = self.num_timesteps + self.a.check
         pol = self.model.policy
         ev = self.eval_env
         if self.a.mask:
@@ -46,7 +49,7 @@ class Check(BaseCallback):
         else:
             m = metrics(run(ev, lambda o: pol.predict(o, deterministic=False)[0]))
         tr = metrics(list(self.train_eps)) if self.train_eps else {}
-        sps = self.num_timesteps / (time.time() - self.t0)
+        sps = (self.num_timesteps - self.s0) / (time.time() - self.t0)
         self.log(f"[check] step={self.num_timesteps} min={(time.time() - self.t0) / 60:.0f} sps={sps:.0f} "
                  f"score={m['score']} r6set={m['score_r6set']} (random {self.base['random']['score']}, legal random {self.base.get('random_legal', {}).get('score')}, noop {self.base['noop']['score']}) "
                  f"ach={m['ach']} ticks={m['ticks']} deaths={m['deaths']}/{m['n']} crafts_distinct={m['crafts_distinct']} "
@@ -79,6 +82,7 @@ def main():
     p.add_argument("--hours", type=float, default=2.0)
     p.add_argument("--resume", default="")
     p.add_argument("--ent", type=float, default=0.01)
+    p.add_argument("--lr", type=float, default=3e-4)
     p.add_argument("--gamma", type=float, default=0.995)
     p.add_argument("--days", type=float, default=0.75, help="episode length in days (from the morning): 0.75 is one night, 2.75 three")
     p.add_argument("--mask", type=int, default=1, help="1: MaskablePPO with the legal-action mask")
@@ -96,10 +100,10 @@ def main():
     bfile.write_text(json.dumps(base, indent=1))
     algo = HybridMaskablePPO if a.mask else HybridPPO
     if a.resume:
-        model = algo.load(a.resume, env=env, device="cpu")
+        model = algo.load(a.resume, env=env, device="cpu", custom_objects={"learning_rate": a.lr, "lr_schedule": lambda _: a.lr, "ent_coef": a.ent})
     else:
         model = algo("MultiInputPolicy", env, n_steps=512, batch_size=1024, n_epochs=4, gamma=a.gamma, gae_lambda=0.95,
-                    learning_rate=3e-4, ent_coef=a.ent, clip_range=0.2, device="cpu", verbose=0,
+                    learning_rate=a.lr, ent_coef=a.ent, clip_range=0.2, device="cpu", verbose=0,
                     policy_kwargs=dict(features_extractor_class=GridVec, net_arch=dict(pi=[256], vf=[256])))
     cb = Check(a, out, ev, base)
     cb.log(f"[start] run={a.run} envs={a.envs} actions={env.spec['n_actions']} random={base['random']['score']} noop={base['noop']['score']}")
