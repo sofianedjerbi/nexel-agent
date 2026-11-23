@@ -48,12 +48,11 @@ class Planner(Chat, GoalMind):
             recall = [f"diary: {diary[:160]}"] + recall
         if known := self.known_places(obs):
             recall = [known] + recall
-        if skills := self.skill_lines():
-            recall = [f"your skills (they run to their end): {skills}"] + recall
         user = compact_obs(obs, goal=self.goal, record=self.record, heard=list(self.heard)[-2:], history=list(self.history),
                            pending=list(pending), notes=" ".join(filter(None, [self.mem.notes_text(),
                            (f"Your cards: {cards}" if (cards := self.cards.text(2)) else "")])), lessons="",
                            danger=danger_lines(obs, self.body), recall=people + recall, goal_line=self.goal_line(obs),
+                           skills=self.skill_lines(),
                            habit=" ".join(filter(None, [stuck(obs, self.memory) and stuck_line(obs), self.fail_facts(),
                                                         f"Of your last 20 commands: {', '.join(habit)}." if habit else ""])))
         return [{"role": "system", "content": self.prefix}, {"role": "user", "content": user}]

@@ -146,7 +146,7 @@ def needs_for(goal: str | None, inv: dict, grid) -> str:
 
 
 def compact_obs(obs, goal=None, heard=(), history=(), pending=(), notes="", lessons="", habit="", record=None,
-                danger=(), recall=(), goal_line="") -> str:
+                danger=(), recall=(), goal_line="", skills="") -> str:
     me, grid = obs["self"], obs["grid"]
     r = len(grid) // 2
     crop = [row[r - VIEW:r + VIEW + 1] for row in grid[r - VIEW:r + VIEW + 1]]
@@ -161,6 +161,8 @@ def compact_obs(obs, goal=None, heard=(), history=(), pending=(), notes="", less
              *([f"Can craft now: {', '.join(c)}."] if (c := craftable(inv, grid)) else []),
              *([goal_line] if goal_line else []),
              *progress_lines(obs, goal, record),
+             *([f"Your skills (\"skill NAME [N]\" does the whole of it, walking and gathering included): {skills}."]
+               if skills else []),
              f"Map (@ = you; rows y{me['y'] - VIEW}..{me['y'] + VIEW}, columns x{me['x'] - VIEW}..{me['x'] + VIEW}):",
              *crop,
              "Key: " + ", ".join(f"{c} {LEGEND.get(c, c).split(' (')[0]}" for c in used if c in LEGEND)]

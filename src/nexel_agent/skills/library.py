@@ -49,13 +49,14 @@ class Library:
             out.append(n)
         return out
 
-    def lines(self, k=8) -> str:
-        """For the plan prompt: 'skill get_wood N: <doc> (sim 5/5, play 3/4)'."""
+    def lines(self, k=12) -> str:
+        """For the plan prompt: 'skill get_wood N (play 3/4), skill make_workbench, ...' (names say what they do)."""
         def one(n):
             m = self.index[n]
             args = " ".join(a.upper() for a in m.get("call", "").split(",") if a.strip())
-            return f"skill {n}{' ' + args if args else ''}: {m['doc']} (sim {m['sim']}, play {m['wins']}/{m['wins'] + m['losses']})"
-        return "; ".join(one(n) for n in self.offered()[:k])
+            runs = m["wins"] + m["losses"]
+            return f"{n}{' ' + args if args else ''}" + (f" (won {m['wins']}/{runs})" if runs else "")
+        return ", ".join(one(n) for n in self.offered()[:k])
 
     def outcome(self, name, won: bool):
         if name in self.index:

@@ -73,7 +73,7 @@ def test_the_forge_keeps_a_skill_that_passes_and_retries_one_that_fails(tmp_path
     assert "It passed in 0 of 2 worlds" in asked[1][-1]["content"]
     again = Library(tmp_path / "_skills")
     assert "get_wood" in again.sources() and again.index["get_wood"]["sim"] == "2/2"
-    assert again.lines().startswith("skill get_wood N: Dig trees until n wood. (sim 2/2, play 0/0)")
+    assert again.lines() == "get_wood N"
     json.loads((tmp_path / "_skills" / "forge_log.json").read_text())
 
 
@@ -122,4 +122,4 @@ def test_a_plan_runs_a_library_skill_to_its_end_and_its_test_says_won(tmp_path):
     looks = [a[2]["dir"] for a in game.acts if a[1] == "look_far"]
     assert looks[:4] == ["N", "E", "S", "W"]
     assert Library(tmp_path / "_skills").index["scan"]["wins"] >= 1
-    assert "skill scan: Look all four ways." in calls[-1][1]["messages"][1]["content"]
+    assert "Your skills (\"skill NAME [N]\" does the whole of it" in calls[-1][1]["messages"][1]["content"]
