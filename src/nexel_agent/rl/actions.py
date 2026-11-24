@@ -9,7 +9,7 @@ import numpy as np
 
 from megastructure.sim.constants import FOOD_MAX, LAYER, VIEW_R
 from . import ring
-from .facts import within
+from .facts import short, within
 from megastructure.tiles import ARMOR, BLOCKS, FEED, FILLERS, FOOD, GROUNDS, PLACEABLE, RECIPES, REACH, USE_R, WEAPONS, WEAR
 
 DIRS = ("N", "E", "S", "W")
@@ -73,8 +73,7 @@ def wanted(obs, goal) -> str | None:
     if goal.kind in ("gather", "ask"):
         return goal.item
     if goal.kind == "craft" and goal.item in RECIPES:
-        inv = obs["self"].get("inventory", {})
-        return next((k for k, n in RECIPES[goal.item].inputs.items() if inv.get(k, 0) < n), None)
+        return next(iter(short(RECIPES[goal.item], obs["self"].get("inventory", {}))), None)
     return None
 
 
@@ -219,7 +218,7 @@ def legal(obs: dict, facing: str = "S", social=None, goal=None) -> np.ndarray:
             m[i] = bool(inv.get(arg)) and me.get("hunger", 0) < FOOD_MAX
         elif kind == "craft":
             r = RECIPES[arg]
-            m[i] = all(inv.get(k, 0) >= n for k, n in r.inputs.items()) and (not r.station or _STATION_CH[r.station] in near)
+            m[i] = not short(r, inv) and (not r.station or _STATION_CH[r.station] in near)
         elif kind == "water":
             m[i] = bool(inv.get("watering_can"))
         elif kind == "sleep":

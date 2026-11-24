@@ -57,3 +57,19 @@ def test_one_distance_the_servers():
                         {"kind": "agent", "name": "Near", "dx": 5, "dy": 0}]}
     assert [p["name"] for p in F.people(obs)] == ["Near", "Far"]
     assert F.is_creature("a tusker") and F.is_creature("tusker#7") and not F.is_creature("Mira")
+
+
+def test_a_pile_on_the_ground_is_seen_by_the_body_and_the_words():
+    from nexel_agent.rl.core import SimEnv
+    from nexel_agent.rl.encode import CHAR_ID, encode
+    env = SimEnv(ep_ticks=200)
+    env.reset(7)
+    sim, a = env.sim, env.a
+    x, y = next((a.x + dx, a.y + dy) for dx in range(2, 8) for dy in range(-3, 4) if sim.world.block(a.x + dx, a.y + dy) == "none")
+    sim.add_items(x, y, {"meat": 2})
+    obs = sim.observe(a)
+    assert F.ground(obs) == [(x - a.x, y - a.y, {"meat": 2})]
+    assert (encode(obs)["grid"] == CHAR_ID["$"]).sum() == 1              # (the body sees a pile, not what it is)
+    now = Now(a.name)
+    now.see(obs)
+    assert f"2 meat on the ground {F.compass(x - a.x, y - a.y)}" in now.text()

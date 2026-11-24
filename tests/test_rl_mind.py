@@ -45,7 +45,7 @@ def test_facts_in_goal_aims_and_allies_out(tmp_path):
     assert mem["aims"] == ["bed", "door"] and mem["people"]["Mira"]["record"] == {"gave you berries": 1}   # (no model notes)
     assert again.aims == ["bed", "door"]
     asyncio.run(again.think(OBS))
-    assert "Your aims: bed (lacks" in again.http.sent[0]["messages"][1]["content"]
+    assert "Your aims: bed (you have 0; made from" in again.http.sent[0]["messages"][1]["content"]
 
 
 def test_a_bad_reply_keeps_the_goal(tmp_path):
@@ -161,3 +161,46 @@ def test_records_are_outcomes_only(monkeypatch):
     now.see({"self": {"hp": 20}, "entities": [mira], "events": []})
     assert now.relations["Mira"]["record"] == {"asked you for stone": 1, "you asked them for wood": 1, "you gave them stone": 2,
                                                "did not give you the wood you asked for": 1}
+
+
+def test_what_lies_about_and_the_whole_pack_are_facts():
+    from nexel_agent.rl.voice import Now
+    now = Now("Rook")
+    pack = {f"item{i}": 20 - i for i in range(12)} | {"wood": 1}
+    now.see({"self": {"hp": 20, "hunger": 20, "inventory": pack},
+             "items": [{"dx": 0, "dy": 5, "items": {"wood": 3}}, {"dx": 2, "dy": 0, "items": {"meat": 2, "fiber": 1}}]})
+    s = now.text()
+    assert "2 meat, 1 fiber on the ground 2 tiles E; 3 wood on the ground 5 tiles S" in s       # (nearest first)
+    assert "You carry 20 item0, 19 item1" in s and ", 1 wood." in s                            # (never cut)
+    now.see({"self": {"hp": 20, "hunger": 20, "inventory": {}}})
+    assert "You carry nothing." in now.text() and "nothing on the ground" in now.text()
+
+
+def test_what_a_thing_takes_is_the_games_own_recipe():
+    from megastructure.tiles import RECIPES
+    from nexel_agent.rl.facts import counted, needs
+    sword, ingot = RECIPES["sword"], RECIPES["ingot"]
+    obs = {"self": {"inventory": {"wood": 5}, "stations": []}}
+    s = needs("sword", obs)
+    assert s.startswith(f"you have 0; made from {counted(sword.inputs)} at a {sword.station}; you lack ")
+    assert f"(ingot is made from {counted(ingot.inputs)} at a {ingot.station})" in s
+    have = {k: 9 for k in sword.inputs}
+    assert needs("sword", {"self": {"inventory": have, "stations": []}}).endswith(f"no {sword.station} in reach")
+    assert needs("sword", {"self": {"inventory": have, "stations": [sword.station]}}).endswith("you can make it now")
+    assert needs("wood", obs, ("wood",)) == "you have 5, no recipe makes it"
+    assert needs("good_hoe", obs, ("wood",)).endswith("no item you know goes by that name")
+
+
+def test_what_someone_told_it_is_kept(tmp_path):
+    reply = ('{"goal": "free", "aims": ["good_hoe"], "learned": {"good hoe": {"by": "mira", "what": "just a hoe, 2 wood 1 stone"},'
+             ' "sword": {"by": "Nobody", "what": "made up"}}}')
+    m = Mind("Rook", "", "http://x", FakeHTTP(reply), tmp_path / "memory.json")
+    m.now.see(OBS)
+    asyncio.run(m.think(OBS))
+    assert m.told == {"good_hoe": 'Mira: "just a hoe, 2 wood 1 stone"'}      # (from someone it saw only)
+    again = Mind("Rook", "", "http://x", FakeHTTP("{}"), tmp_path / "memory.json")
+    assert "told" not in again.relations and again.told == m.told
+    asyncio.run(again.think(OBS))
+    facts = again.http.sent[0]["messages"][1]["content"]
+    assert 'What people told you: good_hoe (Mira: "just a hoe, 2 wood 1 stone").' in facts
+    assert "Your aims: good_hoe (you have 0, no recipe makes it" in facts

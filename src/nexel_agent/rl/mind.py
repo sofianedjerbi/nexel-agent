@@ -2,8 +2,9 @@
 to, asked, hit, given something) one small local model is given the facts - what is happening to it now (the same
 text the words get: rl/voice.py Now), what it carries, its own standing aims and how far it is from each, the goal it
 is on and since when, what happened between it and each person (outcomes only) - and answers with JSON: the next goal
-for the policy, who with, what item, a line to say, its aims, who it calls an ally; aims, allies and the records are
-kept in memory.json across sessions. Whether to do what someone asks, to refuse, to team up or to
+for the policy, who with, what item, a line to say, its aims, who it calls an ally, what someone told it a thing
+takes (the game's own recipes it reads itself; a person is who it asks for the rest); aims, allies, the records and
+what it was told are kept in memory.json across sessions. Whether to do what someone asks, to refuse, to team up or to
 break off is the model's call from those facts; nothing here says what to do when. The policy pursues the goal and
 answers danger by itself, at its own pace (rl/live.py)."""
 
@@ -13,22 +14,18 @@ import time
 from pathlib import Path
 
 from megastructure.tiles import RECIPES
-from .facts import Attack, Give, Say, events, people
+from .facts import Attack, Give, Say, events, needs, people, short
 from .goals import KINDS, Goal
-from .voice import CHAT_STYLE, Now
+from .voice import CHAT_STYLE, THOUGHT_TOKENS, Now
 
 THINK_S = 20.0             # (the model it asks: rl/voice.py MODEL, the same server as the words)
 GOALS_DOC = ("Goals: gather (an item), craft (an item), give (an item, to a person), ask (a person, for an item), "
              "stay (with a person), help (a person, in a fight), avoid (a person), free (no goal)")
 
 
-def lacks(item: str, have: dict) -> str:
-    """How far it is from owning `item`: had, or what its recipe still lacks."""
-    r = RECIPES.get(item)
-    if have.get(item) or not r:
-        return f"you have {have.get(item, 0)}" + ("" if r else ", no recipe makes it")
-    miss = [f"{n - have.get(k, 0)} {k}" for k, n in r.inputs.items() if have.get(k, 0) < n]
-    return "lacks " + ", ".join(miss) if miss else "you can make it now"
+def item_name(s) -> str:
+    """An item as the game spells it ("Stone Block" is stone_block)."""
+    return str(s or "").strip().lower().replace(" ", "_")
 
 
 def goal_text(g: Goal) -> str:
@@ -41,9 +38,10 @@ class Mind:
         self.path.parent.mkdir(parents=True, exist_ok=True)      # (its notes, thoughts and timings go there)
         mem = json.loads(self.path.read_text()) if self.path.exists() else {}
         self.aims = list(mem.get("aims", []))                  # what it wants to own or build, its own choice
+        self.told = dict(mem.get("told", {}))                  # item: what a person told it that takes, in their words
         self.now = now or Now(name)       # (what is happening to it: fed by the live body; it keeps the records)
         self.relations = self.now.relations                  # name: {ally, record}
-        self.relations.update(mem.get("people", {k: v for k, v in mem.items() if k != "aims"}))
+        self.relations.update(mem.get("people", {k: v for k, v in mem.items() if k not in ("aims", "told")}))
         self.goal, self.goal_at = Goal(), time.monotonic()
         self.last, self.salient, self.busy = 0.0, False, False
         self.to_say: str | None = None
@@ -72,20 +70,24 @@ class Mind:
         return not self.busy and (self.salient or time.monotonic() - self.last >= THINK_S)
 
     def facts(self, obs: dict) -> str:
-        """What is happening now (rl/voice.py Now: the same text the words get), then the planner's own: the pack, the
-        goal, what it could make, an open ask, the people it knows who are not here."""
-        have = obs["self"].get("inventory", {})
-        inv = ", ".join(f"{k} {v}" for k, v in sorted(have.items(), key=lambda kv: -kv[1])[:10]) or "nothing"
-        close = sorted((sum(max(0, n - have.get(k, 0)) for k, n in r.inputs.items()), name) for name, r in RECIPES.items()
-                       if name not in have)
-        close = [f"{name} ({lacks(name, have)})" for miss, name in close if 0 < miss <= 2][:5]
-        lines = [self.now.text(), f"You carry {inv}.",
-                 ("Your aims: " + "; ".join(f"{a} ({lacks(a, have)})" for a in self.aims) + "." if self.aims
+        """What is happening now (rl/voice.py Now: the same text the words get, the pack in it), then the planner's own:
+        its aims and what each takes (the game's recipes: facts.needs), the goal, what it could make, what people told
+        it, an open ask, the people it knows who are not here."""
+        me = obs["self"]
+        have, known = me.get("inventory", {}), self.now.items
+        close = sorted((sum(short(r, have).values()), name) for name, r in RECIPES.items() if name not in have)
+        close = [f"{name} ({needs(name, obs)})" for miss, name in close if 0 < miss <= 2][:5]
+        lines = [self.now.text(),
+                 ("Your aims: " + "; ".join(f"{a} ({needs(a, obs, known)})" for a in self.aims) + "." if self.aims
                   else "You have set yourself no aims yet."),
                  (f"Your goal now: {goal_text(self.goal)}, set {time.monotonic() - self.goal_at:.0f} s ago."
                   if self.goal.kind != "free" else "You have no goal now.")]
+        if me.get("craftable"):
+            lines.append("Your pack has enough to make: " + ", ".join(list(me["craftable"])[:8]) + ".")
         if close:
             lines.append("Things you could make with a little more: " + "; ".join(close) + ".")
+        if self.told:
+            lines.append("What people told you: " + "; ".join(f"{k} ({v})" for k, v in list(self.told.items())[-6:]) + ".")
         if self.asks:
             lines.append(self.asks + ".")
         here = {p.get("name") for p in people(obs)}
@@ -98,10 +100,12 @@ class Mind:
     def messages(self, obs: dict) -> list:
         sys_ = (f"You are {self.name}, a player in a survival sandbox game. Your character: {self.persona}\n"
                 "Your body plays by itself (moving, gathering, crafting, fighting back); you choose what it is after. "
-                f"{GOALS_DOC}. Reply with JSON only: "
+                f"{GOALS_DOC}. The other players know the game too: what a thing takes, where it is found; your line can ask them. "
+                "Reply with JSON only: "
                 '{"aims": ["1 to 3 items you want to own or build, from your character (kept: repeat them, or change them)"], '
                 '"goal": "gather|craft|give|ask|stay|help|avoid|free", "with": "a name you see, or empty", "item": "a game item name, or empty", "say": "a short chat line or empty", '
-                '"relation_update": {"PERSON": {"ally": true|false}}}. '
+                '"relation_update": {"PERSON": {"ally": true|false}}, '
+                '"learned": {"ITEM": {"by": "who told you", "what": "what they said it takes or where it is found, short"}}}. '
                 "The line you say, if any: " + CHAT_STYLE)
         return [{"role": "system", "content": sys_}, {"role": "user", "content": self.facts(obs) + "\n/no_think"}]
 
@@ -110,10 +114,10 @@ class Mind:
         try:
             msgs = self.messages(obs)
             if self.voice is not None:
-                out, timing = await self.voice.post(msgs, 100, words=False)
+                out, timing = await self.voice.post(msgs, THOUGHT_TOKENS, words=False)
             else:
                 r = await self.http.post(self.url, timeout=40, json={"model": "default_model", "messages": msgs,
-                                                                     "max_tokens": 100, "temperature": 0.7})
+                                                                     "max_tokens": THOUGHT_TOKENS, "temperature": 0.7})
                 out, timing = r.json()["choices"][0]["message"]["content"] or "", {}
             with open(self.log, "a") as f:
                 f.write(json.dumps({"t": round(time.time(), 1), "facts": msgs[1]["content"].removesuffix("\n/no_think"), "reply": out, **timing}) + "\n")
@@ -129,17 +133,21 @@ class Mind:
         kind = kind if kind in KINDS else "free"
         who = str(d.get("with") or "").strip()
         who = self.names.get(who.lower(), who) or None               # (the name as the game spells it)
-        g = Goal(kind, (str(d.get("item") or "").strip().lower().replace(" ", "_") or None), who)
+        g = Goal(kind, item_name(d.get("item")) or None, who)
         if (g.kind, g.item, g.person) != (self.goal.kind, self.goal.item, self.goal.person):
             self.goal, self.goal_at = g, time.monotonic()
             self.stats["goals"][kind] = self.stats["goals"].get(kind, 0) + 1
         say = str(d.get("say") or "").strip()
         self.to_say = say[:120] or None
         if isinstance(d.get("aims"), list) and d["aims"]:
-            self.aims = [str(a).strip().lower().replace(" ", "_") for a in d["aims"][:3] if str(a).strip()]
+            self.aims = [item_name(a) for a in d["aims"][:3] if item_name(a)]
         for who, upd in (d.get("relation_update") or {}).items():
             who = self.names.get(str(who).lower())              # (people it has seen only)
             if isinstance(upd, dict) and who and "ally" in upd:
                 self.relations.setdefault(who, {})["ally"] = bool(upd["ally"])
+        for item, t in (d.get("learned") or {}).items():
+            by = self.names.get(str(t.get("by") or "").lower()) if isinstance(t, dict) else None   # (people it has seen only)
+            if by and by != self.name and item_name(item) and str(t.get("what") or "").strip():
+                self.told[item_name(item)] = f'{by}: "{str(t["what"]).strip()[:80]}"'
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(json.dumps({"aims": self.aims, "people": self.relations}, indent=1))
+        self.path.write_text(json.dumps({"aims": self.aims, "people": self.relations, "told": self.told}, indent=1))

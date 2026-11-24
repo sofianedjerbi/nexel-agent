@@ -1,7 +1,7 @@
 """The live body's words: one small local model, one request at a time, chat lines first (a planner thought waits
 for them). Every prompt (the words, the planner: rl/mind.py) is built on one text, Now.text(): what is happening to
-it now - health and food and how they went, who is near and what they did, what its body did, what it got or lost,
-what was said. Lines heard while it is answering join the next answer: a burst gets one reply. The model's reply -
+it now - health and food and how they went, what it carries, who is near and what they did, what lies on the ground,
+what its body did, what it got or lost, what was said. Lines heard while it is answering join the next answer: a burst gets one reply. The model's reply -
 possibly nothing: it chooses - is said. The policy still chooses when to start talk by itself (rl/live.py). Every
 call is timed into latency.jsonl."""
 
@@ -14,7 +14,8 @@ from collections import Counter, deque
 from itertools import groupby
 from pathlib import Path
 
-from .facts import HOSTILE, Attack, Craft, Give, Say, compass, counted, dist, events, is_creature, named, people, plain, told
+from .facts import (HOSTILE, Attack, Craft, Give, Say, compass, counted, dist, events, ground, is_creature, named, pack,
+                    people, plain, told)
 
 # (one style for every line it says: the words here, the planner's line in rl/mind.py)
 CHAT_STYLE = ("Type the way people really type in a game chat: mostly lowercase, capitals only now and then, short "
@@ -22,7 +23,7 @@ CHAT_STYLE = ("Type the way people really type in a game chat: mostly lowercase,
               "never formal or robotic. You have your own things going on: friendly and easy, but not needy, you never "
               "fish for attention or keep the talk going for its own sake.")
 
-WORDS_TOKENS, THOUGHT_TOKENS = 30, 100
+WORDS_TOKENS, THOUGHT_TOKENS = 30, 140         # (a thought: its JSON, and what it learned, if anything)
 # The model to serve for the words and the planner (rl_runs/bench, 2026-11-23, with training at 4 envs): the 30B-A3B
 # answered fastest (p90 0.6 s), never off-topic, and planned as well as any; the 8B broke the planner's JSON at 100
 # tokens (19 of 20). It needs ~16 GB: with less free, the 4B (p90 0.8 s) is the fallback.
@@ -143,7 +144,7 @@ class Now:
         ago = f"{now - t0:.0f} s ago"
         out = [f"You: health {me.get('hp')}/20" + (f" (was {hp0} {ago})" if hp0 != me.get("hp") else "")
                + f", food {me.get('hunger')}/20" + (f" (was {food0} {ago})" if food0 != me.get("hunger") else "")
-               + (f". {obs['time']}." if obs.get("time") else ".")]
+               + (f". {obs['time']}." if obs.get("time") else "."), f"You carry {pack(obs)}."]
         beings = sorted(obs.get("entities", []), key=dist)
         near = []
         for kind in dict.fromkeys(b["kind"] for b in beings if b.get("kind") != "agent"):
@@ -153,7 +154,8 @@ class Now:
         for b in people(obs):
             near.append(f"{b.get('name')} {compass(b['dx'], b['dy'])}, health {b.get('hp')}, holding {b.get('holding') or 'nothing'}, "
                         f"doing: {b.get('doing') or 'idle'} (so far: {self.person(b.get('name'))})")
-        out.append("Near you: " + ("; ".join(near) if near else "nobody, no creature") + ".")
+        near += [f"{counted(items)} on the ground {compass(dx, dy)}" for dx, dy, items in ground(obs)[:5]]
+        out.append("Near you: " + ("; ".join(near) if near else "nobody, no creature, nothing on the ground") + ".")
         seen = Counter(p for _, e in self.past if (p := self.event(e)))
         if seen:
             out.append(f"In the last {WINDOW_S:.0f} s: " + "; ".join(p + (f" x{n}" if n > 1 else "") for p, n in seen.items()) + ".")
@@ -210,7 +212,7 @@ class Voice:
                      "tok_s": round((u.get("completion_tokens") or 0) / max(1e-3, t2 - t1), 1)}
 
     def facts(self, heard: list, doing: str = "") -> str:
-        """The lines heard first (all of a burst), then what is happening now; of the pack only the items the lines name."""
+        """The lines heard first (all of a burst), then what is happening now (the whole pack in it)."""
         by = {}
         for who, text, _ in heard:
             by.setdefault(who, []).append(f'"{text}"')
@@ -218,10 +220,6 @@ class Voice:
         out.append(self.now.text())
         if doing:
             out.append(f"You are after: {doing}.")
-        inv = (self.now.obs.get("self") or {}).get("inventory") or {}
-        asked = named(" ".join(t for _, t, _ in heard), self.now.items)
-        if asked:
-            out.append("You carry " + ", ".join(f"{inv.get(k, 0)} {k}" for k in asked[:4]) + ".")
         return "\n".join(out)
 
     async def line(self, heard: list, doing: str = "", kind="reply") -> str:
