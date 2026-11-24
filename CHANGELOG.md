@@ -5,6 +5,14 @@ Written by [python-semantic-release](https://python-semantic-release.readthedocs
 
 <!-- version list -->
 
+## v0.9.0 (2026-11-24)
+
+### Features
+
+- **rl**: The observation shows what it has already done this life
+  ([`f3a2d72`](https://github.com/sofianedjerbi/nexel-agent/commit/f3a2d72c5ec5c980b6b49751f5b44df130fff0db))
+
+
 ## v0.8.0 (2026-11-24)
 
 ### Features
