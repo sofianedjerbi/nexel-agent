@@ -5,6 +5,14 @@ Written by [python-semantic-release](https://python-semantic-release.readthedocs
 
 <!-- version list -->
 
+## v0.5.1 (2026-11-24)
+
+### Bug Fixes
+
+- **rl**: Close three reward holes behind first strikes
+  ([`0b91419`](https://github.com/sofianedjerbi/nexel-agent/commit/0b9141988b7c44c612bc90fac4bf79127e0d9a3d))
+
+
 ## v0.5.0 (2026-11-23)
 
 ### Features

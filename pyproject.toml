@@ -1,6 +1,6 @@
 [project]
 name = "nexel-agent"
-version = "0.5.0"
+version = "0.5.1"
 description = "The AI player of Nexel Worlds: a trained body (reinforcement learning), a local model that plans and talks"
 readme = "README.md"
 license = "MIT"
