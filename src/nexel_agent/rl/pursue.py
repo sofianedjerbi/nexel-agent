@@ -5,7 +5,8 @@ own path finding (move_to).
 
 - gather X: a pile with X on the ground (walk there, pick it up), else the nearest block in view that drops X (walk
   beside it, dig it with the right tool from the pack);
-- craft X: what X still lacks, one step down (an input that is made itself is crafted first, else gathered); its
+- craft X: what X still lacks, one step down, the first it can get at now (gathered where something in view gives
+  it - stone from a rock, though stone is made too -, else crafted); its
   station within reach (walk to one in view; carried, put down; else make one); then the craft;
 - ask, give, stay (a person): walk toward them, where they are or were last seen; in reach, the ask or the give.
 
@@ -64,11 +65,14 @@ def craft(obs, item, ground_ch, tool_for, dirs, depth=0, blocked=()):
     if r is None or depth > DEPTH:
         return None
     inv = obs["self"].get("inventory", {})
-    lack = next((k for k, n in r.inputs.items() if inv.get(k, 0) < n), None)
-    if lack is not None:
-        if lack in RECIPES:
-            return craft(obs, lack, ground_ch, tool_for, dirs, depth + 1, blocked)
-        return gather(obs, lack, ground_ch, tool_for, dirs, blocked)
+    lacks = [k for k, n in r.inputs.items() if inv.get(k, 0) < n]
+    for lack in lacks:        # (what it can get at now - the stone in view while no tree is -: dug or picked up
+        step = gather(obs, lack, ground_ch, tool_for, dirs, blocked)                  # where something here gives it,
+        step = step or craft(obs, lack, ground_ch, tool_for, dirs, depth + 1, blocked)     # else made)
+        if step is not None:
+            return step
+    if lacks:
+        return None
     if r.station:
         ch = STATION_CH[r.station]
         at = next(iter(_cells(obs, {ch}, blocked)), None)
