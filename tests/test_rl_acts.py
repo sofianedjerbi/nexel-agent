@@ -70,3 +70,14 @@ def test_reading_out_the_pack_goes_unsaid_unless_asked():
     assert asyncio.run(v.speak("stone_block 26, dirt 13", reply=True)) is None
     v.asked_pack = True                                                # (someone asked what it carries)
     assert asyncio.run(v.speak("stone_block 26, dirt 13", reply=True)) is not None and said == ["stone_block 26, dirt 13"]
+
+
+def test_a_named_thing_comes_with_the_games_recipe():
+    """#23: "how do i make a pickaxe?" - the words get what the game says a pickaxe takes, not a guess."""
+    http = FakeHTTP("wood and stone, at a bench")
+    now = Now("Rook", ITEMS + ("pickaxe", "fiber", "workbench"))
+    now.see({"self": {"inventory": {"wood": 2}}, "entities": [], "events": []})
+    v = Voice("Rook", "", "http://x", http, "/dev/null", now)
+    asyncio.run(v.line([("Mira", "how do i make a pickaxe?", 0.0)]))
+    facts = http.sent[0]["messages"][1]["content"]
+    assert "What pickaxe takes (the game's recipe): you have 0; made from 2 wood, 3 stone, 1 fiber at a workbench" in facts

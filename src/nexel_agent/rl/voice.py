@@ -16,7 +16,8 @@ from pathlib import Path
 
 from nexel_worlds.sim.constants import sec
 from . import acts
-from .facts import dist, people
+from nexel_worlds.tiles import RECIPES
+from .facts import dist, named, needs, people
 from .now import Now
 from .social import TALK_GAP
 
@@ -113,6 +114,9 @@ class Voice:
             if talk:
                 out.append(f"Your talk with {who} before that: " + " | ".join(
                     f'{"you" if s == self.name else s}: "{x}"' for s, x in talk))
+        asked = [k for _, text, _ in heard for k in named(text, self.now.items) if k in RECIPES]
+        for item in dict.fromkeys(asked).keys() if heard else ():      # (a thing named: what the game says it takes)
+            out.append(f"What {item} takes (the game's recipe): {needs(item, self.now.obs)}.")
         if self.mine:
             out.append("Your own last lines: " + " | ".join(f'"{x}"' for _, x in self.mine) + " (do not say one again).")
         if doing:
@@ -176,6 +180,18 @@ class Voice:
         for who in [to] if to else [p.get("name") for p in people(self.now.obs) if dist(p) <= NEAR_R]:
             self.note(who, self.name, line)
         return await self.out(line)
+
+    def news(self, what: str, doing=lambda: ""):
+        """Something it may want to say a word about (someone it knows just joined): the model is asked, and may well
+        say nothing; the line keeps the pace of a line of its own."""
+        if self.answering:
+            return
+
+        async def go():
+            out = await self.line([], f"{doing()}. Just now: {what}".lstrip(". "), kind="news")
+            if out:
+                await self.speak(out)
+        asyncio.get_running_loop().create_task(go())
 
     async def answer(self, doing):
         try:

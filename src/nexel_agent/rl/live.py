@@ -5,8 +5,7 @@ the policy chooses when to speak (say) and what to hand over (give); with --mode
 (rl/voice.py), else a plain short line. The model to serve there: voice.MODEL (Qwen3-30B-A3B-Instruct-2507, 4-bit), or
 voice.FALLBACK_MODEL (the 4B) on a Mac with less than ~20 GB free.
     python -m mlx_lm.server --model mlx-community/Qwen3-30B-A3B-Instruct-2507-4bit --port 8080
-    nexel-agent --name Rook          # the shipped models/rook.npz, the game at :7777, words from :8080
-(`python -m nexel_agent` and `python -m nexel_agent.rl.live` are the same command.)"""
+    nexel-agent --name Rook          # the shipped models/rook.npz, the game at :7777, words from :8080 (= python -m nexel_agent)"""
 
 import argparse
 import asyncio
@@ -22,7 +21,7 @@ from .achieve import Ledger, from_wire
 from .brain import Brain
 from .core import split
 from .encode import ACTIONS, ITEMS, N_NEAR, action_name, encode, legal, to_command
-from .facts import HOSTILE, Say, dist, events
+from .facts import HOSTILE, Join, Say, dist, events
 from .social import SocialMemory
 from .mind import goal_text
 from .now import Now
@@ -40,12 +39,11 @@ class LiveBody:
         self.a, self.pol, self.rng = a, NumpyPolicy(a.policy), np.random.default_rng(a.seed)
         self.facing, self.last, self.last_ok, self.hurt = "S", 0, 0.0, 0.0
         self.stats = {"decisions": 0, "acts": 0, "fails": 0, "interrupted": 0, "idle": 0, "crafted": 0, "placed": 0,
-                      "deaths": 0, "hits": 0, "won": 0, "lost": 0, "kills": 0, "chat": 0}
+                      "deaths": 0, "hits": 0, "won": 0, "lost": 0, "kills": 0, "chat": 0, "said": 0, "gave": 0}
         self.crafts, self.reactions, self.foes, self.fails_by = set(), {}, {}, {}
         self.results: list = []                                 # (the actions that came back since the last look)
         self.ledger, self.made, self.pack = Ledger(), {}, None      # what it has done this life, as in the sim (rl/achieve.py)
         self.social, self.social_done, self.http, self.game = SocialMemory(a.name, ITEMS), set(), None, None
-        self.stats.update(said=0, gave=0)
         self.tick, self.me, self.obs_entities, self.fighting = 0, {}, [], False
         self.mind = self.voice = None                       # (the LLM planner that sets goals: rl/mind.py; words: voice.py)
         self.now = Now(a.name, ITEMS)                            # (what is happening to it, for every prompt: rl/voice.py)
@@ -125,37 +123,35 @@ class LiveBody:
             await asyncio.sleep(POLL_S)
 
     def listen(self, game, obs):
-        """Each observation: into what is happening now; someone spoke: a salient event, straight to the voice
-        (rl/voice.py: a burst of lines gets one answer), whose reply, if any, is said."""
+        """Each observation: into what is happening now; a line heard, or someone it knows joining: to the voice."""
         self.now.see(obs)
         for ev in events(obs) if self.voice else ():
             if isinstance(ev, Say) and ev.src != self.a.name:
                 self.voice.hear(ev.src, ev.text[:200], self.doing)
+            elif isinstance(ev, Join) and ev.name != self.a.name and ev.name in self.now.relations:
+                self.voice.news(f"{ev.name}, whom you know, joined the game", self.doing)     # (it may greet, or not)
 
     async def say(self, line):
-        """The one place a line goes to the game (with a voice, through Voice.speak: its pace, its record)."""
+        """The one place a line goes to the game (with a voice, through Voice.speak)."""
         r = await self.game.act("say", text=line)
         self.social.my_last = self.tick
         self.stats["chat"] += 1
         return r
 
     def heard(self, who, kind, item):
-        """What a line said to it does, as the words model told it (rl/acts.py): an ask is recorded, by the social
-        memory (the policy's flag, the give) and in what is happening (the planner's records)."""
+        """What a line said to it does, as the words model told it (rl/acts.py): an ask is recorded (social, now)."""
         if kind == "ask" and item:
             self.social.heard_ask(who, item, self.tick)
             self.now.ask(who, self.a.name, item)
 
-    def ask_to(self) -> str | None:
-        """Whom the policy's line is to: the goal's person."""
+    def ask_to(self) -> str | None:                    # (whom the policy's line is to: the goal's person)
         return self.mind.goal.person if self.mind else None
 
-    def doing(self, ask=None) -> str:
+    def doing(self, ask=None) -> str:                  # (what it is after, for the words)
         return f"some {ask}" if ask else goal_text(self.mind.goal) if self.mind else ""
 
     async def words(self, ask=None, plain="hey") -> str:
-        """The policy chose to speak (or to ask for something); the words are the LLM's, from the same facts - or none
-        (it may stay silent; an answer under way is its turn already)."""
+        """The policy chose to speak (or ask): the words are the LLM's, or none (an answer under way is its turn)."""
         if not self.voice:
             return plain if ask else "hey"
         if ask:
