@@ -67,7 +67,7 @@ def test_voice_lines_timed_and_silence_kept(tmp_path):
 
 
 def test_places_are_only_real_ones():
-    from nexel_agent.rl.voice import places
+    from nexel_agent.rl.now import places
     obs = {"self": {"x": 0, "y": 0, "spawn": [0, 20], "in_cave": False}, "grid": ["~T.", ".@."],
            "legend": {"~": "water", "T": "tree", ".": "grass", "@": "you"}}
     assert places(obs, {(5, -5): "mira's camp"}) == 'a sign "mira\'s camp" 7 tiles NE; your spawn point 20 tiles S; in sight: water, tree'
@@ -137,15 +137,17 @@ def test_a_burst_of_lines_gets_one_reply(tmp_path):
 
     async def say(line):
         said.append(line)
+        return {"ok": True}
+    v.out = say
 
     async def burst():
-        for text in ("wanna fight mossback", "?", "hello??"):
-            v.hear("doben00", text, say)
+        for text in ("rook wanna fight mossback", "?", "hello??"):
+            v.hear("doben00", text)
         while v.answering:
             await asyncio.sleep(0.01)
     asyncio.run(burst())
     assert len(http.sent) == 1 and said == ["nah"]
-    assert 'doben00 says to you: "wanna fight mossback" then "?" then "hello??"' in http.sent[0]["messages"][1]["content"]
+    assert 'doben00 says to you: "rook wanna fight mossback" then "?" then "hello??"' in http.sent[0]["messages"][1]["content"]
 
 
 def test_records_are_outcomes_only(monkeypatch):

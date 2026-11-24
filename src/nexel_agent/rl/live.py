@@ -25,7 +25,8 @@ from .encode import ACTIONS, ITEMS, N_NEAR, action_name, encode, legal, to_comma
 from .facts import HOSTILE, Say, dist, events
 from .social import SocialMemory
 from .mind import goal_text
-from .voice import Now, Voice
+from .now import Now
+from .voice import Voice
 
 POLICY = Path(__file__).resolve().parents[3] / "models/rook.npz"     # (the shipped body: models/README.md)
 MODEL_URL = "http://127.0.0.1:8080/v1/chat/completions"             # (the shared local model server, as players.py starts it)
@@ -91,9 +92,12 @@ class LiveBody:
             if self.fighting and r is not None and not r.get("ok"):
                 break                                  # (the fight is over: the target fell or got away)
             if step[0] == "say":                       # the words: the LLM's (rl/voice.py), or the plain line
-                step = ("say", {"text": await self.words(step[1].get("ask"), step[1]["text"])})
-                if not step[1]["text"]:
-                    continue                           # (it chose to say nothing)
+                step = ("say", {**step[1], "text": await self.words(step[1].get("ask"), step[1]["text"])})
+                r = await (self.voice.speak(step[1]["text"], self.ask_to()) if self.voice else self.say(step[1]["text"]))
+                if r is None:
+                    continue                           # (it chose to say nothing, or the speaker held it back)
+                self.done("say", step[1], r)
+                continue
             r = await game.act(step[0], **step[1])
             self.done(step[0], step[1], r)
         self.fighting = False
@@ -126,12 +130,18 @@ class LiveBody:
         self.now.see(obs)
         for ev in events(obs) if self.voice else ():
             if isinstance(ev, Say) and ev.src != self.a.name:
-                self.voice.hear(ev.src, ev.text[:200], self.say, self.doing)
+                self.voice.hear(ev.src, ev.text[:200], self.doing)
 
     async def say(self, line):
-        await self.game.act("say", text=line)
+        """The one place a line goes to the game (with a voice, through Voice.speak: its pace, its record)."""
+        r = await self.game.act("say", text=line)
         self.social.my_last = self.tick
         self.stats["chat"] += 1
+        return r
+
+    def ask_to(self) -> str | None:
+        """Whom the policy's line is to: the goal's person."""
+        return self.mind.goal.person if self.mind else None
 
     def doing(self, ask=None) -> str:
         return f"some {ask}" if ask else goal_text(self.mind.goal) if self.mind else ""
@@ -145,7 +155,6 @@ class LiveBody:
             self.now.ask(self.a.name, None, ask)
         if self.voice.answering:
             return ""
-        self.stats["chat"] += 1
         return await self.voice.line([], self.doing(ask), kind="start")
 
     async def play(self):
@@ -158,6 +167,7 @@ class LiveBody:
             self.mind.where = self.social.where                 # (where it last saw each person: the body's own memory)
             self.voice = self.mind.voice = Voice(self.a.name, self.a.persona, self.a.model_url, self.http,
                                                  self.mind.path.with_name("latency.jsonl"), self.now)
+            self.voice.out = self.say
         t_end = time.monotonic() + self.a.minutes * 60 if self.a.minutes else math.inf
         async with Client(self.a.game) as game:
             self.game = game
@@ -182,10 +192,9 @@ class LiveBody:
                         self.mind.asks = (f"{self.social.asked_by} asked you for {ask}; you carry "
                                           f"{me.get('inventory', {}).get(ask, 0)} {ask}") if ask else ""
                         asyncio.create_task(self.mind.think(obs))
-                    if self.mind.to_say and self.social.can_talk(obs["tick"]):    # (its own line: the same chat cooldown)
+                    if self.mind.to_say:                    # (its own line: through the one speaker, at its pace)
                         line, self.mind.to_say = self.mind.to_say, None
-                        asyncio.create_task(game.act("say", text=line))
-                        self.stats["said"] += 1
+                        asyncio.create_task(self.voice.speak(line, self.mind.goal.person))
                 self.hurt = max(0.0, hp - me["hp"]) if me["deaths"] == deaths else hp
                 for k, n in self.social.got_now.items():           # (given, not found)
                     self.made[k] = self.made.get(k, 0) + n

@@ -16,7 +16,8 @@ from pathlib import Path
 from nexel_worlds.tiles import RECIPES
 from .facts import Attack, Give, Say, dist, events, needs, people, short
 from .goals import KINDS, Goal, account, judge
-from .voice import CHAT_STYLE, THOUGHT_TOKENS, Now
+from .now import Now
+from .voice import CHAT_STYLE, THOUGHT_TOKENS
 
 THINK_S = 20.0             # (the model it asks: rl/voice.py MODEL, the same server as the words)
 GOALS_DOC = ("Goals: gather (an item), craft (an item), give (an item, to a person), ask (a person, for an item), "
