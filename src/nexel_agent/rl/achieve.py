@@ -66,14 +66,14 @@ class Ledger:
             r += self.unlock("place_10_kinds") if len(self.placed) >= 10 else 0
         elif tool == "eat":
             r += self.unlock(f"eat_{args.get('item')}")
-        elif tool == "attack" and args.get("with"):
-            r += self.unlock("fought_armed")                     # (a blow struck with a weapon in hand)
+        elif tool == "attack":
+            armed = bool(args.get("with"))                       # (a blow struck with a weapon in hand)
+            self.counts["blows"] = self.counts.get("blows", 0) + 1
+            self.counts["armed_blows"] = self.counts.get("armed_blows", 0) + armed
+            r += self.unlock("fought_armed") if armed else 0
             if res.get("killed"):
                 self.killed.add(int(args.get("target", -1)))
                 r += self.unlock(f"defeat_{kind}") + (self.unlock("win_hurt") if kind in HOSTILE and hp <= 10 else 0)
-        elif tool == "attack" and res.get("killed"):
-            self.killed.add(int(args.get("target", -1)))
-            r += self.unlock(f"defeat_{kind}") + (self.unlock("win_hurt") if kind in HOSTILE and hp <= 10 else 0)
         elif tool == "dig" and args.get("with") == "hoe":
             r += self.unlock("till")
         elif tool == "water" and any(t.get("ground") == "wet_tilled" for t in (res.get("changed") or {}).get("tiles", [])):

@@ -20,6 +20,14 @@ from .vec import PipeVecEnv
 ROOT = Path(__file__).resolve().parents[3] / "rl_runs"
 
 
+def gear(m: dict) -> str:
+    """Tools in a check line: spears, axes and pickaxes made per episode (first-time rates), the share of blows struck
+    armed, armour worn, and the share of moments by a bench with fiber still in the pack."""
+    t = m["top"]
+    return (f"gear=[spear {t.get('craft_spear', 0)} axe {t.get('craft_axe', 0)} pickaxe {t.get('craft_pickaxe', 0)} "
+            f"armed_blows {m['armed']} armor {t.get('wear_armor', 0)} fiber_at_bench {m['bench_fiber']}]")
+
+
 class Check(BaseCallback):
     def __init__(self, a, out: Path, eval_env, base):
         super().__init__()
@@ -71,7 +79,7 @@ class Check(BaseCallback):
                  f"ach={m['ach']} ticks={m['ticks']} deaths={m['deaths']}/{m['n']} crafts_distinct={m['crafts_distinct']} "
                  f"places={m['places']} places_distinct={m['places_distinct']} nights={m['nights']} chunks={m['chunks']} fail%={m['fail_pct']} fights={m['fights']} rival={m['visits']} social={m['social']}/6 hit_neighbour={m['hit_neighbour']} unprovoked={m['hit_neighbour_unprovoked']} first_strikes={m['first_strikes']} near_min={m['near_min']} fs/near_min={m['fs_per_near_min']} attack_picks=[{m['picks']}] said/ep={m['said']} goals=[{m['goals']}] hits={m['hits']} "
                  f"kl_mean={np.mean(self.kls) if self.kls else 0:.4f} kl_max={max(self.kls, default=0):.4f} entropy={np.mean(self.ents) if self.ents else 0:.3f} "
-                 f"fills={m.get('fills', '')} stock={m.get('stock', '')} multi={m.get('multi', '')} rooms={m['top'].get('room_built', 0)} "
+                 f"{gear(m)} fills={m.get('fills', '')} stock={m.get('stock', '')} multi={m.get('multi', '')} rooms={m['top'].get('room_built', 0)} "
                  f"train_score={tr.get('score')} train_ach={tr.get('ach')}")
         self.log("        top: " + json.dumps(m["top"]))
         self.log("        social: " + json.dumps(m["social_kinds"]))
@@ -80,8 +88,7 @@ class Check(BaseCallback):
             lk = metrics(run(ev.live_like, lambda o: pol.predict(o, deterministic=False, action_masks=np.stack(ev.live_like.masks))[0],
                             LIVE_LIKE_SEEDS))
             self.log(f"[live-like] score={lk['score']} ach={lk['ach']} deaths={lk['deaths']}/{lk['n']} crafts_distinct={lk['crafts_distinct']} "
-                     f"first_strikes={lk['first_strikes']} multi={lk['multi']} fills={lk['fills']} stock={lk['stock']} rooms={lk['top'].get('room_built', 0)} near_min={lk['near_min']} fs/near_min={lk['fs_per_near_min']} fail%={lk['fail_pct']} gear={lk['top'].get('craft_spear', 0)}/"
-                     f"{lk['top'].get('craft_axe', 0)}/{lk['top'].get('fought_armed', 0)}/{lk['top'].get('wear_armor', 0)}")
+                     f"first_strikes={lk['first_strikes']} multi={lk['multi']} fills={lk['fills']} stock={lk['stock']} rooms={lk['top'].get('room_built', 0)} near_min={lk['near_min']} fs/near_min={lk['fs_per_near_min']} fail%={lk['fail_pct']} {gear(lk)}")
         self.kls, self.ents = [], []
         if m["score"] > self.best:
             self.best, self.flat = m["score"], 0
@@ -175,6 +182,7 @@ def main():
     p.add_argument("--ent-end", type=float, default=None, help="the entropy bonus falls linearly to this by --steps")
     p.add_argument("--live-seed", type=int, default=-1, help="the live world's seed: --live-pct of the train episodes there")
     p.add_argument("--live-pct", type=int, default=20)
+    p.add_argument("--gear-pct", type=int, default=0, help="the share of train starts one step from a tool (rl/starts.py)")
     p.add_argument("--thin-pct", type=int, default=50, help="the share of train starts laid out like the live save")
     p.add_argument("--death-ends", type=int, default=1, help="0: as live, a death drops the pack and the episode goes on")
     p.add_argument("--gamma", type=float, default=0.995)
@@ -186,7 +194,7 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     ep = [f"ep_ticks={int(a.days * 12000)}", f"death_ends={a.death_ends}"] + a.env
     live = [f"live_seed={a.live_seed}", f"live_pct={a.live_pct}"] if a.live_seed >= 0 else []
-    env = PipeVecEnv(a.envs, rng_seed=hash(a.run) % 1000, env_args=ep + live + [f"thin_pct={a.thin_pct}"])
+    env = PipeVecEnv(a.envs, rng_seed=hash(a.run) % 1000, env_args=ep + live + [f"thin_pct={a.thin_pct}", f"gear_pct={a.gear_pct}"])
     ev = PipeVecEnv(a.eval_envs, env_args=ep)                                       # (held-out worlds as they are)
     ev.live_like = PipeVecEnv(a.eval_envs, env_args=ep + ["thin_pct=100"]) if a.thin_pct else None
     names_from(ev)

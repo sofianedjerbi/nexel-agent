@@ -11,7 +11,7 @@ from pathlib import Path
 
 from megastructure.sim import Simulation
 from megastructure.sim.constants import DAY_TICKS, FOOD_MAX, VIEW_R
-from . import facts
+from . import facts, starts
 from .achieve import HOSTILE, Ledger
 from megastructure.tiles import DIRS
 from .actions import RING_I
@@ -37,13 +37,14 @@ OUTCOME = {"won": "defeat_player", "fled": "escape_attack", "endured": "survive_
 class SimEnv:
     def __init__(self, ep_ticks: int = EP_TICKS, decide: int = DECIDE, rivals: int = 1, roam: int = 1,
                  live_seed: int = -1, live_pct: int = 0, folk: int = 2, goals: int = 1, death_ends: int = 1,
-                 shadow_pct: int = 30, thin_pct: int = 0, actions: int = 0, no_ring: int = 0):
+                 shadow_pct: int = 30, thin_pct: int = 0, actions: int = 0, no_ring: int = 0, gear_pct: int = 0):
         """rivals: a sparring partner (rl/rival.py); roam: start anywhere on the land within 400 tiles, not at the
         world's spawn; live_seed/live_pct: that share of the episodes in the live world's seed (its land, unaltered)."""
         self.ep_ticks, self.decide, self.rivals, self.roam = ep_ticks, decide, rivals, roam
         self.live_seed, self.live_pct, self.n_folk, self.use_goals = live_seed, live_pct, folk, goals
         self.death_ends = death_ends      # 0: as live, a death drops the pack and you wake at your spawn; the episode goes on
         self.shadow_pct = shadow_pct      # the share of episodes a neighbour stays right beside the player all along
+        self.gear_pct = gear_pct          # the share of starts one step from a tool (starts.near_a_tool)
         self.thin_pct = thin_pct          # the share of starts laid out like the live save near its players (thin_land)
         self.actions = actions or N_ACTIONS   # (an older action set: the first `actions`, the obs as it saw them)
         self.no_ring = no_ring            # (ring never legal: a control run)
@@ -56,9 +57,11 @@ class SimEnv:
         self.a = self.sim.login("Learner", "rl-token")
         self.a.hunger, self.a.sat = rng.randint(FOOD_START, FOOD_MAX), 0.0     # (rarely full, as a player found mid-game)
         if self.roam:
-            self.start_somewhere(rng)
+            starts.somewhere(self.sim, self.a, rng)
         if rng.random() * 100 < self.thin_pct:
-            self.thin_land(rng)
+            starts.thin_land(self.sim, self.a, rng)
+        if self.gear_pct and rng.random() * 100 < self.gear_pct:      # (no draw otherwise: the other starts stay as they were)
+            starts.near_a_tool(self.sim, self.a, rng)
         self.sim.tick = self.sim.tick // DAY_TICKS * DAY_TICKS + int(START * DAY_TICKS)
         self.rng = random.Random(seed * 13 + 1)
         self.rival = Rival(self.sim, self.a, seed, pick=self.pick_target) if self.rivals else None
@@ -152,6 +155,9 @@ class SimEnv:
         self.taken = {}
         near = min((math.dist((o.x, o.y), (a.x, a.y)) for o in sim.agents.values() if o is not a and o.online), default=99)
         results, L.counts["own_now"] = [], 0
+        if sim.near_block(a, "workbench", 2):               # (is fiber still in the pack when a bench is at hand?)
+            L.counts["bench_near"] = L.counts.get("bench_near", 0) + 1
+            L.counts["bench_fiber"] = L.counts.get("bench_fiber", 0) + (a.count("fiber") > 0)
         for p in [p for p in self.pending if p[0].result is not None]:
             self.pending.remove(p)
             res = p[0].result
@@ -245,24 +251,6 @@ class SimEnv:
                     pile[k] -= t
                     self.taken[k] = self.taken.get(k, 0) + t
 
-    def thin_land(self, rng, r=40):
-        """Land as players leave it near them (the live save): most trees round the start felled, and a few thickets
-        and rocks spread out, so wood, fiber and stone take travelling for."""
-        sim, a = self.sim, self.a
-        for dy in range(-r, r + 1):
-            for dx in range(-r, r + 1):
-                if sim.world.block(a.x + dx, a.y + dy) in ("tree", "fruit_tree") and rng.random() < 0.9:
-                    sim.world.set(a.x + dx, a.y + dy, block="none")
-        for block, n in (("thicket", rng.randint(3, 6)), ("rock", rng.randint(2, 4)), ("tree", rng.randint(3, 8))):
-            for _ in range(n * 10):
-                d, ang = rng.uniform(12, r), rng.uniform(0, 6.283)
-                x, y = a.x + round(d * math.cos(ang)), a.y + round(d * math.sin(ang))
-                if sim.world.block(x, y) == "none" and sim.world.ground(x, y) in ("grass", "dirt"):
-                    sim.world.set(x, y, block=block)
-                    n -= 1
-                    if n <= 0:
-                        break
-
     def pick_target(self):
         """Whom the rival goes for: now and then a neighbour near the player, else the player."""
         near = [f.a for f in self.folk if f.on and f.dist() <= 8]
@@ -275,15 +263,6 @@ class SimEnv:
         a, R = self.a, VIEW_R
         return ({c.id for c in self.sim.creatures.values() if abs(c.x - a.x) <= R and abs(c.y - a.y) <= R}
                 | {o.id for o in self.sim.agents.values() if o is not a and o.online and abs(o.x - a.x) <= R and abs(o.y - a.y) <= R})
-
-    def start_somewhere(self, rng):
-        """Somewhere on open land within 400 tiles of the spawn (a live world's players are rarely where it began)."""
-        sim, a = self.sim, self.a
-        for _ in range(40):
-            x, y = a.x + rng.randint(-400, 400), a.y + rng.randint(-400, 400)
-            if sim.world.passable(x, y) and sim.world.ground(x, y) in ("grass", "dirt"):
-                a.x, a.y, a.z = x, y, 99
-                return
 
     def summary(self, died: bool) -> dict:
         c = self.ledger.counts
