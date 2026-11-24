@@ -27,27 +27,25 @@ for _b in BLOCKS:
 STATION_CH = {b.name: b.char for b in BLOCKS}
 
 
-def _cells(obs, chars):
-    """(dx, dy) of the tiles in view showing one of `chars`, nearest first."""
-    grid = obs.get("grid") or []
-    out = [(x - VIEW_R, y - VIEW_R) for y, row in enumerate(grid) for x, ch in enumerate(row) if ch in chars]
+def _cells(obs, chars, blocked=()):
+    """(dx, dy) of the tiles in view showing one of `chars`, nearest first, less those a walk found no way to."""
+    grid, me = obs.get("grid") or [], obs["self"]
+    out = [(x - VIEW_R, y - VIEW_R) for y, row in enumerate(grid) for x, ch in enumerate(row) if ch in chars
+           and (me["x"] + x - VIEW_R, me["y"] + y - VIEW_R) not in blocked]
     return sorted(out, key=lambda d: math.hypot(*d))
 
 
-def _walk(obs, dx, dy, ground_ch):
-    """move_to the open tile beside (dx, dy) nearest the player (the thing itself may be solid, or someone)."""
-    me, grid = obs["self"], obs.get("grid") or []
-    beside = [(dx + i, dy + j) for i, j in ((0, 1), (0, -1), (1, 0), (-1, 0))
-              if abs(dx + i) <= VIEW_R and abs(dy + j) <= VIEW_R and grid[VIEW_R + dy + j][VIEW_R + dx + i] in ground_ch]
-    tx, ty = min(beside, key=lambda d: math.hypot(*d)) if beside else (dx, dy)
-    return "move_to", {"x": me["x"] + tx, "y": me["y"] + ty}
+def _walk(obs, dx, dy, ground_ch=None):
+    """move_to the thing: the server's path finding goes beside what nobody can stand on (sim/movement.py)."""
+    return "move_to", {"x": obs["self"]["x"] + dx, "y": obs["self"]["y"] + dy}
 
 
-def gather(obs, item, ground_ch, tool_for, dirs):
-    pile = next(((dx, dy) for dx, dy, items in _piles(obs) if items.get(item)), None)
+def gather(obs, item, ground_ch, tool_for, dirs, blocked=()):
+    me = obs["self"]
+    pile = next(((dx, dy) for dx, dy, items in _piles(obs) if items.get(item) and (me["x"] + dx, me["y"] + dy) not in blocked), None)
     if pile is not None:
         return ("pick_up", {}) if pile == (0, 0) else ("move_to", {"x": obs["self"]["x"] + pile[0], "y": obs["self"]["y"] + pile[1]})
-    cell = next(iter(_cells(obs, DROPS.get(item, ()))), None)
+    cell = next(iter(_cells(obs, DROPS.get(item, ()), blocked)), None)
     if cell is None:
         return None
     d = next((k for k, v in dirs.items() if v == cell), None)
@@ -61,7 +59,7 @@ def _piles(obs):
     return [(p["dx"], p["dy"], dict(p["items"])) for p in obs.get("items") or [] if p.get("items")]
 
 
-def craft(obs, item, ground_ch, tool_for, dirs, depth=0):
+def craft(obs, item, ground_ch, tool_for, dirs, depth=0, blocked=()):
     r = RECIPES.get(item)
     if r is None or depth > DEPTH:
         return None
@@ -69,16 +67,16 @@ def craft(obs, item, ground_ch, tool_for, dirs, depth=0):
     lack = next((k for k, n in r.inputs.items() if inv.get(k, 0) < n), None)
     if lack is not None:
         if lack in RECIPES:
-            return craft(obs, lack, ground_ch, tool_for, dirs, depth + 1)
-        return gather(obs, lack, ground_ch, tool_for, dirs)
+            return craft(obs, lack, ground_ch, tool_for, dirs, depth + 1, blocked)
+        return gather(obs, lack, ground_ch, tool_for, dirs, blocked)
     if r.station:
         ch = STATION_CH[r.station]
-        at = next(iter(_cells(obs, {ch})), None)
+        at = next(iter(_cells(obs, {ch}, blocked)), None)
         if at is None:
             if inv.get(r.station):
                 d = next((k for k, (dx, dy) in dirs.items() if obs["grid"][VIEW_R + dy][VIEW_R + dx] in ground_ch - {"~"}), None)
                 return ("place", {"dir": d, "item": r.station}) if d else None
-            return craft(obs, r.station, ground_ch, tool_for, dirs, depth + 1)
+            return craft(obs, r.station, ground_ch, tool_for, dirs, depth + 1, blocked)
         if not in_reach(at[0], at[1], 0, reach_of("station")):
             return _walk(obs, *at, ground_ch)
     return "craft", {"recipe": item}
@@ -104,9 +102,9 @@ def next_step(obs, goal, social, *, person, wanted, handed, tool_for, ground_ch,
     if goal is None or goal.kind == "free":
         return None
     if goal.kind == "gather" and goal.item:
-        return gather(obs, goal.item, ground_ch, tool_for, dirs)
+        return gather(obs, goal.item, ground_ch, tool_for, dirs, goal.blocked)
     if goal.kind == "craft" and goal.item:
-        return craft(obs, goal.item, ground_ch, tool_for, dirs)
+        return craft(obs, goal.item, ground_ch, tool_for, dirs, blocked=goal.blocked)
     if goal.kind in ("ask", "give", "stay"):
         return with_person(obs, goal, social, person(obs, goal), wanted, handed, ground_ch)
     return None

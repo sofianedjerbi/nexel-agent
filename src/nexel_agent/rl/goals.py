@@ -27,6 +27,7 @@ class Goal:
         self.struck = False             # it hit the goal's person while the goal was on: nothing done with them counts
         self.asked, self.d0, self.d = 0, None, None      # (what was tried: asks made of the person; how far, first and now)
         self.seen = None                # (the person: where last seen, (x, y, hp); rl/actions.py person keeps it)
+        self.blocked: set = set()       # (places a walk to them found no way: rl/pursue.py tries the next one)
         self.promise = False            # it said it would (rl/mind.py commit): kept or broken goes on the record
 
 
@@ -37,6 +38,8 @@ def judge(g: Goal, tick: int, count, results, got_from: dict, d: float, pid=None
     last, g.last = g.last, tick
     g.d0, g.d = (d if g.d0 is None else g.d0), d
     g.asked += sum(t == "say" and bool(args.get("ask")) for t, args, r in results) if g.kind == "ask" else 0
+    g.blocked |= {(args["x"], args["y"]) for t, args, r in results
+                  if t == "move_to" and not r.get("ok") and r.get("error") == "no_path" and "x" in args}
     g.struck |= any(t == "attack" and r.get("ok") and pid is not None and args.get("target") == pid for t, args, r in results)
     if g.kind == "gather":
         return count(g.item) >= g.base + GATHER_N
