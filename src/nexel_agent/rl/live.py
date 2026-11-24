@@ -18,6 +18,7 @@ from pathlib import Path
 import numpy as np
 
 from megastructure.client import Client
+from .achieve import Ledger, from_wire
 from .brain import Brain
 from .core import split
 from .encode import ACTIONS, ITEMS, N_NEAR, action_name, encode, legal, to_command
@@ -40,6 +41,7 @@ class LiveBody:
         self.stats = {"decisions": 0, "acts": 0, "fails": 0, "interrupted": 0, "idle": 0, "crafted": 0, "placed": 0,
                       "deaths": 0, "hits": 0, "won": 0, "lost": 0, "kills": 0, "chat": 0}
         self.crafts, self.reactions, self.foes, self.fails_by = set(), {}, {}, {}
+        self.ledger, self.made, self.pack = Ledger(), {}, None      # what it has done this life, as in the sim (rl/achieve.py)
         self.social, self.social_done, self.http, self.game = SocialMemory(a.name, ITEMS), set(), None, None
         self.stats.update(said=0, gave=0)
         self.tick, self.me, self.obs_entities, self.fighting = 0, {}, [], False
@@ -49,6 +51,10 @@ class LiveBody:
         self.brain = Brain(a.brain, a.log and Path(a.log).with_name("brain.jsonl"), a.name, a.persona) if getattr(a, "brain", 0) else None
 
     def done(self, tool, args, r):
+        res = from_wire(r)
+        self.ledger.result(tool, args, res, self.foes.get(args.get("target"), ""), self.me.get("hp", 20))
+        for k, n in (res.get("made") or {}).items():       # (made, not found: no collect for it)
+            self.made[k] = self.made.get(k, 0) + n
         if not r.get("ok") and r.get("error") == "interrupted":
             self.stats["interrupted"] += 1
             return
@@ -176,10 +182,16 @@ class LiveBody:
                         asyncio.create_task(game.act("say", text=line))
                         self.stats["said"] += 1
                 self.hurt = max(0.0, hp - me["hp"]) if me["deaths"] == deaths else hp
+                for k, n in self.social.got_now.items():           # (given, not found)
+                    self.made[k] = self.made.get(k, 0) + n
                 if me["deaths"] > deaths:
+                    self.ledger = Ledger()                           # (a new life: nothing done yet)
                     self.stats["deaths"] += me["deaths"] - deaths
                     self.stats["lost"] += len(self.foes)
                     self.foes.clear()
+                elif self.pack is not None:
+                    self.ledger.gained(self.pack, me.get("inventory", {}), self.made)
+                self.pack, self.made = dict(me.get("inventory", {})), {}
                 if self.hurt > 0:
                     self.stats["hits"] += 1
                     foe = next((b for b in obs.get("entities", []) if b.get("kind") in HOSTILE + ("agent",) and dist(b) <= 5), None)
@@ -188,7 +200,7 @@ class LiveBody:
                 hp, deaths = me["hp"], me["deaths"]
                 goal = self.mind.goal if self.mind else None
                 enc = encode(obs, self.facing, self.last, self.last_ok, self.hurt, self.social.flags(obs), goal,
-                             self.social.people_flags(obs, N_NEAR))
+                             self.social.people_flags(obs, N_NEAR), self.ledger.done)
                 mask = legal(obs, self.facing, self.social, goal) if self.a.mask else None
                 i = self.pol.act(enc, self.rng, mask)
                 kind = ACTIONS[i][0]

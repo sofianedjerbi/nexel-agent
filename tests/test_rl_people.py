@@ -16,9 +16,9 @@ def test_a_neighbour_hit_hits_back_and_goes():
     f = neighbour_beside(env)
     hp = env.a.hp
     o, *_ = env.step(idx("attack"))
-    from nexel_agent.rl.encode import PEOPLE
-    late = N_ACTIONS - 181
-    assert o["vec"][VEC - late - PEOPLE + 1] == 1               # (the nearest: "I hit it lately")
+    from nexel_agent.rl.encode import ACTIONS_V3, PEOPLE, V3
+    late = ACTIONS_V3 - 181
+    assert o["vec"][V3 - late - PEOPLE + 1] == 1               # (the nearest: "I hit it lately")
     f.act = 0
     for _ in range(40):
         env.step(0)

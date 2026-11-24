@@ -84,6 +84,45 @@ def test_refusals_the_obs_shows_are_masked():
     assert m[idx("dig_E")] and not m[idx("dig_E_hoe")] and not m[idx("step_E")]
 
 
+def test_it_sees_what_it_has_already_done():
+    from nexel_agent.rl.achieve import KNOWN
+    from nexel_agent.rl.encode import DONE_ID, V3
+    env = SimEnv(ep_ticks=10 ** 6, roam=0, rivals=0, folk=0)
+    o = env.reset(5)
+    bits = lambda o: {KNOWN[i] for i in np.flatnonzero(o["vec"][V3:V3 + len(KNOWN)])}   # noqa: E731
+    assert bits(o) == set()
+    env.a.inventory["wood"] = 6
+    o, r, *_ = env.step(idx("craft_plank"))
+    assert r >= 1.0 and "craft_plank" in bits(o)                 # (the first: paid, and now seen as done)
+    o, r, *_ = env.step(idx("craft_plank"))
+    assert r < 1.0 and bits(o) == env.ledger.done & set(DONE_ID)  # (the repeat pays nothing: the same record says so)
+    assert "shelter" not in DONE_ID and "greeted_someone" not in DONE_ID    # (what takes a look at the world or at others)
+
+
+def test_the_live_body_keeps_the_same_record():
+    from nexel_agent.rl.achieve import from_wire
+    sim, live = Ledger(), Ledger()
+    script = [("craft", {"recipe": "plank"}, {"ok": True, "made": {"plank": 2}}),
+              ("craft", {"recipe": "plank"}, {"ok": True, "made": {"plank": 2}}),
+              ("place", {"item": "plank"}, {"ok": True}),
+              ("eat", {"item": "berries"}, {"ok": True}),
+              ("dig", {"dir": "E", "with": "hoe"}, {"ok": True}),
+              ("attack", {"target": 7, "with": "spear"}, {"ok": True, "killed": True}),
+              ("craft", {"recipe": "axe"}, {"ok": False, "status": "interrupted"}),
+              ("wear", {"item": "bandana"}, {"ok": False})]
+    for tool, args, res in script:
+        wire = ({"ok": True, "result": {k: v for k, v in res.items() if k != "ok"}} if res["ok"]
+                else {"ok": False, "error": "interrupted" if res.get("status") else "bad_target"})
+        a = sim.result(tool, args, res, "tusker", 8)
+        b = live.result(tool, args, from_wire(wire), "tusker", 8)
+        assert a == b
+    sim.gained({}, {"wood": 2, "plank": 4}, {"plank": 4})
+    live.gained({}, {"wood": 2, "plank": 4}, {"plank": 4})
+    assert sim.done == live.done == {"craft_plank", "place_plank", "eat_berries", "till", "fought_armed", "defeat_tusker",
+                                     "win_hurt", "collect_wood"}
+    assert sim.counts == live.counts
+
+
 def test_goals_pay_once_when_done():
     from nexel_agent.rl.goals import Goal
     env = SimEnv(ep_ticks=10 ** 6, roam=0, rivals=0, folk=0)

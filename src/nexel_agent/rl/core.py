@@ -37,7 +37,7 @@ OUTCOME = {"won": "defeat_player", "fled": "escape_attack", "endured": "survive_
 class SimEnv:
     def __init__(self, ep_ticks: int = EP_TICKS, decide: int = DECIDE, rivals: int = 1, roam: int = 1,
                  live_seed: int = -1, live_pct: int = 0, folk: int = 2, goals: int = 1, death_ends: int = 1,
-                 shadow_pct: int = 30, thin_pct: int = 0, actions: int = 0, no_ring: int = 0, gear_pct: int = 0):
+                 shadow_pct: int = 30, thin_pct: int = 0, gear_pct: int = 0):
         """rivals: a sparring partner (rl/rival.py); roam: start anywhere on the land within 400 tiles, not at the
         world's spawn; live_seed/live_pct: that share of the episodes in the live world's seed (its land, unaltered)."""
         self.ep_ticks, self.decide, self.rivals, self.roam = ep_ticks, decide, rivals, roam
@@ -46,8 +46,6 @@ class SimEnv:
         self.shadow_pct = shadow_pct      # the share of episodes a neighbour stays right beside the player all along
         self.gear_pct = gear_pct          # the share of starts one step from a tool (starts.near_a_tool)
         self.thin_pct = thin_pct          # the share of starts laid out like the live save near its players (thin_land)
-        self.actions = actions or N_ACTIONS   # (an older action set: the first `actions`, the obs as it saw them)
-        self.no_ring = no_ring            # (ring never legal: a control run)
         self.sim = None
 
     def reset(self, seed: int):
@@ -87,14 +85,9 @@ class SimEnv:
 
     def encoded(self):
         goal = self.goals.goal if self.goals else None
-        o = {**encode(self.obs, self.facing, self.last, self.last_ok, self.hurt, self.social.flags(self.obs), goal,
-                      self.social.people_flags(self.obs, N_NEAR)),
-             "mask": legal(self.obs, self.facing, self.social, goal)}
-        if self.no_ring:
-            o["mask"][RING_I] = False
-        if self.actions < N_ACTIONS:              # (the late actions' last-action slots are the vector's tail)
-            o["vec"], o["mask"] = o["vec"][:VEC - (N_ACTIONS - self.actions)], o["mask"][:self.actions]
-        return o
+        return {**encode(self.obs, self.facing, self.last, self.last_ok, self.hurt, self.social.flags(self.obs), goal,
+                         self.social.people_flags(self.obs, N_NEAR), self.ledger.done),
+                "mask": legal(self.obs, self.facing, self.social, goal)}
 
     def step(self, i: int):
         sim, a, L = self.sim, self.a, self.ledger

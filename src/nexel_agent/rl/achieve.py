@@ -27,6 +27,19 @@ ACHIEVEMENTS = tuple([f"collect_{x}" for x in COLLECT] + [f"craft_{x}" for x in 
                      + [f"eat_{x}" for x in EATS] + [f"defeat_{x}" for x in DEFEATS] + list(MILESTONES) + list(SOCIAL))
 
 
+# What the player itself can know it has done, from its own acts and what came back (the sim and the live body alike):
+# everything but what takes a look at the world (rl/milestones.py) or at other people (rl/social.py). The observation
+# shows these (rl/encode.py), so a first time that pays can be told from a repeat that does not.
+BY_ACT = ("till", "plant", "water_crop", "feed_animal", "milk_cow", "sleep_bed", "wear_any", "wear_armor",
+          "place_5_kinds", "place_10_kinds", "fought_armed", "win_hurt")
+KNOWN = tuple(a for a in ACHIEVEMENTS if a.startswith(("collect_", "craft_", "place_", "eat_", "defeat_")) or a in BY_ACT)
+
+
+def from_wire(r: dict) -> dict:
+    """The agent API's reply to an action, as the sim's own result (what Ledger.result reads)."""
+    return {**(r.get("result") or {}), "ok": bool(r.get("ok")), "status": "interrupted" if r.get("error") == "interrupted" else None}
+
+
 class Ledger:
     """What happened this episode, and the reward for it."""
 

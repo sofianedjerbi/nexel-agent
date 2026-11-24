@@ -25,3 +25,7 @@ def test_the_shipped_body_acts():
         seen.add(i)
         o, *_ = env.step(i)
     assert len(seen) > 1
+    from nexel_agent.rl.encode import V3
+    marked = {**o, "vec": o["vec"].copy()}
+    marked["vec"][V3:] = 1                                       # (inputs it was not trained on: it does not read them)
+    assert np.array_equal(pol.logits(o), pol.logits(marked))

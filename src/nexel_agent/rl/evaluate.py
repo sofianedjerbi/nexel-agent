@@ -77,6 +77,7 @@ def metrics(eps: list) -> dict:
             "first_strikes": sum(e.get("first_strikes", 0) for e in eps),
             "fills": "/".join(str(round(sum(e.get(f"fill_{n}", 0) for e in eps) / max(1, len(eps)), 2)) for n in (4, 6, 8)),
             "stock": "/".join(str(round(sum(e.get(f"stock_{n}", 0) for e in eps) / max(1, len(eps)), 2)) for n in (4, 8)),
+            "repeat_crafts": round(1 - sum(e["distinct_crafts"] for e in eps) / max(1, sum(e["crafts"] for e in eps)), 2),
             "armed": round(sum(e.get("armed_blows", 0) for e in eps) / max(1, sum(e.get("blows", 0) for e in eps)), 2),
             "bench_fiber": round(sum(e.get("bench_fiber", 0) for e in eps) / max(1, sum(e.get("bench_near", 0) for e in eps)), 2),
             "multi": round(sum(e.get("multi_place", 0) for e in eps) / max(1, len(eps)), 2),

@@ -22,10 +22,11 @@ ROOT = Path(__file__).resolve().parents[3] / "rl_runs"
 
 def gear(m: dict) -> str:
     """Tools in a check line: spears, axes and pickaxes made per episode (first-time rates), the share of blows struck
-    armed, armour worn, and the share of moments by a bench with fiber still in the pack."""
+    armed, armour worn, the share of moments by a bench with fiber still in the pack, and the share of crafts that
+    repeat one already made this life (they pay nothing)."""
     t = m["top"]
     return (f"gear=[spear {t.get('craft_spear', 0)} axe {t.get('craft_axe', 0)} pickaxe {t.get('craft_pickaxe', 0)} "
-            f"armed_blows {m['armed']} armor {t.get('wear_armor', 0)} fiber_at_bench {m['bench_fiber']}]")
+            f"armed_blows {m['armed']} armor {t.get('wear_armor', 0)} fiber_at_bench {m['bench_fiber']} repeat_crafts {m['repeat_crafts']}]")
 
 
 class Check(BaseCallback):
