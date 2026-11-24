@@ -108,13 +108,12 @@ def to_command(i: int, obs: dict, facing: str, social=None, goal=None):
         return None
     if kind in ("step", "jump"):
         return kind, {"dir": d}
-    if kind == "dig":
-        return "dig", {"dir": d, **({"with": arg} if arg else {})}
-    if kind == "dig_at":
-        return "dig", {"dir": d, "z": int(me.get("z", 0)) + arg}
-    if kind == "climb":
-        return "climb", {"dir": d, "z": int(me.get("z", 0)) + 2}
-    if kind in ("dig_down", "pick_up"):
+    if kind in ("dig", "dig_at", "climb", "dig_down"):
+        w = arg if kind == "dig" and arg else tool_for(obs, d if kind == "dig" else None)
+        z = {"dig_at": arg, "climb": 2}.get(kind)
+        return ("dig" if kind == "dig_at" else kind), {**({"dir": d} if d else {}), **({"z": int(me.get("z", 0)) + z} if z else {}),
+                                                       **({"with": w} if w else {})}
+    if kind == "pick_up":
         return kind, {}
     if kind == "attack":                                  # (the being in that slot of the obs: nearest first)
         ents = obs.get("entities", [])
@@ -166,6 +165,16 @@ def _level(ch: str) -> int:
 
 LEVEL = {chr(c): _level(chr(c)) for c in range(48, 123) if chr(c).isalnum()}
 _STATION_CH = {b.name: b.char for b in BLOCKS}
+
+
+_TOOL_OF = {b.char: b.tool or b.needs_tool for b in BLOCKS if b.tool or b.needs_tool}
+
+
+def tool_for(obs, d=None) -> str | None:
+    """The tool from the pack a dig wants, as a player swings the right one: the block in front's own (the game's
+    block table: an axe for wood, a pickaxe for stone); the land itself (dug down, or in front at a height), a pickaxe."""
+    want = _TOOL_OF.get(_front(obs, d)[0]) if d else "pickaxe"
+    return want if want and obs["self"].get("inventory", {}).get(want) else None
 
 
 def _front(obs, d):

@@ -186,3 +186,24 @@ def test_the_goals_person_out_of_view_is_where_they_were_last_seen():
     p = person({"self": {"x": 12, "y": 10}, "entities": []}, g)
     assert (p["dx"], p["dy"], p["seen"]) == (1, -2, 0) and g.seen == (13, 8, 20)
     assert person({"self": me, "entities": []}, Goal("ask", "wood", "Bo")) is None
+
+
+def test_every_dig_swings_the_right_tool_from_the_pack_and_it_is_faster():
+    """rl/actions.py tool_for: a dig takes the pack's tool the dug thing wants (the game's block table), dug down too;
+    with no such tool, bare hands. In the sim a pickaxe takes the ground down sooner."""
+    from nexel_agent.rl.actions import to_command
+    env = SimEnv(ep_ticks=10 ** 6, roam=0, rivals=0)
+    times = {}
+    for tool in (None, "pickaxe"):
+        env.reset(3)
+        if tool:
+            env.a.inventory[tool] = 1
+        obs = env.sim.observe(env.a)
+        cmd = to_command(idx("dig_down"), obs, "S")
+        assert cmd == ("dig_down", {"with": "pickaxe"} if tool else {})
+        act, t0 = env.sim.submit(env.a, *cmd), env.sim.tick
+        while act.result is None:
+            env.sim.step()
+        assert act.result["ok"]
+        times[tool] = env.sim.tick - t0
+    assert times["pickaxe"] < times[None]

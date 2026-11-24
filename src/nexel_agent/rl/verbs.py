@@ -10,7 +10,8 @@ def split(cmd) -> list:
     whoever hit it lately; at anyone else, one swing."""
     tool, args = cmd
     if tool == "climb":
-        return [("dig", {"dir": "up"}), ("dig", {"dir": args["dir"], "z": args["z"]}), ("jump", {"dir": args["dir"]})]
+        w = {"with": args["with"]} if args.get("with") else {}        # (the tool for the land: rl/actions.py tool_for)
+        return [("dig", {"dir": "up", **w}), ("dig", {"dir": args["dir"], "z": args["z"], **w}), ("jump", {"dir": args["dir"]})]
     if tool == "ring":
         return [("place", {"x": x, "y": y, "item": it}) for x, y, it in args["pieces"]] or [("noop", {})]
     if tool == "attack" and args.get("fight"):
