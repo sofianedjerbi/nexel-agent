@@ -98,6 +98,11 @@ measured with training running, it replies fastest (p90 0.6 s) and stays on topi
 use `4b` (`rl/voice.py` MODEL, FALLBACK_MODEL). A world that asks who players are lets programs on its machine in with
 its key: `NEXEL_AGENT_KEY=$(cat <game>/saves/default/agent.key)`.
 
+The live scorecard (#2): `python tools/rl_live_scorecard.py --minutes 30` copies a world (never the live one), runs
+the player there with the scripted visitors and prints one table beside the real people of that world (lines a
+minute, reply time, crafts and repeats, tools made, first strikes, gifts...); `tools/scorecard.py` scores any
+events.jsonl the same way. Every target in the issues is a row of it.
+
 Tools: `tools/ai_players.sh` (= `nexel-agent-players`), `tools/rl_soak_visitor.py`, `tools/rl_social_soak.py` and
 `tools/rl_talk_soak.py` (scripted visitors for a QA copy of a world: they hit, ask, talk, and tell what the player did).
 
