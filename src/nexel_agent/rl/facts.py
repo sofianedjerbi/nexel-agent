@@ -4,8 +4,8 @@ rl/ goes through here: the social memory, what is happening now (voice.py Now: t
 feed, the live body, the sim's neighbours.
 
 Distance. The game's reach is a circle round you, as the crow flies: nexel_worlds sim/bodies.py near() is
-dx² + dy² (+ the height, a layer half a tile) <= (r + .5)². So dist() is Euclidean and within() is the server's own
-test, on the map (an observation gives a being's dx, dy, not its height). What a thing takes is read from the game's
+dx² + dy² (+ the height, a layer half a tile) <= (r + .5)². So dist() is Euclidean; whether a thing is in reach is
+asked of the game itself (sim/bodies.py reach_of, in_reach: rl/actions.py), never worked out again here. What a thing takes is read from the game's
 own recipe table (needs), never a list of ours. What a player sees and hears is a square of
 VIEW_R / SAY_R round it (sim/core.py emit, sim/observe.py): the server has applied it already to what an observation
 holds, nothing here measures it again."""
@@ -25,12 +25,6 @@ HOSTILE = ("tusker", "pincer", "strawman", "wyrm", "mossback", "sporeling")     
 def dist(b: dict) -> float:
     """How far a being of the observation is, in tiles, as the server measures reach."""
     return math.hypot(b["dx"], b["dy"])
-
-
-def within(b: dict, r: float, rise: float = 0.0) -> bool:
-    """The server's reach test (sim/bodies.py near): r tiles and the half tile to the far tile's edge; `rise`, the
-    height between you in tiles, is distance too."""
-    return b["dx"] ** 2 + b["dy"] ** 2 + rise ** 2 <= (r + .5) ** 2
 
 
 def compass(dx, dy) -> str:

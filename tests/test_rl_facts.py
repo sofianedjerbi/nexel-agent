@@ -51,7 +51,6 @@ def test_the_items_a_line_names():
 def test_one_distance_the_servers():
     b = {"dx": 3, "dy": 1}
     assert F.dist(b) == math.hypot(3, 1)
-    assert F.within(b, 3) and not F.within({"dx": 3, "dy": 2}, 3)       # (sim/bodies.py near: dx2 + dy2 <= (r + .5)2)
     assert F.compass(3, 3) == "4 tiles SE" and F.compass(0, -6) == "6 tiles N" and F.compass(1, 1) == "right here"
     obs = {"entities": [{"kind": "tusker", "dx": 1, "dy": 0}, {"kind": "agent", "name": "Far", "dx": 4, "dy": 4},
                         {"kind": "agent", "name": "Near", "dx": 5, "dy": 0}]}
@@ -73,3 +72,16 @@ def test_a_pile_on_the_ground_is_seen_by_the_body_and_the_words():
     now = Now(a.name)
     now.see(obs)
     assert f"2 meat on the ground {F.compass(x - a.x, y - a.y)}" in now.text()
+
+
+def test_the_mask_reach_is_the_games():
+    """A blow is legal where the server accepts it: the game's own rule (sim/bodies.py reach_of, in_reach), with no
+    KeyError when a being is in view (the reach table is keyed by kind of action now, not by weapon)."""
+    from nexel_worlds.sim.bodies import reach_of
+    from nexel_agent.rl.actions import ACTIONS, legal
+    hit = ACTIONS.index(("attack", None, None))
+    obs = lambda dx, inv: {"self": {"x": 0, "y": 0, "hp": 20, "hunger": 20, "inventory": inv}, "grid": ["." * 21] * 21,
+                           "entities": [{"id": 1, "kind": "chicken", "dx": dx, "dy": 0, "hp": 3}], "tick": 0}
+    r = reach_of("melee")
+    assert legal(obs(int(r), {}))[hit] and not legal(obs(int(r) + 1, {}))[hit]
+    assert legal(obs(int(r) + 1, {"spear": 1}))[hit]

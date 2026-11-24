@@ -7,9 +7,10 @@ names what the goal needs - the "how" of one action. Only numpy (it runs in the 
 
 import numpy as np
 
-from nexel_worlds.sim.constants import FOOD_MAX, LAYER, VIEW_R
+from nexel_worlds.sim.bodies import in_reach, reach_of
+from nexel_worlds.sim.constants import FOOD_MAX, VIEW_R
 from . import ring
-from .facts import short, within
+from .facts import short
 from nexel_worlds.tiles import ARMOR, BLOCKS, FEED, FILLERS, FOOD, GROUNDS, PLACEABLE, RECIPES, REACH, WEAPONS, WEAR
 USE_R = REACH["use"]   # (the game's one reach table: tiles.py REACH; USE_R was its old name)
 
@@ -225,7 +226,7 @@ def legal(obs: dict, facing: str = "S", social=None, goal=None) -> np.ndarray:
             e = (social.hitter(obs) if social else None) if arg == "back" else (ents[arg or 0] if len(ents) > (arg or 0) else None)
             if e is not None and e.get("kind") != "wisp":
                 dz = (LEVEL.get(hs[VIEW_R + e["dy"]][VIEW_R + e["dx"]], 0) - LEVEL.get(hs[VIEW_R][VIEW_R], 0)) if hs and abs(e["dx"]) <= VIEW_R and abs(e["dy"]) <= VIEW_R else 0
-                m[i] = within(e, REACH.get(weapon, REACH[None]) + (e.get("kind") == "mossback"), dz * LAYER)   # (the server's reach)
+                m[i] = in_reach(e["dx"], e["dy"], dz, reach_of("melee", weapon, e.get("kind")))   # (the server's own rule)
             else:
                 m[i] = False
         elif kind == "pick_up":

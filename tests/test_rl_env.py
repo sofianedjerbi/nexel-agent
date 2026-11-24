@@ -77,7 +77,7 @@ def test_a_start_one_step_from_a_tool():
         plain.reset(seed)
         assert (env.a.x, env.a.y, env.a.hunger) == (plain.a.x, plain.a.y, plain.a.hunger)      # (the same start otherwise)
         assert set(env.a.inventory) - set(plain.a.inventory) <= {"wood", "stone", "fiber"}
-        benches += env.sim.near_block(env.a, "workbench", 2) and not plain.sim.near_block(plain.a, "workbench", 2)
+        benches += env.sim.near_block(env.a, "workbench") and not plain.sim.near_block(plain.a, "workbench")
         can = [t for t in TOOLS if all(env.a.count(k) >= n for k, n in RECIPES[t].inputs.items())]
         ready += bool(can)
         kinds |= set(can)

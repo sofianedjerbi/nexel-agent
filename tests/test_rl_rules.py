@@ -161,6 +161,7 @@ def test_ask_goal_and_a_neighbour_who_says_yes():
     f.next = sim.tick + 1
     env.step(0)
     f.a.x, f.a.y, f.a.z = a.x + 1, a.y, 99
+    sim.height(f.a)                                   # (on the ground now: the game's hearing counts height)
     f.rng.random = lambda: 0.0                        # (it says yes)
     f.a.inventory["wood"] = 2
     env.goals.goal = Goal("ask", "wood", f.a.name, sim.tick, until=10 ** 9)

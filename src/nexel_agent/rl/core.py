@@ -149,7 +149,7 @@ class SimEnv:
         self.taken = {}
         near = min((math.dist((o.x, o.y), (a.x, a.y)) for o in sim.agents.values() if o is not a and o.online), default=99)
         results, L.counts["own_now"] = [], 0
-        if sim.near_block(a, "workbench", 2):               # (is fiber still in the pack when a bench is at hand?)
+        if sim.near_block(a, "workbench"):                  # (is fiber still in the pack when a bench is at hand? the game's station reach)
             L.counts["bench_near"] = L.counts.get("bench_near", 0) + 1
             L.counts["bench_fiber"] = L.counts.get("bench_fiber", 0) + (a.count("fiber") > 0)
         for p in [p for p in self.pending if p[0].result is not None]:

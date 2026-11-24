@@ -9,6 +9,12 @@ from nexel_worlds.gen import CHUNK
 from nexel_worlds.tiles import DIRS
 from .achieve import HOSTILE
 
+
+def block_near(sim, a, block: str, r: int) -> bool:
+    """A milestone's own "near" (not a reach: a fire that lights a shelter, a door and a bed of a house): the block in
+    the square of r round the player."""
+    return any(sim.world.block(x, y) == block for y in range(a.y - r, a.y + r + 1) for x in range(a.x - r, a.x + r + 1))
+
 ROOM_PIECES = ("wood_wall", "stone_wall", "door", "gate", "fence")
 
 # Steps toward a room, paid once an episode each, less than a room all told (shaping, not achievements): the 8 tiles
@@ -74,9 +80,9 @@ class Milestones:
             self.been = set()
         if L.placed and not cave and sim.sheltered(a.x, a.y):
             r += u("shelter")
-            if sim.near_block(a, "campfire", 3):
+            if block_near(sim, a, "campfire", 3):
                 r += u("light_shelter")
-            if {"door", "bed"} <= L.placed and sim.near_block(a, "door", 6) and sim.near_block(a, "bed", 6):
+            if {"door", "bed"} <= L.placed and block_near(sim, a, "door", 6) and block_near(sim, a, "bed", 6):
                 r += u("house")
             room = self.room() if L.placed & set(ROOM_PIECES) else None
             if room is not None:                          # (walled all round: not just walls beside it)
