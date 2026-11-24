@@ -43,6 +43,7 @@ def _actions():
     acts += [("attack", None, k) for k in (1, 2)]     # attack the 2nd, 3rd nearest being (the obs's slots); plain attack: the 1st
     acts += [("attack", None, "back")]                # attack whoever hit me last (rl/social.py)
     acts += [("ring", None, None)]                    # walls round me from the pack (rl/ring.py)
+    acts += [("pursue", None, None)]                  # the goal's next step (rl/pursue.py)
     return tuple(acts)
 
 
@@ -154,7 +155,16 @@ def to_command(i: int, obs: dict, facing: str, social=None, goal=None):
         return "move_to", {"x": me["x"] + (p["dx"] if p else 0), "y": me["y"] + (p["dy"] if p else 0)}
     if kind == "craft":
         return "craft", {"recipe": arg}
+    if kind == "pursue":
+        return pursued(obs, goal, social)
     return "eat", {"item": arg}
+
+
+def pursued(obs, goal, social):
+    """The goal's next step as a tool call, or None (rl/pursue.py, with this module's own readings of a goal)."""
+    from .pursue import next_step                         # (it reads the goal with the helpers here)
+    return next_step(obs, goal, social, person=person, wanted=wanted, handed=handed, tool_for=tool_for,
+                     ground_ch=GROUND_CH, dirs=STEP)
 
 
 def _level(ch: str) -> int:
@@ -261,4 +271,6 @@ def legal(obs: dict, facing: str = "S", social=None, goal=None) -> np.ndarray:
         elif kind == "approach":
             p = person(obs, goal)
             m[i] = p is not None and max(abs(p["dx"]), abs(p["dy"])) > 1
+        elif kind == "pursue":
+            m[i] = pursued(obs, goal, social) is not None
     return m
