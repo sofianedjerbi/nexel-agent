@@ -5,8 +5,8 @@ The ones that need a look at the world each step are in rl/milestones.py."""
 
 import math
 
-from megastructure.sim.entities import CREATURES
-from megastructure.tiles import ARMOR, BLOCKS, FOOD, RECIPES
+from nexel_worlds.sim.entities import CREATURES
+from nexel_worlds.tiles import ARMOR, BLOCKS, FOOD, RECIPES
 from .actions import PLACE
 from .facts import HOSTILE  # noqa: F401  (core.py, milestones.py take it from here)
 from .social import SOCIAL

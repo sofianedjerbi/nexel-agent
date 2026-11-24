@@ -3,7 +3,7 @@ wording of an event, one distance, one "is this a creature", one "which items do
 rl/ goes through here: the social memory, what is happening now (voice.py Now: the words and the planner), the brain
 feed, the live body, the sim's neighbours.
 
-Distance. The game's reach is a circle round you, as the crow flies: megastructure sim/bodies.py near() is
+Distance. The game's reach is a circle round you, as the crow flies: nexel_worlds sim/bodies.py near() is
 dx² + dy² (+ the height, a layer half a tile) <= (r + .5)². So dist() is Euclidean and within() is the server's own
 test, on the map (an observation gives a being's dx, dy, not its height). What a thing takes is read from the game's
 own recipe table (needs), never a list of ours. What a player sees and hears is a square of
@@ -14,7 +14,7 @@ import math
 import re
 from typing import NamedTuple
 
-from megastructure.tiles import RECIPES
+from nexel_worlds.tiles import RECIPES
 
 
 HOSTILE = ("tusker", "pincer", "strawman", "wyrm", "mossback", "sporeling")      # the creatures that come at you

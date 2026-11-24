@@ -4,7 +4,7 @@ paid once when it is done, read from the game: never per step of trying. Free pl
 
 import math
 
-from megastructure.sim.constants import sec
+from nexel_worlds.sim.constants import sec
 
 KINDS = ("free", "gather", "craft", "give", "ask", "stay", "help", "avoid")
 WITH_PERSON = ("give", "ask", "stay", "help", "avoid")

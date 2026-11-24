@@ -14,7 +14,7 @@ import time
 
 from websockets.asyncio.client import connect
 
-from megastructure.client import Client
+from nexel_worlds.client import Client
 
 AT = (2, 5, 8, 11, 14, 17, 20, 24)        # minutes: eight visits in a 30-minute soak
 

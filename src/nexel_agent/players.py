@@ -217,7 +217,7 @@ class Launcher:
         url = game_http(self.a.game)
         if not reachable(url):
             self.out(f"The game server is not answering at {url}\n"
-                     f"Start it first (python -m megastructure.server) or pass --game ws://HOST:PORT/agent.")
+                     f"Start it first (python -m nexel_worlds.server) or pass --game ws://HOST:PORT/agent.")
             return 2
         self.data.mkdir(parents=True, exist_ok=True)
         atexit.register(self.stop)

@@ -37,7 +37,7 @@ POLICY_KW = dict(features_extractor_class=GridVec, net_arch=dict(pi=[256], vf=[2
 
 def load(algo, path, custom_objects=None, **kw):
     """A checkpoint, whatever package it was saved from: its policy kwargs are given here, not unpickled (a run from
-    before the move to nexel_agent names megastructure.rl.net's extractor, which is gone)."""
+    before the move to nexel_agent names megastructure.rl.net's extractor (the game's first package name), which is gone)."""
     return algo.load(path, device="cpu", custom_objects={"policy_kwargs": POLICY_KW, **(custom_objects or {})}, **kw)
 
 

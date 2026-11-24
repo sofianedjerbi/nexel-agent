@@ -68,7 +68,7 @@ def test_collect_and_hurt_penalty():
 
 
 def test_a_start_one_step_from_a_tool():
-    from megastructure.tiles import RECIPES
+    from nexel_worlds.tiles import RECIPES
     from nexel_agent.rl.starts import TOOLS
     plain, benches, ready, kinds = SimEnv(ep_ticks=100, rivals=0, folk=0), 0, 0, set()
     for seed in range(30):

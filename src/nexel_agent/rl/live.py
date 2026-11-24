@@ -17,7 +17,7 @@ from pathlib import Path
 
 import numpy as np
 
-from megastructure.client import Client
+from nexel_worlds.client import Client
 from .achieve import Ledger, from_wire
 from .brain import Brain
 from .core import split

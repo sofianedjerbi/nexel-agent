@@ -13,7 +13,7 @@ import re
 import time
 from pathlib import Path
 
-from megastructure.tiles import RECIPES
+from nexel_worlds.tiles import RECIPES
 from .facts import Attack, Give, Say, dist, events, needs, people, short
 from .goals import KINDS, Goal, account, judge
 from .voice import CHAT_STYLE, THOUGHT_TOKENS, Now

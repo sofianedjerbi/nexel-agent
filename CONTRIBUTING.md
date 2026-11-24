@@ -44,7 +44,7 @@ the ruff rules listed in `ignore` in pyproject.toml, and bandit.
 
 A program that joins [Nexel Worlds](https://github.com/sofianedjerbi/nexel-worlds) through its agent API (JSON over a
 websocket, the same rules as a person) and plays it. The game itself (server, simulation, client, art install) is in
-nexel-worlds; this package imports it as `megastructure` and never the other way round.
+nexel-worlds; this package imports it as `nexel_worlds` and never the other way round.
 
 ### What is where
 
@@ -96,7 +96,7 @@ it started. RAM: about 3 GB for 4b, 5 GB for 8b, 9 GB for 14b, 17 GB for 30b, pl
 the players in turn, so keep N small (2 to 4) on a laptop. Serve Qwen3-30B-A3B-Instruct-2507 (4-bit, `--model 30b`):
 measured with training running, it replies fastest (p90 0.6 s) and stays on topic; on a Mac with less than ~20 GB free
 use `4b` (`rl/voice.py` MODEL, FALLBACK_MODEL). A world that asks who players are lets programs on its machine in with
-its key: `MEGASTRUCTURE_AGENT_KEY=$(cat <game>/saves/default/agent.key)`.
+its key: `NEXEL_AGENT_KEY=$(cat <game>/saves/default/agent.key)`.
 
 Tools: `tools/ai_players.sh` (= `nexel-agent-players`), `tools/rl_soak_visitor.py`, `tools/rl_social_soak.py` and
 `tools/rl_talk_soak.py` (scripted visitors for a QA copy of a world: they hit, ask, talk, and tell what the player did).

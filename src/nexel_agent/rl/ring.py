@@ -2,7 +2,7 @@
 if it carries one), one place after another, as the game's own place does it. As many as it holds, at least `least`;
 the policy chooses when. Not while anyone else is on or beside those tiles (it would wall them in)."""
 
-from megastructure.sim.constants import VIEW_R
+from nexel_worlds.sim.constants import VIEW_R
 
 WALLS = ("stone_wall", "wood_wall")          # (the pieces that close a room: the game's ENCLOSE)
 DOORS = ("door", "gate")

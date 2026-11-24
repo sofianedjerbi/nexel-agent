@@ -15,7 +15,7 @@ import time
 
 from websockets.asyncio.client import connect
 
-from megastructure.client import Client
+from nexel_worlds.client import Client
 
 ASKS = {2: "wood", 7: "stone", 12: "berries", 17: "dirt", 22: "wood", 27: "stone"}
 TALK = {1: "hey, i'm mira", 4: "want to team up?", 15: "how's it going?"}

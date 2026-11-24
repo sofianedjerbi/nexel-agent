@@ -7,10 +7,10 @@ import math
 
 import numpy as np
 
-from megastructure.sim.constants import DAY_TICKS, VIEW_R
-from megastructure.sim.entities import CREATURES
-from megastructure.sim.specs import LEGEND
-from megastructure.tiles import BLOCKS, FOOD, RECIPES
+from nexel_worlds.sim.constants import DAY_TICKS, VIEW_R
+from nexel_worlds.sim.entities import CREATURES
+from nexel_worlds.sim.specs import LEGEND
+from nexel_worlds.tiles import BLOCKS, FOOD, RECIPES
 from .achieve import KNOWN
 from .actions import ACTIONS, DIRS, LEVEL, N_ACTIONS, action_name, legal, person, to_command  # noqa: F401 (one place to import from)
 from .goals import KINDS as GOAL_KINDS

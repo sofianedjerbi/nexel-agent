@@ -8,7 +8,7 @@ neighbour near the player instead. The env is told how each visit ended."""
 import math
 import random
 
-from megastructure.sim.constants import sec
+from nexel_worlds.sim.constants import sec
 
 EVERY = (sec(100), sec(260))      # between two visits
 AGAIN = (sec(60), sec(150))       # after it won (or you just took it): sooner
@@ -72,7 +72,7 @@ class Rival:
         for _ in range(30):
             ang, r = self.rng.uniform(0, 2 * math.pi), self.rng.uniform(4, 6)
             x, y = p.x + round(r * math.cos(ang)), p.y + round(r * math.sin(ang))
-            if sim.world.passable(x, y) and abs(sim.world.level(x, y) - sim.world.level(p.x, p.y)) <= 1:
+            if sim.stand(x, y) and abs(sim.world.level(x, y) - sim.world.level(p.x, p.y)) <= 1:
                 break
         else:
             self.next = sim.tick + sec(20)

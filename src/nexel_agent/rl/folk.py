@@ -11,8 +11,8 @@ They say plain short lines; on the live server real players and the LLM's chat t
 import math
 import random
 
-from megastructure.sim.constants import sec
-from megastructure.tiles import DIRS
+from nexel_worlds.sim.constants import sec
+from nexel_worlds.tiles import DIRS
 from .facts import Attack, Give, Say, events, named
 
 EVERY = (sec(60), sec(200))          # between two visits
@@ -154,7 +154,7 @@ class Folk:
         for _ in range(30):
             ang = self.rng.uniform(0, 2 * math.pi)
             x, y = p.x + round(8 * math.cos(ang)), p.y + round(8 * math.sin(ang))
-            if sim.world.passable(x, y):
+            if sim.stand(x, y):
                 break
         else:
             self.next = sim.tick + sec(30)

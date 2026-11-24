@@ -5,8 +5,8 @@ a foe that came close and did no harm. What happened, never how."""
 
 import math
 
-from megastructure.gen import CHUNK
-from megastructure.tiles import DIRS
+from nexel_worlds.gen import CHUNK
+from nexel_worlds.tiles import DIRS
 from .achieve import HOSTILE
 
 ROOM_PIECES = ("wood_wall", "stone_wall", "door", "gate", "fence")
@@ -43,7 +43,7 @@ class Milestones:
                     continue
                 if sim.world.block(*n) in sim.ENCLOSE:
                     edge.add(n)
-                elif not sim.world.passable(*n) and sim.world.block(*n) not in ("bed", "chair", "table", "chest", "workbench", "campfire"):
+                elif not sim.stand(*n) and sim.world.block(*n) not in ("bed", "chair", "table", "chest", "workbench", "campfire"):
                     return None                           # (a cliff or a rock is not a wall it built)
                 else:
                     seen.add(n)

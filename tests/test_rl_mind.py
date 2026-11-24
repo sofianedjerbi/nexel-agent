@@ -177,7 +177,7 @@ def test_what_lies_about_and_the_whole_pack_are_facts():
 
 
 def test_what_a_thing_takes_is_the_games_own_recipe():
-    from megastructure.tiles import RECIPES
+    from nexel_worlds.tiles import RECIPES
     from nexel_agent.rl.facts import counted, needs
     sword, ingot = RECIPES["sword"], RECIPES["ingot"]
     obs = {"self": {"inventory": {"wood": 5}, "stations": []}}

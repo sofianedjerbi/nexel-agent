@@ -7,10 +7,11 @@ names what the goal needs - the "how" of one action. Only numpy (it runs in the 
 
 import numpy as np
 
-from megastructure.sim.constants import FOOD_MAX, LAYER, VIEW_R
+from nexel_worlds.sim.constants import FOOD_MAX, LAYER, VIEW_R
 from . import ring
 from .facts import short, within
-from megastructure.tiles import ARMOR, BLOCKS, FEED, FILLERS, FOOD, GROUNDS, PLACEABLE, RECIPES, REACH, USE_R, WEAPONS, WEAR
+from nexel_worlds.tiles import ARMOR, BLOCKS, FEED, FILLERS, FOOD, GROUNDS, PLACEABLE, RECIPES, REACH, WEAPONS, WEAR
+USE_R = REACH["use"]   # (the game's one reach table: tiles.py REACH; USE_R was its old name)
 
 DIRS = ("N", "E", "S", "W")
 STEP = {"N": (0, -1), "E": (1, 0), "S": (0, 1), "W": (-1, 0)}

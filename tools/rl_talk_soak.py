@@ -12,7 +12,7 @@ import time
 
 from websockets.asyncio.client import connect
 
-from megastructure.client import Client
+from nexel_worlds.client import Client
 
 LINES = ["hey, i'm mira", "what are you up to?", "got any wood to spare?", "nice day for it", "want to team up?",
          "seen any wolves round here?", "where do you sleep at night?", "i found some stone up north",

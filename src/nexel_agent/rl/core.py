@@ -9,11 +9,11 @@ import math
 import random
 from pathlib import Path
 
-from megastructure.sim import Simulation
-from megastructure.sim.constants import DAY_TICKS, FOOD_MAX, VIEW_R
+from nexel_worlds.sim import Simulation
+from nexel_worlds.sim.constants import DAY_TICKS, FOOD_MAX, VIEW_R
 from . import facts, starts
 from .achieve import HOSTILE, Ledger
-from megastructure.tiles import DIRS
+from nexel_worlds.tiles import DIRS
 from .actions import RING_I
 from .encode import ACTIONS, ITEMS, N_ACTIONS, N_NEAR, VEC, encode, legal, to_command
 from .milestones import Milestones

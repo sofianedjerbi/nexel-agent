@@ -3,7 +3,7 @@ leave it, or one step from a tool. Each is a state a player of the live game can
 
 import math
 
-from megastructure.tiles import RECIPES
+from nexel_worlds.tiles import RECIPES
 
 TOOLS = ("spear", "axe", "pickaxe")
 
@@ -12,7 +12,7 @@ def somewhere(sim, a, rng):
     """Somewhere on open land within 400 tiles of the spawn (a live world's players are rarely where it began)."""
     for _ in range(40):
         x, y = a.x + rng.randint(-400, 400), a.y + rng.randint(-400, 400)
-        if sim.world.passable(x, y) and sim.world.ground(x, y) in ("grass", "dirt"):
+        if sim.stand(x, y) and sim.world.ground(x, y) in ("grass", "dirt"):
             a.x, a.y, a.z = x, y, 99
             return
 
@@ -43,6 +43,6 @@ def near_a_tool(sim, a, rng):
         if have > 0:
             a.inventory[item] = a.inventory.get(item, 0) + have
     spots = [(a.x + dx, a.y + dy) for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))
-             if sim.world.block(a.x + dx, a.y + dy) == "none" and sim.world.passable(a.x + dx, a.y + dy)]
+             if sim.world.block(a.x + dx, a.y + dy) == "none" and sim.stand(a.x + dx, a.y + dy)]
     if spots and rng.random() < 0.5:
         sim.set_tile(*rng.choice(spots), block="workbench")

@@ -3,7 +3,7 @@ the sim and on the live server. The policy sees three flags of it (rl/encode.py)
 each per episode, a few in two hundred: never per message, nothing for talking more or following people) are told
 from it here."""
 
-from megastructure.sim.constants import SAY_R, sec
+from nexel_worlds.sim.constants import SAY_R, sec
 from .facts import Attack, Give, Say, events, named
 
 ADDRESSED_S = sec(6)          # "answered someone": said something this soon after being spoken to
