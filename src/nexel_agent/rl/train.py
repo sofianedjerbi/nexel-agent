@@ -34,6 +34,7 @@ class Check(BaseCallback):
         self.a, self.out, self.eval_env, self.base = a, out, eval_env, base
         self.next, self.best, self.flat, self.t0 = a.check, -1.0, 0, time.time()
         self.train_eps = deque(maxlen=200)
+        self.tool_p = []                  # in training, where a tool craft is possible: the chance the policy gives it
         self.kls, self.ents = [], []      # approx KL, and the policy's entropy, of each update since the last check (the drift per update)
 
     def _on_rollout_start(self):
@@ -52,6 +53,8 @@ class Check(BaseCallback):
             f.write(line + "\n")
 
     def _on_training_start(self):
+        names = self.training_env.spec["names"]
+        self.tools = [names.index(n) for n in ("craft_spear", "craft_axe", "craft_pickaxe")]
         self.s0, self.next = self.num_timesteps, self.num_timesteps + self.a.check     # (resumed: counted from here)
         if self.a.eval_first:
             self.next = self.num_timesteps
@@ -60,6 +63,11 @@ class Check(BaseCallback):
         for d, info in zip(self.locals["dones"], self.locals["infos"]):
             if d and "achievements" in info:
                 self.train_eps.append(info)
+        masks = self.locals.get("action_masks")
+        if masks is not None and (rows := masks[:, self.tools].any(1)).any():
+            with torch.no_grad():
+                probs = self.model.policy.get_distribution(self.locals["obs_tensor"], action_masks=masks).distribution.probs
+            self.tool_p += probs[torch.as_tensor(rows)][:, self.tools].sum(1).tolist()
         if self.a.ent_end is not None:
             done = min(1.0, (self.num_timesteps - self.s0) / max(1, self.a.steps))
             self.model.ent_coef = self.a.ent + (self.a.ent_end - self.a.ent) * done
@@ -79,6 +87,7 @@ class Check(BaseCallback):
                  f"ach={m['ach']} ticks={m['ticks']} deaths={m['deaths']}/{m['n']} crafts_distinct={m['crafts_distinct']} "
                  f"places={m['places']} places_distinct={m['places_distinct']} nights={m['nights']} chunks={m['chunks']} fail%={m['fail_pct']} fights={m['fights']} rival={m['visits']} social={m['social']}/6 hit_neighbour={m['hit_neighbour']} unprovoked={m['hit_neighbour_unprovoked']} first_strikes={m['first_strikes']} near_min={m['near_min']} fs/near_min={m['fs_per_near_min']} attack_picks=[{m['picks']}] said/ep={m['said']} goals=[{m['goals']}] hits={m['hits']} "
                  f"kl_mean={np.mean(self.kls) if self.kls else 0:.4f} kl_max={max(self.kls, default=0):.4f} entropy={np.mean(self.ents) if self.ents else 0:.3f} "
+                 f"tool_p={np.mean(self.tool_p) if self.tool_p else 0:.4f} (n={len(self.tool_p)}) "
                  f"{gear(m)} fills={m.get('fills', '')} stock={m.get('stock', '')} multi={m.get('multi', '')} rooms={m['top'].get('room_built', 0)} "
                  f"train_score={tr.get('score')} train_ach={tr.get('ach')}")
         self.log("        top: " + json.dumps(m["top"]))
@@ -89,7 +98,7 @@ class Check(BaseCallback):
                             LIVE_LIKE_SEEDS))
             self.log(f"[live-like] score={lk['score']} ach={lk['ach']} deaths={lk['deaths']}/{lk['n']} crafts_distinct={lk['crafts_distinct']} "
                      f"first_strikes={lk['first_strikes']} multi={lk['multi']} fills={lk['fills']} stock={lk['stock']} rooms={lk['top'].get('room_built', 0)} near_min={lk['near_min']} fs/near_min={lk['fs_per_near_min']} fail%={lk['fail_pct']} {gear(lk)}")
-        self.kls, self.ents = [], []
+        self.kls, self.ents, self.tool_p = [], [], []
         if m["score"] > self.best:
             self.best, self.flat = m["score"], 0
             self.model.save(self.out / "best.zip")
