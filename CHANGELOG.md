@@ -5,6 +5,17 @@ Written by [python-semantic-release](https://python-semantic-release.readthedocs
 
 <!-- version list -->
 
+## v0.8.0 (2026-11-24)
+
+### Features
+
+- **models**: Ship rook from r35 at +300k (score 5.63 to 5.83, rooms 2% to 5%)
+  ([`8f022c2`](https://github.com/sofianedjerbi/nexel-agent/commit/8f022c27d4fb494abfb546aee8d3ce182a8fa33f))
+
+- **rl**: Log the chance the policy gives a tool craft where one is possible
+  ([`d46888b`](https://github.com/sofianedjerbi/nexel-agent/commit/d46888bbd4e6d118dd080f40aa6b4fa93bbedf7d))
+
+
 ## v0.7.0 (2026-11-24)
 
 ### Features
