@@ -27,6 +27,7 @@ class Goal:
         self.struck = False             # it hit the goal's person while the goal was on: nothing done with them counts
         self.asked, self.d0, self.d = 0, None, None      # (what was tried: asks made of the person; how far, first and now)
         self.seen = None                # (the person: where last seen, (x, y, hp); rl/actions.py person keeps it)
+        self.promise = False            # it said it would (rl/mind.py commit): kept or broken goes on the record
 
 
 def judge(g: Goal, tick: int, count, results, got_from: dict, d: float, pid=None, rival=None) -> bool:

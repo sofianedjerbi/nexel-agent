@@ -15,6 +15,7 @@ from collections import deque
 from pathlib import Path
 
 from nexel_worlds.sim.constants import sec
+from . import acts
 from .facts import dist, people
 from .now import Now
 from .social import TALK_GAP
@@ -25,7 +26,7 @@ CHAT_STYLE = ("Type the way people really type in a game chat: mostly lowercase,
               "never formal or robotic. You have your own things going on: friendly and easy, but not needy, you never "
               "fish for attention or keep the talk going for its own sake.")
 
-WORDS_TOKENS, THOUGHT_TOKENS = 30, 140         # (a thought: its JSON, and what it learned, if anything)
+WORDS_TOKENS, THOUGHT_TOKENS = 70, 140         # (a thought: its JSON, and what it learned, if anything)
 # The model to serve for the words and the planner (rl_runs/bench, 2026-11-23, with training at 4 envs): the 30B-A3B
 # answered fastest (p90 0.6 s), never off-topic, and planned as well as any; the 8B broke the planner's JSON at 100
 # tokens (19 of 20). It needs ~16 GB: with less free, the 4B (p90 0.8 s) is the fallback.
@@ -52,7 +53,10 @@ class Voice:
         # (the fixed part first, the same every call: the server keeps its prefix cached)
         self.system = (f"You are {name}, a player in a survival sandbox game. Your character: {persona}\n{CHAT_STYLE}\n"
                        "The facts below are what is happening to you right now in the game. "
-                       "Reply with only your chat line. If you would rather say nothing, reply with nothing.")
+                       + acts.REPLY + ".")
+        self.on_heard = lambda who, kind, item: None      # (rl/live.py: what each line said to it does: an ask is recorded)
+        self.on_promise = lambda to, item, n: None        # (rl/live.py: its promise binds its body: rl/mind.py commit)
+        self.asked_pack = False                           # (the last answer was to someone asking what it carries)
 
     async def post(self, messages, max_tokens, words: bool) -> tuple[str, dict]:
         """A call to the model; chat lines go before thoughts."""
@@ -123,16 +127,17 @@ class Voice:
                                      WORDS_TOKENS, words=True)
         except Exception as e:
             out, t = "", {"error": repr(e)[:80]}
-        out = re.sub(r"<think>.*?</think>", "", out, flags=re.S).strip()
-        if out.startswith("{"):                      # (asked for a line, it answered in JSON: its "say")
-            try:
-                out = str(json.loads(out).get("say") or "")
-            except (ValueError, AttributeError):
-                pass
+        out, labels, promise = acts.read(out, len(heard), self.now.items)
+        for (who, _, _), (kind, item) in zip(heard, labels):
+            self.on_heard(who, kind, item)
+        self.asked_pack = any(k == "pack" for k, _ in labels)
         out = next((ln.strip() for ln in out.splitlines() if ln.strip()), "").strip('"')[:120]     # (one line)
         if out.lower() in ("", "nothing", "(nothing)", "...", "-"):
             out = ""
+        if out and promise and heard:
+            self.on_promise(heard[-1][0], *promise)
         t.update(kind=kind, to=heard[-1][0] if heard else "", heard=" | ".join(h[1] for h in heard)[:120], said=out,
+                 acts=[" ".join(x for x in lab if x) for lab in labels], promise=promise,
                  t=round(time.time(), 2), since_heard_s=round(time.monotonic() - heard[0][2], 2) if heard else None)
         self.write(t)
         return out
@@ -162,6 +167,9 @@ class Voice:
         if not reply and t - self.last_said < OPEN_S and self.heard_at <= self.last_said:
             return None
         if any(x.lower() == line.lower() for _, x in self.mine):
+            return None
+        if acts.pack_dump(line, self.now.items) and not (reply and self.asked_pack):
+            self.write({"kind": "dropped", "said": line, "why": "reads out the pack"})
             return None
         self.last_said = t
         self.mine.append((t, line))

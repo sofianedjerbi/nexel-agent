@@ -28,6 +28,7 @@ class SocialMemory:
         self.my_last = -10 ** 9               # when I last said something
         self.last_hit = (None, None, -10 ** 9)   # who hit me last: (name, id, tick)
         self.where: dict = {}                 # each person: where I last saw them, (x, y, hp)
+        self.words_tell = False               # live with a words model: it tells which lines are asks (rl/acts.py), not a name in them
 
     def see(self, obs: dict):
         tick, me = obs["tick"], obs.get("self") or {}
@@ -42,8 +43,8 @@ class SocialMemory:
                     self.my_last = t
                 case Say(src=who) if who:
                     self.said_to_me = t
-                    if it := next(iter(named(ev.text, self.items)), None):
-                        self.asked, self.asked_by, self.asked_at = it, who, t
+                    if not self.words_tell and (it := next(iter(named(ev.text, self.items)), None)):
+                        self.asked, self.asked_by, self.asked_at = it, who, t     # (the sim's neighbours: their lines are asks)
                 case Attack(by=by, target=tgt) if tgt == self.me and by:
                     self.hit_me[by] = t
                     self.last_hit = (by, ev.id, t)                  # (a creature's blow says its id)
@@ -54,6 +55,10 @@ class SocialMemory:
                     for k, n in ev.items.items():
                         self.got_now[k] = self.got_now.get(k, 0) + n
                         self.got_by.setdefault(who, {})[k] = self.got_by.get(who, {}).get(k, 0) + n
+
+    def heard_ask(self, who, item, tick):
+        """The words model told this line an ask (rl/acts.py): it opens, as a neighbour's does in the sim."""
+        self.asked, self.asked_by, self.asked_at = item, who, tick
 
     def can_talk(self, tick) -> bool:
         """The chat cooldown (an interface limit, the same for anyone who talks): spoken to since my last line, or my

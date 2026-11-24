@@ -139,6 +139,13 @@ class LiveBody:
         self.stats["chat"] += 1
         return r
 
+    def heard(self, who, kind, item):
+        """What a line said to it does, as the words model told it (rl/acts.py): an ask is recorded, by the social
+        memory (the policy's flag, the give) and in what is happening (the planner's records)."""
+        if kind == "ask" and item:
+            self.social.heard_ask(who, item, self.tick)
+            self.now.ask(who, self.a.name, item)
+
     def ask_to(self) -> str | None:
         """Whom the policy's line is to: the goal's person."""
         return self.mind.goal.person if self.mind else None
@@ -168,6 +175,8 @@ class LiveBody:
             self.voice = self.mind.voice = Voice(self.a.name, self.a.persona, self.a.model_url, self.http,
                                                  self.mind.path.with_name("latency.jsonl"), self.now)
             self.voice.out = self.say
+            self.voice.on_heard, self.voice.on_promise = self.heard, self.mind.commit
+            self.social.words_tell = self.now.words_tell = True       # (asks are what the words model tells: rl/acts.py)
         t_end = time.monotonic() + self.a.minutes * 60 if self.a.minutes else math.inf
         async with Client(self.a.game) as game:
             self.game = game

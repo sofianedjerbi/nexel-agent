@@ -13,12 +13,14 @@ import re
 import time
 from pathlib import Path
 
+from nexel_worlds.sim.constants import sec
 from nexel_worlds.tiles import RECIPES
 from .facts import Attack, Give, Say, dist, events, needs, people, short
 from .goals import KINDS, Goal, account, judge
 from .now import Now
 from .voice import CHAT_STYLE, THOUGHT_TOKENS
 
+PROMISE = sec(120)         # a promise to hand something over is kept within this, or broken
 THINK_S = 20.0             # (the model it asks: rl/voice.py MODEL, the same server as the words)
 GOALS_DOC = ("Goals: gather (an item), craft (an item), give (an item, to a person), ask (a person, for an item), "
              "stay (with a person), help (a person, in a fight), avoid (a person), free (no goal)")
@@ -78,9 +80,22 @@ class Mind:
         p = next((b for b in people(obs) if b.get("name") == g.person), None)
         done = judge(g, tick, lambda k: self.pack.get(k, 0), results, got_from, dist(p) if p else 99.0, p and p.get("id"))
         if done or tick >= g.until:
-            self.end(g, account(g, tick, "done" if done else "timed out, not done"))
+            self.end(g, account(g, tick, "done" if done else "timed out, not done"), kept=bool(done))
 
-    def end(self, g: Goal, how: str):
+    def commit(self, to: str, item: str, n: int = 1):
+        """Its own line promised `to` the item (rl/acts.py): the promise is its goal now, a give with a deadline. Kept
+        or broken, it goes on the record with that person (rl/now.py), as their gifts and blows do."""
+        if self.goal.promise:
+            self.end(self.goal, "set aside for another promise", kept=False)
+        g = Goal("give", item, to, self.tick, self.pack.get(item, 0), until=self.tick + PROMISE)
+        g.seen, g.promise = self.where.get(to), True
+        self.goal, self.goal_at = g, time.monotonic()
+        self.stats["promises"] = self.stats.get("promises", 0) + 1
+
+    def end(self, g: Goal, how: str, kept: bool = False):
+        if g.promise:
+            self.now.remember(g.person, "you kept a promise to them" if kept else "you broke a promise to them")
+            how += "; it was a promise"
         self.ended = f"{goal_text(g)}: {how}"
         self.goal, self.goal_at, self.salient = Goal(start=self.tick), time.monotonic(), True
 
@@ -170,6 +185,8 @@ class Mind:
         g = Goal(kind, item, who, self.tick, self.pack.get(item, 0) if item else 0)
         g.seen = self.where.get(who) if who else None
         if (g.kind, g.item, g.person) != (self.goal.kind, self.goal.item, self.goal.person):
+            if self.goal.promise:                               # (the planner's call: it may break its word)
+                self.end(self.goal, "broken: you set another goal")
             self.goal, self.goal_at = g, time.monotonic()
             self.stats["goals"][kind] = self.stats["goals"].get(kind, 0) + 1
             if item and self.now.items and item not in self.now.items:

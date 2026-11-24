@@ -58,6 +58,7 @@ class Now:
         self.past: deque = deque()           # (t, event) within the window
         self.body: deque = deque()           # (t, hp, food, inventory): the oldest is the window's start
         self.acts: deque = deque(maxlen=6)
+        self.words_tell = False              # live with a words model: it tells which lines are asks (rl/acts.py)
 
     def see(self, obs: dict):
         t, me = time.monotonic(), obs.get("self") or {}
@@ -120,7 +121,7 @@ class Now:
                                   trust="gave" if to == me and not i else None)
                     if self.asks.get((to, src), ("",))[0] == k:
                         del self.asks[(to, src)]
-            case Say(src=src) if src != me and (item := next(iter(named(ev.text, self.items)), None)):
+            case Say(src=src) if src != me and not self.words_tell and (item := next(iter(named(ev.text, self.items)), None)):
                 self.ask(src, me, item, t)
 
     def ask(self, who, whom, item, t=None):
