@@ -100,6 +100,9 @@ class Mind:
                   else "You have set yourself no aims yet."),
                  (f"Your goal now: {goal_text(self.goal)}: {account(self.goal, self.tick)}."
                   if self.goal.kind != "free" else "You have no goal now.")]
+        lacks = self.lacks(have, {p.get("name") for p in people(obs)})
+        if lacks:
+            lines.append("What your aims lack, and who had it: " + "; ".join(lacks) + ".")
         if self.ended:
             lines.append(f"Your last goal: {self.ended}.")
         if me.get("craftable"):
@@ -116,6 +119,16 @@ class Mind:
         if others:
             lines.append("People you know, not here: " + "; ".join(f"{n} ({self.now.person(n)})" for n in others[:6]))
         return "\n".join(lines)
+
+    def lacks(self, have: dict, here: set) -> list:
+        """Each input its aims lack (the game's recipes), with the people it knows had some (rl/now.py who_has: seen
+        with it or gave it some), how far it trusts each and who owes whom, and who of them is here. Facts only:
+        whether to ask, trade or go and get it is the model's call."""
+        out = []
+        for item, n in {k: n for a in self.aims if a in RECIPES for k, n in short(RECIPES[a], have).items()}.items():
+            had = [", ".join([p + (" (here)" if p in here else "")] + self.now.standing(p)) for p in self.now.who_has(item)[:2]]
+            out.append(f"{n} {item} (" + ("; ".join(had) if had else "nobody you know had any") + ")")
+        return out[:4]
 
     def messages(self, obs: dict) -> list:
         sys_ = (f"You are {self.name}, a player in a survival sandbox game. Your character: {self.persona}\n"

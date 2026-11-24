@@ -14,6 +14,10 @@ from .facts import (HOSTILE, Attack, Craft, Give, Say, compass, counted, dist, e
 SIGHTS = ("water", "deep_water", "tree", "rock", "ore", "thicket", "berry_bush", "fruit_tree", "campfire", "workbench",
           "bed", "door", "chest", "well", "cave_floor", "hole", "ladder", "stone_wall", "wood_wall", "fence")
 WINDOW_S = 30.0                       # "lately": what it saw in the last 30 s; an ask not met in that time was not met
+# Trust in a person, in [-1, 1], from what they did (never from what they said): a gift, standing by it in a fight,
+# a blow, an ask of its they let pass. It fades toward nothing, by half every TRUST_HALF_S (real time: across sessions).
+TRUST = {"gave": 0.15, "helped": 0.3, "hit": -0.4, "let_pass": -0.1}
+TRUST_HALF_S = 2 * 86400
 WORDS = {"N": "north", "S": "south", "E": "east", "W": "west", "noop": "wait"}
 
 
@@ -65,32 +69,55 @@ class Now:
             self.outcome(ev, t)
         for (asker, whom), (item, t0) in [kv for kv in self.asks.items() if t - kv[1][1] > WINDOW_S]:
             del self.asks[(asker, whom)]
-            self.remember(whom, f"did not give you the {item} you asked for") if asker == self.name else \
+            self.remember(whom, f"did not give you the {item} you asked for", trust="let_pass") if asker == self.name else \
                 self.remember(asker, f"you did not give them the {item} they asked for")
+        for b in people(obs):                                    # (what each was seen with: what they could give)
+            if b.get("holding") and b.get("name") != self.name:
+                self.relations.setdefault(b["name"], {}).setdefault("seen_with", {})[b["holding"]] = round(time.time())
         self.body.append((t, me.get("hp"), me.get("hunger"), dict(me.get("inventory") or {})))
         while self.past and t - self.past[0][0] > WINDOW_S:
             self.past.popleft()
         while len(self.body) > 1 and t - self.body[1][0] >= WINDOW_S:
             self.body.popleft()
 
-    def remember(self, who, what: str, n=1):
+    def remember(self, who, what: str, n=1, trust: str | None = None):
         if who and who != self.name and not is_creature(who):     # (people only)
-            rec = self.relations.setdefault(who, {}).setdefault("record", {})
+            rel = self.relations.setdefault(who, {})
+            rec = rel.setdefault("record", {})
             rec[what] = rec.get(what, 0) + n
+            if trust:
+                rel["trust"], rel["trust_at"] = round(max(-1.0, min(1.0, self.trust(who) + TRUST[trust])), 3), round(time.time())
+
+    def trust(self, name) -> float:
+        """How far it trusts `name` now, from what they did ([-1, 1], faded since)."""
+        rel = self.relations.get(name) or {}
+        return rel.get("trust", 0.0) * 0.5 ** ((time.time() - rel.get("trust_at", time.time())) / TRUST_HALF_S)
+
+    def balance(self, name) -> int:
+        """What it gave `name` less what they gave it, counted in items (above 0: they owe it)."""
+        rec = (self.relations.get(name) or {}).get("record") or {}
+        return round(sum(n for w, n in rec.items() if w.startswith("you gave them ")) - sum(n for w, n in rec.items() if w.startswith("gave you ")))
+
+    def who_has(self, item) -> list:
+        """The people it knows had `item` (seen holding it, or gave it some), most trusted first."""
+        had = [n for n, rel in self.relations.items() if item in (rel.get("seen_with") or {})
+               or f"gave you {item}" in (rel.get("record") or {})]
+        return sorted(had, key=self.trust, reverse=True)
 
     def outcome(self, ev, t: float):
         me = self.name
         match ev:
             case Attack(by=a, target=tgt) if tgt == me:
-                self.remember(a, "hit you")
+                self.remember(a, "hit you", trust="hit")
                 self.fought = t if is_creature(a) else self.fought
             case Attack(by=a, target=tgt) if a == me:
                 self.remember(tgt, "you hit them")
             case Attack(by=a, target=tgt) if is_creature(tgt) and t - self.fought <= WINDOW_S:
-                self.remember(a, "fought a creature that was fighting you")
+                self.remember(a, "fought a creature that was fighting you", trust="helped")
             case Give(src=src, to=to) if me in (src, to):
-                for k, n in ev.items.items():
-                    self.remember(src if to == me else to, f"gave you {k}" if to == me else f"you gave them {k}", n)
+                for i, (k, n) in enumerate(ev.items.items()):     # (a gift moves trust once, whatever it holds)
+                    self.remember(src if to == me else to, f"gave you {k}" if to == me else f"you gave them {k}", n,
+                                  trust="gave" if to == me and not i else None)
                     if self.asks.get((to, src), ("",))[0] == k:
                         del self.asks[(to, src)]
             case Say(src=src) if src != me and (item := next(iter(named(ev.text, self.items)), None)):
@@ -104,11 +131,17 @@ class Now:
             self.remember(who if who != self.name else whom, f"asked you for {item}" if who != self.name else f"you asked them for {item}")
 
     def person(self, name) -> str:
-        """What happened between it and `name` so far, and whether it calls them an ally."""
+        """What happened between it and `name` so far, whether it calls them an ally, how far it trusts them, who owes."""
         rel = self.relations.get(name) or {}
         rec = [f"{w} x{n:g}" if n != 1 else w for w, n in (rel.get("record") or {}).items()]
         ally = {True: "your ally", False: "not your ally"}.get(rel.get("ally"))
-        return "; ".join(([ally] if ally else []) + rec) or "nothing between you yet"
+        return "; ".join(([ally] if ally else []) + self.standing(name) + rec) or "nothing between you yet"
+
+    def standing(self, name) -> list:
+        """How far it trusts `name`, and who owes whom: ["trust +0.3", "they owe you 2 items"] (what is nothing, left out)."""
+        tr, bal = self.trust(name), self.balance(name)
+        return ([f"trust {tr:+.1f}"] if abs(tr) >= 0.05 else []) + \
+               ([(f"they owe you {bal}" if bal > 0 else f"you owe them {-bal}") + (" item" if abs(bal) == 1 else " items")] if bal else [])
 
     def did(self, action: str):
         self.acts.append(" ".join(WORDS.get(w, w) for w in action.split("_")))
