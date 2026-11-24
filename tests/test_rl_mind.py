@@ -204,3 +204,24 @@ def test_what_someone_told_it_is_kept(tmp_path):
     facts = again.http.sent[0]["messages"][1]["content"]
     assert 'What people told you: good_hoe (Mira: "just a hoe, 2 wood 1 stone").' in facts
     assert "Your aims: good_hoe (you have 0, no recipe makes it" in facts
+
+
+def test_a_goal_is_judged_live_as_in_the_sim_and_ends(tmp_path):
+    """The planner's goal is judged by the sim's own judge (rl/goals.py): done, or timed out; then it is free again,
+    the planner thinks at once and is told how it went. A goal for an item the game has not ends at once."""
+    from nexel_agent.rl.goals import TIMEOUT
+    from nexel_agent.rl.voice import Now
+    m = Mind("Rook", "calm", "http://x", None, tmp_path / "memory.json", now=Now("Rook", ("wood", "hoe")))
+    obs = {"tick": 100, "self": {"inventory": {}}, "entities": [{"kind": "agent", "name": "Mira", "id": 7, "dx": 4, "dy": 0}]}
+    m.see(obs)
+    m.names = {"mira": "Mira"}
+    m.apply({"goal": "ask", "with": "Mira", "item": "wood"})
+    m.track(obs, [("say", {"ask": "wood"}, {"ok": True})], {})
+    assert m.goal.kind == "ask" and m.goal.asked == 1 and "you asked 1 times" in m.facts(obs)
+    m.track({**obs, "tick": 101}, [], {"Mira": {"wood": 2}})
+    assert m.goal.kind == "free" and m.salient and "ask wood (with Mira): " in m.ended and "done" in m.ended
+    m.apply({"goal": "ask", "with": "Mira", "item": "hoe"})
+    m.track({**obs, "tick": 101 + TIMEOUT, "entities": []}, [], {})
+    assert m.goal.kind == "free" and "timed out" in m.ended and "now out of sight" in m.ended
+    m.apply({"goal": "ask", "with": "Mira", "item": "good_hoe"})
+    assert m.goal.kind == "free" and "no item called good_hoe" in m.ended and "Your last goal" in m.facts(obs)

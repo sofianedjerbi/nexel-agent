@@ -127,7 +127,7 @@ def test_goals_pay_once_when_done():
     from nexel_agent.rl.goals import Goal
     env = SimEnv(ep_ticks=10 ** 6, roam=0, rivals=0, folk=0)
     env.reset(5)
-    env.goals.goal, env.goals.next = Goal("craft", "plank", None, env.sim.tick), env.sim.tick + 10 ** 6
+    env.goals.goal = Goal("craft", "plank", None, env.sim.tick, until=10 ** 9)
     env.a.inventory["wood"] = 3
     _, r, *_ = env.step(idx("craft_plank"))
     assert r >= 2.0 and env.goals.counts["craft"][0] == 1 and env.goals.goal.kind == "free"   # (achievement + goal)
@@ -141,7 +141,7 @@ def test_a_goal_about_a_person_it_struck_is_not_paid():
         env = SimEnv(ep_ticks=10 ** 6, roam=0, rivals=0, shadow_pct=0)
         env.reset(5)
         f = neighbour_beside(env)
-        env.goals.goal, env.goals.next = Goal("avoid", None, f.a.name, env.sim.tick), env.sim.tick + 10 ** 6
+        env.goals.goal = Goal("avoid", None, f.a.name, env.sim.tick, until=10 ** 9)
         if strike:
             env.step(idx("attack"))
             env.step(0)
@@ -162,7 +162,7 @@ def test_ask_goal_and_a_neighbour_who_says_yes():
     env.step(0)
     f.a.x, f.a.y, f.a.z = a.x + 1, a.y, 99
     f.rng.random = lambda: 0.0                        # (it says yes)
-    env.goals.goal, env.goals.next = Goal("ask", "wood", f.a.name, sim.tick), sim.tick + 10 ** 6
+    env.goals.goal = Goal("ask", "wood", f.a.name, sim.tick, until=10 ** 9)
     env.obs = sim.observe(a)
     assert env.encoded()["mask"][idx("ask")]
     env.step(idx("ask"))

@@ -14,8 +14,8 @@ import time
 from pathlib import Path
 
 from megastructure.tiles import RECIPES
-from .facts import Attack, Give, Say, events, needs, people, short
-from .goals import KINDS, Goal
+from .facts import Attack, Give, Say, dist, events, needs, people, short
+from .goals import KINDS, Goal, account, judge
 from .voice import CHAT_STYLE, THOUGHT_TOKENS, Now
 
 THINK_S = 20.0             # (the model it asks: rl/voice.py MODEL, the same server as the words)
@@ -43,6 +43,7 @@ class Mind:
         self.relations = self.now.relations                  # name: {ally, record}
         self.relations.update(mem.get("people", {k: v for k, v in mem.items() if k not in ("aims", "told")}))
         self.goal, self.goal_at = Goal(), time.monotonic()
+        self.tick, self.pack, self.ended = 0, {}, ""     # (the game's tick and the pack, last seen; how the last goal went)
         self.last, self.salient, self.busy = 0.0, False, False
         self.to_say: str | None = None
         self.names: dict = {}
@@ -53,7 +54,7 @@ class Mind:
 
     def see(self, obs: dict):
         """Something that happened to it (spoken to - unless the voice answers -, given, hit, an ally hit) thinks at once."""
-        me = self.name
+        me, self.tick, self.pack = self.name, obs.get("tick", self.tick), dict((obs.get("self") or {}).get("inventory") or {})
         for ev in events(obs):
             match ev:
                 case Say(src=who):
@@ -65,6 +66,21 @@ class Mind:
                 case _:
                     continue
             self.salient |= mine and bool(who and who != me)
+
+    def track(self, obs: dict, results: list, got_from: dict):
+        """Judges the goal as the sim does (rl/goals.py judge, with its timeout). When it ends, done or not, the goal is
+        free again, as in training, and the planner thinks at once, told how it went."""
+        g, tick = self.goal, obs.get("tick", self.tick)
+        if g.kind == "free":
+            return
+        p = next((b for b in people(obs) if b.get("name") == g.person), None)
+        done = judge(g, tick, lambda k: self.pack.get(k, 0), results, got_from, dist(p) if p else 99.0, p and p.get("id"))
+        if done or tick >= g.until:
+            self.end(g, account(g, tick, "done" if done else "timed out, not done"))
+
+    def end(self, g: Goal, how: str):
+        self.ended = f"{goal_text(g)}: {how}"
+        self.goal, self.goal_at, self.salient = Goal(start=self.tick), time.monotonic(), True
 
     def due(self) -> bool:
         return not self.busy and (self.salient or time.monotonic() - self.last >= THINK_S)
@@ -80,8 +96,10 @@ class Mind:
         lines = [self.now.text(),
                  ("Your aims: " + "; ".join(f"{a} ({needs(a, obs, known)})" for a in self.aims) + "." if self.aims
                   else "You have set yourself no aims yet."),
-                 (f"Your goal now: {goal_text(self.goal)}, set {time.monotonic() - self.goal_at:.0f} s ago."
+                 (f"Your goal now: {goal_text(self.goal)}: {account(self.goal, self.tick)}."
                   if self.goal.kind != "free" else "You have no goal now.")]
+        if self.ended:
+            lines.append(f"Your last goal: {self.ended}.")
         if me.get("craftable"):
             lines.append("Your pack has enough to make: " + ", ".join(list(me["craftable"])[:8]) + ".")
         if close:
@@ -133,10 +151,13 @@ class Mind:
         kind = kind if kind in KINDS else "free"
         who = str(d.get("with") or "").strip()
         who = self.names.get(who.lower(), who) or None               # (the name as the game spells it)
-        g = Goal(kind, item_name(d.get("item")) or None, who)
+        item = item_name(d.get("item")) or None
+        g = Goal(kind, item, who, self.tick, self.pack.get(item, 0) if item else 0)
         if (g.kind, g.item, g.person) != (self.goal.kind, self.goal.item, self.goal.person):
             self.goal, self.goal_at = g, time.monotonic()
             self.stats["goals"][kind] = self.stats["goals"].get(kind, 0) + 1
+            if item and self.now.items and item not in self.now.items:
+                self.end(g, f"there is no item called {item} in the game")
         say = str(d.get("say") or "").strip()
         self.to_say = say[:120] or None
         if isinstance(d.get("aims"), list) and d["aims"]:

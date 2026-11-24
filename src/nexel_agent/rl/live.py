@@ -41,6 +41,7 @@ class LiveBody:
         self.stats = {"decisions": 0, "acts": 0, "fails": 0, "interrupted": 0, "idle": 0, "crafted": 0, "placed": 0,
                       "deaths": 0, "hits": 0, "won": 0, "lost": 0, "kills": 0, "chat": 0}
         self.crafts, self.reactions, self.foes, self.fails_by = set(), {}, {}, {}
+        self.results: list = []                                 # (the actions that came back since the last look)
         self.ledger, self.made, self.pack = Ledger(), {}, None      # what it has done this life, as in the sim (rl/achieve.py)
         self.social, self.social_done, self.http, self.game = SocialMemory(a.name, ITEMS), set(), None, None
         self.stats.update(said=0, gave=0)
@@ -52,6 +53,7 @@ class LiveBody:
 
     def done(self, tool, args, r):
         res = from_wire(r)
+        self.results.append((tool, args, res))                 # (for the goal's judge, rl/goals.py: what came back)
         self.ledger.result(tool, args, res, self.foes.get(args.get("target"), ""), self.me.get("hp", 20))
         for k, n in (res.get("made") or {}).items():       # (made, not found: no collect for it)
             self.made[k] = self.made.get(k, 0) + n
@@ -170,8 +172,10 @@ class LiveBody:
                 me = self.me = obs["self"]
                 self.tick = obs["tick"]
                 self.social.see(obs)
+                results, self.results = self.results, []           # (what came back since the last look)
                 if self.mind:
                     self.mind.see(obs)
+                    self.mind.track(obs, results, self.social.got_by)
                     if self.mind.due():
                         ask = self.social.ask_open(obs["tick"])
                         self.mind.asks = (f"{self.social.asked_by} asked you for {ask}; you carry "
