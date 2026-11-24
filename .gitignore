@@ -9,7 +9,8 @@ agents/
 saves/
 logs/
 models/*
-rl_runs/
+rl_runs/*
+!rl_runs/LEDGER.md
 *.gguf
 *.safetensors
 *.npz

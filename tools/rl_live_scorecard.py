@@ -95,7 +95,8 @@ def main():
                            "--logs", str(logs), "--humans", str(src / "events.jsonl")], capture_output=True, text=True)
     text = card.stdout + card.stderr + visited(out / "visitor.json")
     (out / "scorecard.md").write_text(text)
-    print(text + f"\n(all of it in {out})")
+    subprocess.run([py, str(ROOT / "tools" / "kpis.py"), "live", str(out)], capture_output=True)    # (its row in docs/kpis.md)
+    print(text + f"\n(all of it in {out}; its KPIs: docs/kpis.md)")
 
 
 def visited(path: Path) -> str:
