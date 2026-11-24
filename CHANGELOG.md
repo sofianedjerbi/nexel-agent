@@ -5,6 +5,14 @@ Written by [python-semantic-release](https://python-semantic-release.readthedocs
 
 <!-- version list -->
 
+## v0.10.0 (2026-11-24)
+
+### Features
+
+- **models**: Ship rook from r37 at +600k (first strikes per near-minute 0.061 to 0.036)
+  ([`8eaf73c`](https://github.com/sofianedjerbi/nexel-agent/commit/8eaf73c78df82c362bacdfc3dd166ea47b76d096))
+
+
 ## v0.9.0 (2026-11-24)
 
 ### Features
