@@ -62,6 +62,18 @@ def test_collect_and_hurt_penalty():
     during_next_tick(env, lambda: env.sim.damage(env.a, 2, "test"))
     _, r, *_ = env.step(0)
     assert abs(r + 2 * HURT) < 1e-6 and env.ledger.counts["hits"] == 1
+    during_next_tick(env, lambda: setattr(env.a, "hp", env.a.hp + 2))
+    _, r, *_ = env.step(0)
+    assert r == 0.0                                             # (healing does not pay the loss back)
+
+
+def test_an_episode_rarely_starts_full():
+    food = []
+    for seed in range(12):
+        env = SimEnv(ep_ticks=100, roam=0, rivals=0, folk=0)
+        env.reset(seed)
+        food.append(env.a.hunger)
+    assert min(food) >= 8 and max(food) <= 20 and len(set(food)) > 3 and sum(f < 20 for f in food) >= 8
 
 
 def test_death_ends_episode():

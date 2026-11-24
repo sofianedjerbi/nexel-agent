@@ -10,7 +10,7 @@ import random
 from pathlib import Path
 
 from megastructure.sim import Simulation
-from megastructure.sim.constants import DAY_TICKS, VIEW_R
+from megastructure.sim.constants import DAY_TICKS, FOOD_MAX, VIEW_R
 from . import facts
 from .achieve import HOSTILE, Ledger
 from megastructure.tiles import DIRS
@@ -29,7 +29,8 @@ MIN_TICKS = 2                       # the shortest a decision waits (0.2 s: a st
 WAIT_MAX = 50                       # and the longest (a chop by hand takes ~5 s)
 START = 0.3                         # the time of day an episode starts (morning)
 EP_TICKS = int(2.75 * DAY_TICKS)    # three days and nights: to the third dawn, and a little more
-HURT = 0.1                          # reward per half heart lost (and, Crafter's way, gained back)
+HURT = 0.1                          # reward lost per half heart lost (healing does not pay it back)
+FOOD_START = 8                      # an episode starts with food between this and full
 OUTCOME = {"won": "defeat_player", "fled": "escape_attack", "endured": "survive_attack", "killed": None}
 
 
@@ -53,6 +54,7 @@ class SimEnv:
         world = self.live_seed if self.live_seed >= 0 and rng.random() * 100 < self.live_pct else seed
         self.sim = Simulation(Path(":memory:"), seed=world)
         self.a = self.sim.login("Learner", "rl-token")
+        self.a.hunger, self.a.sat = rng.randint(FOOD_START, FOOD_MAX), 0.0     # (rarely full, as a player found mid-game)
         if self.roam:
             self.start_somewhere(rng)
         if rng.random() * 100 < self.thin_pct:
@@ -190,8 +192,6 @@ class SimEnv:
                 L.foes[foe.id] = foe.kind
             elif self.rival and self.rival.on and math.dist((self.rival.a.x, self.rival.a.y), (a.x, a.y)) <= 4:
                 L.foes[self.rival.a.id] = "player"
-        elif not died and a.hp > hp0:
-            r += HURT * (a.hp - hp0)                     # (health back: eating keeps it coming)
         if self.goals:
             r += self.goals.step(results, self.social.got_by, self.rival)
         if self.rival and self.rival.outcome:

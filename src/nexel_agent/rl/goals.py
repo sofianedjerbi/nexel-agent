@@ -22,6 +22,7 @@ class Goal:
     def __init__(self, kind="free", item=None, person=None, start=0, base=0):
         self.kind, self.item, self.person, self.start, self.base = kind, item, person, start, base     # person: a name
         self.near_ticks, self.hit_foe, self.last = 0, False, start
+        self.struck = False             # it hit the goal's person while the goal was on: nothing done with them counts
 
 
 class Goals:
@@ -65,6 +66,7 @@ class Goals:
         last, g.last = g.last, sim.tick
         p = self.agent(g.person)
         d = math.dist((p.x, p.y), (a.x, a.y)) if p is not None and p.online else 99.0
+        g.struck |= p is not None and any(t == "attack" and r.get("ok") and args.get("target") == p.id for t, args, r in results)
         done = False
         if g.kind == "gather":
             done = a.count(g.item) >= g.base + GATHER_N
@@ -84,7 +86,7 @@ class Goals:
         elif g.kind == "help" and rival is not None:
             g.hit_foe |= any(t == "attack" and r.get("ok") and args.get("target") == rival.a.id for t, args, r in results)
             done = g.hit_foe and rival.outcome is not None
-        if not done:
+        if not done or g.struck:
             return 0.0
         self.counts[g.kind][0] += 1
         self.goal, self.next = Goal(start=sim.tick), sim.tick + sec(10)      # (a spell of free play, then another)

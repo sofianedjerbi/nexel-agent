@@ -75,6 +75,7 @@ def test_refusals_the_obs_shows_are_masked():
     a = env.a
     env.sim.set_tile(a.x + 1, a.y, block="none")
     a.inventory.update({"hoe": 1, "berries": 1})
+    a.hunger = 20
     m = legal(env.sim.observe(a), "E")
     assert not m[idx("dig_E")] and not m[idx("dig_E_axe")] and m[idx("dig_E_hoe")]    # (bare level ground: tilling)
     assert not m[idx("eat_berries")]                                                   # (full)
@@ -93,6 +94,24 @@ def test_goals_pay_once_when_done():
     assert r >= 2.0 and env.goals.counts["craft"][0] == 1 and env.goals.goal.kind == "free"   # (achievement + goal)
     _, r, *_ = env.step(idx("craft_plank"))
     assert r < 1.0                                                                   # (nothing more for the same)
+
+
+def test_a_goal_about_a_person_it_struck_is_not_paid():
+    from nexel_agent.rl.goals import Goal
+    for strike, paid in ((False, 1), (True, 0)):
+        env = SimEnv(ep_ticks=10 ** 6, roam=0, rivals=0, shadow_pct=0)
+        env.reset(5)
+        f = neighbour_beside(env)
+        env.goals.goal, env.goals.next = Goal("avoid", None, f.a.name, env.sim.tick), env.sim.tick + 10 ** 6
+        if strike:
+            env.step(idx("attack"))
+            env.step(0)
+        f.a.x, f.a.y = env.a.x + 40, env.a.y + 40             # (far off for a minute: the goal's own measure of done)
+        f.act = 10 ** 9
+        for _ in range(140):
+            env.step(0)
+            f.a.x, f.a.y = env.a.x + 40, env.a.y + 40
+        assert env.goals.counts["avoid"][0] == paid
 
 
 def test_ask_goal_and_a_neighbour_who_says_yes():
