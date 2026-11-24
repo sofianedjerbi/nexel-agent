@@ -64,7 +64,8 @@ class SimEnv:
         self.rng = random.Random(seed * 13 + 1)
         self.rival = Rival(self.sim, self.a, seed, pick=self.pick_target) if self.rivals else None
         self.rival_on = False
-        self.goals = Goals(self.sim, self.a, random.Random(seed * 7 + 5), lambda: [f.a.name for f in self.folk]) if self.use_goals else None
+        self.goals = Goals(self.sim, self.a, random.Random(seed * 7 + 5), lambda: [f.a.name for f in self.folk],
+                           lambda n: self.social.where.get(n)) if self.use_goals else None
         town: list = []
         self.folk = [Folk(self.sim, self.a, seed + k, f"Neighbour{k}", town) for k in range(self.n_folk)]
         town += self.folk

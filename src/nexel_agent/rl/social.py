@@ -27,10 +27,14 @@ class SocialMemory:
         self.i_hit: dict = {}                 # whom I hit, when
         self.my_last = -10 ** 9               # when I last said something
         self.last_hit = (None, None, -10 ** 9)   # who hit me last: (name, id, tick)
+        self.where: dict = {}                 # each person: where I last saw them, (x, y, hp)
 
     def see(self, obs: dict):
-        tick = obs["tick"]
+        tick, me = obs["tick"], obs.get("self") or {}
         self.got_now, self.got_by = {}, {}
+        for b in obs.get("entities", []):
+            if b.get("kind") == "agent" and b.get("name"):
+                self.where[b["name"]] = (me.get("x", 0) + b["dx"], me.get("y", 0) + b["dy"], b.get("hp", 0))
         for ev in events(obs):
             t = tick if ev.tick is None else ev.tick
             match ev:

@@ -162,6 +162,7 @@ def test_ask_goal_and_a_neighbour_who_says_yes():
     env.step(0)
     f.a.x, f.a.y, f.a.z = a.x + 1, a.y, 99
     f.rng.random = lambda: 0.0                        # (it says yes)
+    f.a.inventory["wood"] = 2
     env.goals.goal = Goal("ask", "wood", f.a.name, sim.tick, until=10 ** 9)
     env.obs = sim.observe(a)
     assert env.encoded()["mask"][idx("ask")]
@@ -171,3 +172,17 @@ def test_ask_goal_and_a_neighbour_who_says_yes():
         if env.goals.counts["ask"][0]:
             break
     assert env.goals.counts["ask"][0] == 1 and a.count("wood") >= 1
+
+
+
+def test_the_goals_person_out_of_view_is_where_they_were_last_seen():
+    """rl/actions.py person: in view as the game shows them ("seen" 1), kept on the goal; gone from view, where the
+    player last saw them, from where it is now ("seen" 0), for the encoder, the mask and approach alike."""
+    from nexel_agent.rl.actions import person
+    from nexel_agent.rl.goals import Goal
+    g = Goal("ask", "wood", "Mira")
+    me = {"x": 10, "y": 10}
+    assert person({"self": me, "entities": [{"kind": "agent", "name": "Mira", "dx": 3, "dy": -2, "hp": 20}]}, g)["seen"] == 1
+    p = person({"self": {"x": 12, "y": 10}, "entities": []}, g)
+    assert (p["dx"], p["dy"], p["seen"]) == (1, -2, 0) and g.seen == (13, 8, 20)
+    assert person({"self": me, "entities": []}, Goal("ask", "wood", "Bo")) is None

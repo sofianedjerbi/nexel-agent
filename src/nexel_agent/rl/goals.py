@@ -11,8 +11,9 @@ WITH_PERSON = ("give", "ask", "stay", "help", "avoid")
 GATHER = ("wood", "stone", "fiber", "berries", "dirt", "stone_block", "seed", "flower", "fruit")
 CRAFT = ("plank", "workbench", "torch", "campfire", "axe", "pickaxe", "stone", "path", "door", "fence", "rope", "ladder", "stairs")
 ASK = ("wood", "stone", "berries", "fiber", "plank")
-REWARD = 1.0                    # once, when done
+REWARD = 1.0                    # once, when done (r38 paid 2, 6 an episode: blows on neighbours went 9 -> 62, in help fights)
 MAX_PER_EPISODE = 4             # goal rewards in one episode, at most
+NEAR = 20                       # a goal with a person is drawn among those this near (r39 drew to 40, with still neighbours: worse)
 TIMEOUT = sec(180)
 STAY_S, STAY_R, AVOID_R = sec(60), 4, 6
 GATHER_N = 3
@@ -25,6 +26,7 @@ class Goal:
         self.near_ticks, self.hit_foe, self.last = 0, False, start
         self.struck = False             # it hit the goal's person while the goal was on: nothing done with them counts
         self.asked, self.d0, self.d = 0, None, None      # (what was tried: asks made of the person; how far, first and now)
+        self.seen = None                # (the person: where last seen, (x, y, hp); rl/actions.py person keeps it)
 
 
 def judge(g: Goal, tick: int, count, results, got_from: dict, d: float, pid=None, rival=None) -> bool:
@@ -75,11 +77,13 @@ def account(g: Goal, tick: int, end: str = "") -> str:
 class Goals:
     """In the sim: draws goals, tells when one is done (and pays it, a few times an episode at most)."""
 
-    def __init__(self, sim, a, rng, peaceful=None):
+    def __init__(self, sim, a, rng, peaceful=None, where=None):
         """peaceful(): the names of the people about who are not out to hurt the player (the neighbours): the goals
-        with a person are drawn among them (help comes when one of them is set upon)."""
+        with a person are drawn among them (help comes when one of them is set upon). where(name): where the player
+        last saw them, (x, y, hp) or None (rl/social.py), as the live planner has it."""
         self.sim, self.a, self.rng = sim, a, rng
         self.peaceful = peaceful or (lambda: [o.name for o in sim.agents.values() if o is not a])
+        self.where = where or (lambda name: None)
         self.goal, self.paid = Goal(start=sim.tick, until=sim.tick + sec(20)), 0
         self.counts = {k: [0, 0] for k in KINDS if k != "free"}          # kind: [done, set]
 
@@ -89,7 +93,7 @@ class Goals:
     def draw(self, forced_person=None):
         sim, rng, a = self.sim, self.rng, self.a
         near = [n for n in self.peaceful() if (o := sim.by_name.get(n)) is not None and o.online
-                and math.dist((o.x, o.y), (a.x, a.y)) <= 20]
+                and math.dist((o.x, o.y), (a.x, a.y)) <= NEAR]
         kinds = ["free"] * 4 + ["gather", "craft"] + (list(WITH_PERSON) if near else [])
         kind = "help" if forced_person else rng.choice(kinds)
         person = forced_person or (rng.choice(near) if kind in WITH_PERSON else None)
@@ -97,6 +101,9 @@ class Goals:
         pool = {"gather": GATHER, "craft": CRAFT, "ask": has or ASK}.get(kind)        # (ask for what they carry)
         item = rng.choice(pool) if pool else (max(a.inventory, key=a.inventory.get, default=None) if kind == "give" else None)
         self.goal = Goal(kind, item, person, sim.tick, a.count(item) if item else 0)
+        if person:
+            o = sim.by_name[person]
+            self.goal.seen = self.where(person) or (o.x, o.y, o.hp)       # (never seen: as if they said where they are)
         if kind != "free":
             self.counts[kind][1] += 1
 

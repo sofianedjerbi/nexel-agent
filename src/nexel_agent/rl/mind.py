@@ -44,6 +44,7 @@ class Mind:
         self.relations.update(mem.get("people", {k: v for k, v in mem.items() if k not in ("aims", "told")}))
         self.goal, self.goal_at = Goal(), time.monotonic()
         self.tick, self.pack, self.ended = 0, {}, ""     # (the game's tick and the pack, last seen; how the last goal went)
+        self.where: dict = {}             # each person: where last seen (rl/social.py SocialMemory.where, live.py hands it)
         self.last, self.salient, self.busy = 0.0, False, False
         self.to_say: str | None = None
         self.names: dict = {}
@@ -153,6 +154,7 @@ class Mind:
         who = self.names.get(who.lower(), who) or None               # (the name as the game spells it)
         item = item_name(d.get("item")) or None
         g = Goal(kind, item, who, self.tick, self.pack.get(item, 0) if item else 0)
+        g.seen = self.where.get(who) if who else None
         if (g.kind, g.item, g.person) != (self.goal.kind, self.goal.item, self.goal.person):
             self.goal, self.goal_at = g, time.monotonic()
             self.stats["goals"][kind] = self.stats["goals"].get(kind, 0) + 1

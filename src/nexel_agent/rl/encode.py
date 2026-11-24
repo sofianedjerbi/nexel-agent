@@ -101,7 +101,7 @@ def encode(obs: dict, facing: str = "S", last_action: int = 0, last_ok: float = 
         v[g + GOAL_KINDS.index(goal.kind)] = 1
         if goal.item in ITEM_ID:
             v[g + len(GOAL_KINDS) + ITEM_ID[goal.item]] = 1
-        p = person(obs, goal.person)
+        p = person(obs, goal)             # (in view, or where last seen: "seen" says which)
         if p is not None:
-            v[g + GOAL - 4:g + GOAL] = (p["dx"] / VIEW_R, p["dy"] / VIEW_R, p.get("hp", 0) / 20, 1.0)
+            v[g + GOAL - 4:g + GOAL] = (np.clip(p["dx"] / VIEW_R, -4, 4), np.clip(p["dy"] / VIEW_R, -4, 4), p.get("hp", 0) / 20, p["seen"])
     return {"grid": grid, "height": height, "vec": v}

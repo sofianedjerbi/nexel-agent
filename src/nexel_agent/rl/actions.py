@@ -62,8 +62,20 @@ def _people(obs, r):
     return [e for e in obs.get("entities", []) if e.get("kind") == "agent" and max(abs(e["dx"]), abs(e["dy"])) <= r]
 
 
-def person(obs, name):
-    return next((e for e in obs.get("entities", []) if e.get("kind") == "agent" and e.get("name") == name), None) if name else None
+def person(obs, goal):
+    """The goal's person: in view, as the game shows them ("seen" 1; where they are is kept on the goal), or where
+    they were last seen, from here ("seen" 0). None: no person, or never seen."""
+    if goal is None or not goal.person:
+        return None
+    me = obs["self"]
+    p = next((e for e in obs.get("entities", []) if e.get("kind") == "agent" and e.get("name") == goal.person), None)
+    if p is not None:
+        goal.seen = (me["x"] + p["dx"], me["y"] + p["dy"], p.get("hp", 0))
+        return {**p, "seen": 1}
+    if goal.seen is None:
+        return None
+    x, y, hp = goal.seen
+    return {"dx": x - me["x"], "dy": y - me["y"], "hp": hp, "seen": 0}
 
 
 def wanted(obs, goal) -> str | None:
@@ -137,7 +149,7 @@ def to_command(i: int, obs: dict, facing: str, social=None, goal=None):
         p = next((e for e in _people(obs, USE_R) if handed(obs, goal, social, e.get("name"))), None)
         return "give", {"target": p["id"] if p else -1, "item": (handed(obs, goal, social, p.get("name")) if p else "") or "", "n": 1}
     if kind == "approach":
-        p = person(obs, goal.person if goal else None)
+        p = person(obs, goal)
         return "move_to", {"x": me["x"] + (p["dx"] if p else 0), "y": me["y"] + (p["dy"] if p else 0)}
     if kind == "craft":
         return "craft", {"recipe": arg}
@@ -236,6 +248,6 @@ def legal(obs: dict, facing: str = "S", social=None, goal=None) -> np.ndarray:
         elif kind == "give":
             m[i] = any(handed(obs, goal, social, e.get("name")) for e in _people(obs, USE_R))
         elif kind == "approach":
-            p = person(obs, goal.person if goal else None)
+            p = person(obs, goal)
             m[i] = p is not None and max(abs(p["dx"]), abs(p["dy"])) > 1
     return m
