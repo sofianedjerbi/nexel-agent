@@ -5,6 +5,17 @@ Written by [python-semantic-release](https://python-semantic-release.readthedocs
 
 <!-- version list -->
 
+## v0.7.0 (2026-11-24)
+
+### Features
+
+- **models**: Ship rook from r34 at +900k (deaths 4.0 to 1.0, first strikes 0.10 to 0.07)
+  ([`551ef0a`](https://github.com/sofianedjerbi/nexel-agent/commit/551ef0ab97da2c97f2335ea773c463fc378bcbc9))
+
+- **rl**: Starts one step from a tool, and gear numbers in the checks
+  ([`810afd3`](https://github.com/sofianedjerbi/nexel-agent/commit/810afd318fa0f058740d7b053141749410393349))
+
+
 ## v0.6.0 (2026-11-24)
 
 ### Features
