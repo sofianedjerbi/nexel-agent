@@ -27,6 +27,7 @@ class SocialMemory:
         self.i_hit: dict = {}                 # whom I hit, when
         self.my_last = -10 ** 9               # when I last said something
         self.last_hit = (None, None, -10 ** 9)   # who hit me last: (name, id, tick)
+        self.home = None                      # (x, y) of the home's inside, once chosen (rl/build.py)
         self.where: dict = {}                 # each person: where I last saw them, (x, y, hp)
         self.words_tell = False               # live with a words model: it tells which lines are asks (rl/acts.py), not a name in them
 

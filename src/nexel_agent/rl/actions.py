@@ -46,6 +46,7 @@ def _actions():
     acts += [("attack", None, "back")]                # attack whoever hit me last (rl/social.py)
     acts += [("ring", None, None)]                    # walls round me from the pack (rl/ring.py)
     acts += [("pursue", None, None)]                  # the goal's next step (rl/pursue.py)
+    acts += [("build", None, None)]                   # the home's next step (rl/build.py)
     return tuple(acts)
 
 
@@ -160,6 +161,8 @@ def to_command(i: int, obs: dict, facing: str, social=None, goal=None):
         return "craft", {"recipe": arg}
     if kind == "pursue":
         return pursued(obs, goal, social)
+    if kind == "build":
+        return built(obs, social)
     return "eat", {"item": arg}
 
 
@@ -168,6 +171,12 @@ def pursued(obs, goal, social):
     from .pursue import next_step                         # (it reads the goal with the helpers here)
     return next_step(obs, goal, social, person=person, wanted=wanted, handed=handed, tool_for=tool_for,
                      ground_ch=GROUND_CH, dirs=STEP)
+
+
+def built(obs, social):
+    """The home's next step as a tool call, or None (rl/build.py), on bare ground (no water, no pile)."""
+    from .build import next_step
+    return next_step(obs, social, ground_ch=GROUND_CH - {"~", "$"}, tool_for=tool_for, dirs=STEP)
 
 
 LEVEL = {height_char(lv): lv for lv in range(-26, 36)}     # (a height char of the grid: the game's height_char, read back)
@@ -269,4 +278,6 @@ def legal(obs: dict, facing: str = "S", social=None, goal=None) -> np.ndarray:
             m[i] = p is not None and max(abs(p["dx"]), abs(p["dy"])) > 1
         elif kind == "pursue":
             m[i] = pursued(obs, goal, social) is not None
+        elif kind == "build":
+            m[i] = built(obs, social) is not None
     return m

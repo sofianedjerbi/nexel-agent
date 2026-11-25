@@ -76,7 +76,7 @@ def craft(obs, item, ground_ch, tool_for, dirs, depth=0, blocked=()):
             return step
     if lacks:
         return None
-    if r.station:
+    if r.station and r.station not in (obs["self"].get("stations") or ()):  # (the game says which are in reach)
         ch = STATION_CH[r.station]
         at = next(iter(_cells(obs, {ch}, blocked)), None)
         if at is None:
@@ -84,8 +84,7 @@ def craft(obs, item, ground_ch, tool_for, dirs, depth=0, blocked=()):
                 d = next((k for k, (dx, dy) in dirs.items() if obs["grid"][VIEW_R + dy][VIEW_R + dx] in ground_ch - {"~"}), None)
                 return ("place", {"dir": d, "item": r.station}) if d else None
             return craft(obs, r.station, ground_ch, tool_for, dirs, depth + 1, blocked)
-        if not in_reach(at[0], at[1], 0, reach_of("station")):
-            return _walk(obs, *at, ground_ch)
+        return _walk(obs, *at, ground_ch)                   # (in view, not in reach: walk to it)
     return "craft", {"recipe": item}
 
 
