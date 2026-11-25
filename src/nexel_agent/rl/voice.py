@@ -131,12 +131,16 @@ class Voice:
                                      WORDS_TOKENS, words=True)
         except Exception as e:
             out, t = "", {"error": repr(e)[:80]}
-        out, labels, promise = acts.read(out, len(heard), self.now.items)
+        raw, (out, labels, promise) = out, acts.read(out, len(heard), self.now.items)
         for (who, _, _), (kind, item) in zip(heard, labels):
             self.on_heard(who, kind, item)
         self.asked_pack = any(k == "pack" for k, _ in labels)
         out = next((ln.strip() for ln in out.splitlines() if ln.strip()), "").strip('"')[:120]     # (one line)
         if out.lower() in ("", "nothing", "(nothing)", "...", "-"):
+            out = ""
+        claim = acts.deed(raw, self.now.items)
+        if out and claim and not self.now.backs(*claim, heard[-1][0] if heard else None):
+            self.write({"kind": "dropped", "said": out, "why": f"claims it {' '.join(claim)}: no such deed"})
             out = ""
         if out and promise and heard:
             self.on_promise(heard[-1][0], *promise)

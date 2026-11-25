@@ -144,6 +144,14 @@ class Now:
         return ([f"trust {tr:+.1f}"] if abs(tr) >= 0.05 else []) + \
                ([(f"they owe you {bal}" if bal > 0 else f"you owe them {-bal}") + (" item" if abs(bal) == 1 else " items")] if bal else [])
 
+    def backs(self, deed: str, item: str, to: str | None = None) -> bool:
+        """Is the deed a line claims on record: `item` given to `to` (to anyone when None), or made lately or carried?"""
+        if deed == "gave":
+            rels = [self.relations.get(to) or {}] if to else self.relations.values()
+            return any((r.get("record") or {}).get(f"you gave them {item}") for r in rels)
+        return bool((self.obs.get("self") or {}).get("inventory", {}).get(item)) or any(
+            isinstance(ev, Craft) and ev.name == self.name and item in (ev.made or {}) for _, ev in self.past)
+
     def did(self, action: str):
         self.acts.append(" ".join(WORDS.get(w, w) for w in action.split("_")))
 

@@ -87,3 +87,19 @@ def test_one_pace_when_all_want_to_talk_at_once(tmp_path):
     a, b, c, d, e = asyncio.run(go())
     assert a is not None and b is None and c is None and d is None and e is not None
     assert said == ["hey", "yo"]
+
+
+def test_a_claimed_deed_with_none_behind_it_goes_unsaid(tmp_path):
+    """'I gave you the wood' with no give on record: the line is dropped; once the give is on record, it is said."""
+    reply = '{"heard": ["chat"], "say": "I gave you the wood already", "promise": "", "deed": "gave wood"}'
+    v, said = speaker(tmp_path, reply=reply, near=(person("Mira", 2),))
+
+    async def go():
+        v.hear("Mira", "hey Rook, where is my wood?")
+        await settle(v)
+        assert said == []
+        v.now.remember("Mira", "you gave them wood")
+        v.hear("Mira", "Rook? the wood?")
+        await settle(v)
+        assert said == ["I gave you the wood already"]
+    asyncio.run(go())

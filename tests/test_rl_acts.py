@@ -81,3 +81,9 @@ def test_a_named_thing_comes_with_the_games_recipe():
     asyncio.run(v.line([("Mira", "how do i make a pickaxe?", 0.0)]))
     facts = http.sent[0]["messages"][1]["content"]
     assert "What pickaxe takes (the game's recipe): you have 0; made from 2 wood, 3 stone, 1 fiber at a workbench" in facts
+
+
+def test_the_deed_its_line_claims():
+    assert acts.deed('{"say": "made you a sword", "deed": "made sword"}', ITEMS) == ("made", "sword")
+    assert acts.deed('{"say": "hi", "deed": ""}', ITEMS) is None
+    assert acts.deed("no json at all", ITEMS) is None
