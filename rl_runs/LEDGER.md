@@ -189,3 +189,8 @@ verdict: keep the shipped body (targets: goals_done; 20 min)
 - Changed: a craft goal gets 20 s more per step of its recipe tree (a tool: ~420 s, was 180 s); the spear is among
   the sim's craft goals (ee531ff).
 - Config: as r46, but 3 h at most and patience 6.
+
+## r48 (planned, after r47)
+
+- From: r47's best (or r46's), `--init`, a value warmup (the craft rewards grew).
+- Changed: a first craft pays as deep as it is, 1 to 4 (a spear 2.75, an axe 3; was 1 for all).
