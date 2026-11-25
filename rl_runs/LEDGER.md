@@ -330,3 +330,10 @@ verdict: keep the shipped body (targets: score; 18 min)
 
 - From: r47 best (shipped), `--init`. With both craft rewards (depth pay, the spare-craft cost), from the shipped body
   rather than r48's; 4 h at most, lr 2e-5. Queued behind another agent's job.
+
+## r51 (planned, after r50's gate)
+
+- From: the better of r50 and r47, `--init` (one new action: `build`, rl/build.py; a 75k value warmup).
+- Changed: the `build` verb (a 3x3 hut, laid step by step) and the build reward (a potential on the judge's grade,
+  0.25 a check: rl/judge.py). The game pin moves to main (roofs in the observation, ores and tool tiers).
+- Target: builds_5 (best build passes 5 of 6 checks) up from about 0, score and deaths no worse.
