@@ -255,8 +255,8 @@ def legal(obs: dict, facing: str = "S", social=None, goal=None) -> np.ndarray:
         elif kind == "eat":
             m[i] = bool(inv.get(arg)) and me.get("hunger", 0) < FOOD_MAX
         elif kind == "craft":
-            r = RECIPES[arg]
-            m[i] = not short(r, inv) and (not r.station or _STATION_CH[r.station] in near)
+            r = RECIPES.get(arg)                  # (a learned action the game no longer has: never legal, rl/vocab.py)
+            m[i] = r is not None and not short(r, inv) and (not r.station or _STATION_CH[r.station] in near)
         elif kind == "water":
             m[i] = bool(inv.get("watering_can"))
         elif kind == "sleep":

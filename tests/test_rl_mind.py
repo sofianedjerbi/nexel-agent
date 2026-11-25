@@ -181,11 +181,13 @@ def test_what_lies_about_and_the_whole_pack_are_facts():
 def test_what_a_thing_takes_is_the_games_own_recipe():
     from nexel_worlds.tiles import RECIPES
     from nexel_agent.rl.facts import counted, needs
-    sword, ingot = RECIPES["sword"], RECIPES["ingot"]
+    sword = RECIPES["sword"]
+    made = next(k for k in sword.inputs if k in RECIPES)          # (the bar it takes, whatever the game calls it)
+    ingot = RECIPES[made]
     obs = {"self": {"inventory": {"wood": 5}, "stations": []}}
     s = needs("sword", obs)
     assert s.startswith(f"you have 0; made from {counted(sword.inputs)} at a {sword.station}; you lack ")
-    assert f"(ingot is made from {counted(ingot.inputs)} at a {ingot.station})" in s
+    assert f"({made} is made from {counted(ingot.inputs)} at a {ingot.station})" in s
     have = {k: 9 for k in sword.inputs}
     assert needs("sword", {"self": {"inventory": have, "stations": []}}).endswith(f"no {sword.station} in reach")
     assert needs("sword", {"self": {"inventory": have, "stations": [sword.station]}}).endswith("you can make it now")
