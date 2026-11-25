@@ -177,3 +177,4 @@ _Made by `tools/kpis.py show`, 2026-11-25. Arrows: which way is better._
 | run | words | min | lines_min ↑ | reply_p90_s ↓ | fs_hour ↓ | repeat_crafts_pct ↓ | tools_made ↑ | fail_pct ↓ | asks_met ↑ |
 |---|---|---|---|---|---|---|---|---|---|
 | 20261124-231114 | silent | 21 | 0.52 | - | 0 | 75 | 2 | 26.2 | 3/4 |
+| 20261125-103903 | words | 31 | 0.42 | 2.27 | 0 | 80 | 0 | 24.7 | 5/6 |

@@ -227,3 +227,15 @@ def test_a_goal_is_judged_live_as_in_the_sim_and_ends(tmp_path):
     assert m.goal.kind == "free" and "timed out" in m.ended and "now out of sight" in m.ended
     m.apply({"goal": "ask", "with": "Mira", "item": "good_hoe"})
     assert m.goal.kind == "free" and "no item called good_hoe" in m.ended and "Your last goal" in m.facts(obs)
+
+
+def test_an_aim_said_as_a_phrase_is_the_items_it_names(tmp_path):
+    """Live, the model wrote aims as phrases ("a good hoe"): stored as such, no recipe matched them and it asked a
+    neighbour for a bed 95 times out of 95. An aim is the game's items it names."""
+    reply = '{"goal": "free", "aims": ["a house with a door and bed", "a good hoe", "a bed"]}'
+    m = Mind("Rook", "a quiet player", "http://x", FakeHTTP(reply), tmp_path / "memory.json")
+    m.now.items = ("bed", "door", "hoe", "stone")
+    m.now.see(OBS)
+    m.see(OBS)
+    asyncio.run(m.think(OBS))
+    assert m.aims == ["door", "bed", "hoe"]

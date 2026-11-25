@@ -145,3 +145,4 @@
 {"kind": "sim", "run": "r46", "step": 975267, "set": "live-like", "score": 5.67, "deaths": 0, "fs_near_min": 0.0, "goals_done": null, "tools": 0.0, "repeat_crafts": 0.7, "rooms": 0.04, "fail_pct": 21.3}
 {"kind": "sim", "run": "r46", "step": 1125267, "set": "lush", "score": 5.687, "deaths": 2, "fs_near_min": 0.013, "goals_done": 0.565, "tools": 0.0, "repeat_crafts": 0.71, "rooms": 0.12, "fail_pct": 22.9}
 {"kind": "sim", "run": "r46", "step": 1125267, "set": "live-like", "score": 5.768, "deaths": 0, "fs_near_min": 0.0, "goals_done": null, "tools": 0.0, "repeat_crafts": 0.7, "rooms": 0.04, "fail_pct": 21.4}
+{"kind": "live", "run": "20261125-103903", "who": "Rook", "model": "words", "minutes": 31, "lines_min": 0.42, "reply_p90_s": 2.27, "fs_hour": 0.0, "repeat_crafts_pct": 80, "tools_made": 0, "fail_pct": 24.7, "asks_met": "5/6"}

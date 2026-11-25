@@ -15,7 +15,7 @@ from pathlib import Path
 
 from nexel_worlds.sim.constants import sec
 from nexel_worlds.tiles import RECIPES
-from .facts import Attack, Give, Say, dist, events, needs, people, short
+from .facts import Attack, Give, Say, dist, events, named, needs, people, short
 from .goals import KINDS, Goal, account, judge
 from .now import Now
 from .voice import CHAT_STYLE, THOUGHT_TOKENS
@@ -194,7 +194,9 @@ class Mind:
         say = str(d.get("say") or "").strip()
         self.to_say = say[:120] or None
         if isinstance(d.get("aims"), list) and d["aims"]:
-            self.aims = [item_name(a) for a in d["aims"][:3] if item_name(a)]
+            said = [str(a) for a in d["aims"][:3]]               # ("a house with a door and bed": door, bed - the
+            aims = [k for a in said for k in named(a, self.now.items)] if self.now.items else [item_name(a) for a in said]
+            self.aims = list(dict.fromkeys(a for a in aims if a))[:3]   # game's items it names; a phrase is no item)
         for who, upd in (d.get("relation_update") or {}).items():
             who = self.names.get(str(who).lower())              # (people it has seen only)
             if isinstance(upd, dict) and who and "ally" in upd:
