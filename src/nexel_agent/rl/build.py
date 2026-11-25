@@ -25,6 +25,7 @@ CH = {b.name: b.char for b in BLOCKS}
 WALLS = tuple(k for k in ENCLOSE if _SOLID[k])
 DOORS = tuple(k for k in ENCLOSE if not _SOLID[k])
 WALL_CH, DOOR_CH = {CH[k] for k in WALLS}, {CH[k] for k in DOORS}
+BLOCK_CH = {b.char for b in BLOCKS if b.name != "none" and b.solid and b.hardness > 0}   # (what stands in the way and can be dug)
 
 
 def blueprint() -> list:
@@ -92,6 +93,15 @@ def next_step(obs, social, *, ground_ch, tool_for, dirs):
             return next_step(obs, social, ground_ch=ground_ch, tool_for=tool_for, dirs=dirs)
         k = (VIEW_R - 1) / d
         return "move_to", {"x": me["x"] + round(dx * k), "y": me["y"] + round(dy * k)}
+    for dx, dy, piece in PLAN:                               # (the ground cleared first, as a player clears it:
+        X, Y = hx + dx, hy + dy                              # a tree, a stump or a bush grown on the spot since)
+        ch = _at(obs, "grid", X, Y)
+        if piece != "roof" and ch in BLOCK_CH and not laid(obs, X, Y, piece) and ch not in WALL_CH | DOOR_CH:
+            d = next((k for k, v in dirs.items() if v == (X - me["x"], Y - me["y"])), None)
+            if d is None:
+                return "move_to", {"x": X, "y": Y}                # (the server walks beside it)
+            w = tool_for(obs, d)
+            return "dig", {"dir": d, **({"with": w} if w else {})}
     for dx, dy, piece in PLAN:
         X, Y = hx + dx, hy + dy
         if laid(obs, X, Y, piece):
