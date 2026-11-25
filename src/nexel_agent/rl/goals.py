@@ -7,17 +7,19 @@ import math
 
 from nexel_worlds.sim.constants import sec
 
-from .progress import potential
+from .progress import left, potential
 
 KINDS = ("free", "gather", "craft", "give", "ask", "stay", "help", "avoid")
 WITH_PERSON = ("give", "ask", "stay", "help", "avoid")
 GATHER = ("wood", "stone", "fiber", "berries", "dirt", "stone_block", "seed", "flower", "fruit")
-CRAFT = ("plank", "workbench", "torch", "campfire", "axe", "pickaxe", "stone", "path", "door", "fence", "rope", "ladder", "stairs")
+CRAFT = ("plank", "workbench", "torch", "campfire", "spear", "axe", "pickaxe", "stone", "path", "door", "fence", "rope", "ladder", "stairs")
 ASK = ("wood", "stone", "berries", "fiber", "plank")
 REWARD = 1.0                    # once, when done (r38 paid 2, 6 an episode: blows on neighbours went 9 -> 62, in help fights)
 MAX_PER_EPISODE = 4             # goal rewards in one episode, at most
 NEAR = 20                       # a goal with a person is drawn among those this near (r39 drew to 40, with still neighbours: worse)
 TIMEOUT = sec(180)
+STEP_S = sec(20)                # and a craft goal this much more per step of its recipe tree (a tool from bare hands:
+                                # ~12 steps, 420 s: pursue alone took 46-310 s, and r46's 180 s left most out of reach)
 STAY_S, STAY_R, AVOID_R = sec(60), 4, 6
 GATHER_N = 3
 
@@ -109,6 +111,8 @@ class Goals:
         pool = {"gather": GATHER, "craft": CRAFT, "ask": has or ASK}.get(kind)        # (ask for what they carry)
         item = rng.choice(pool) if pool else (max(a.inventory, key=a.inventory.get, default=None) if kind == "give" else None)
         self.goal = Goal(kind, item, person, sim.tick, a.count(item) if item else 0)
+        if kind == "craft":
+            self.goal.until += STEP_S * int(left(item, a.inventory, lambda s: sim.near_block(a, s)))
         if person:
             o = sim.by_name[person]
             self.goal.seen = self.where(person) or (o.x, o.y, o.hp)       # (never seen: as if they said where they are)

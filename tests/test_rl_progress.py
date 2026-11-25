@@ -40,3 +40,12 @@ def test_a_goal_that_ends_undone_sums_to_nothing():
     g.goal.until = env.sim.tick                               # (time is up: another goal)
     total += g.step([], {}, None)
     assert abs(total) < 1e-9
+
+
+def test_a_long_recipe_gets_the_time_it_takes():
+    from nexel_agent.rl.goals import STEP_S, TIMEOUT
+    env, g = goals_with("axe")
+    g.rng.choice = lambda pool: "craft" if "craft" in pool else "axe"
+    g.draw()
+    assert (g.goal.kind, g.goal.item) == ("craft", "axe")
+    assert g.goal.until - g.goal.set_at == TIMEOUT + STEP_S * int(left("axe", {}, lambda s: False))
