@@ -129,3 +129,13 @@ verdict: keep the shipped body (targets: goals_done; 20 min)
 
 - As r44 (from r43 best, the fibre pursue), with the body's vocabulary frozen as it learned it (rl/vocab.py). Today's
   game (nexel-worlds b5671f6): new creatures read as unknown chars, the hob craft is a new last action.
+
+- **Result (r45):** sane again (deaths 0-2/48, best score 5.78), tools still ~0 (one check 0.02 spears). Not gated: its
+  target (tools) is not met, so it cannot ship.
+
+## r46
+
+- From: r45's best (already on today's game), `--init`.
+- Changed: the progress shaping of craft and gather goals (rl/progress.py): potential-based, 0.05 a step of the
+  recipe tree, paid back when the goal ends. r43 picked pursue 7% of the times it was legal under a tool goal.
+- Target: tools_made (and goals_done); the guards as ever.
