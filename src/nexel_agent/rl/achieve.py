@@ -5,6 +5,7 @@ The ones that need a look at the world each step are in rl/milestones.py."""
 
 import math
 
+from nexel_worlds.sim.core import Simulation
 from nexel_worlds.sim.entities import CREATURES
 from nexel_worlds.tiles import ARMOR, BLOCKS, FOOD, RECIPES
 from .actions import PLACE
@@ -37,6 +38,11 @@ BY_ACT = ("till", "plant", "water_crop", "feed_animal", "milk_cow", "sleep_bed",
 # 1, a plank and an axe were worth the same, and the wood of one axe bought several first crafts: r37-r47 made no tool
 # (the policy gave a tool craft 0.2% when it was one action away). An axe or a spear is now worth about 3.
 DEEP = {k: min(4.0, max(1.0, left(k, {}, lambda s: False) / 4)) for k in RECIPES}     # (4 at most: no one craft outweighs a life)
+# Another one made while one sits unused in the pack (a mailbox, a chair, a trough, a bench) costs a little: it burned
+# the wood a tool needed, and r47 made 3 in 4 of its crafts again. Free to make again: what recipes take (stone, plank,
+# rope...) and the pieces of a room (the game's ENCLOSE), which are needed by the dozen.
+KEEP = {k for r in RECIPES.values() for k in r.inputs} | set(Simulation.ENCLOSE)
+WASTE = 0.05
 KNOWN = tuple(a for a in ACHIEVEMENTS if a.startswith(("collect_", "craft_", "place_", "eat_", "defeat_")) or a in BY_ACT)
 
 
@@ -62,8 +68,8 @@ class Ledger:
             return 1.0
         return 0.0
 
-    def result(self, tool: str, args: dict, res: dict, kind: str = "", hp: float = 20) -> float:
-        """An action came back."""
+    def result(self, tool: str, args: dict, res: dict, kind: str = "", hp: float = 20, have=lambda k: 0) -> float:
+        """An action came back. have(item): what the pack holds now."""
         if res.get("status") == "interrupted":
             return 0.0
         self.counts["acts"] += 1
@@ -74,7 +80,10 @@ class Ledger:
         if tool == "craft":
             self.counts["crafts"] += 1
             self.crafted.add(args.get("recipe"))
-            r += self.unlock(f"craft_{args.get('recipe')}") * DEEP.get(args.get("recipe"), 1.0)
+            rec = args.get("recipe")
+            first = self.unlock(f"craft_{rec}")
+            spare = rec in RECIPES and have(rec) > RECIPES[rec].output.get(rec, 1)      # (one was in the pack already)
+            r += first * DEEP.get(rec, 1.0) - (WASTE if spare and res.get("ok", True) and rec not in KEEP else 0.0)
         elif tool == "place":
             self.counts["places"] += 1
             item = args.get("item")

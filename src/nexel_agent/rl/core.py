@@ -170,7 +170,7 @@ class SimEnv:
                 L.counts["multi_place"] = L.counts.get("multi_place", 0) or int(own >= 2)    # (2+ in one decision)
             if p[1] == "say" and res.get("ok"):
                 L.counts["said"] = L.counts.get("said", 0) + 1
-            r += L.result(p[1], p[2], res, p[3], a.hp)
+            r += L.result(p[1], p[2], res, p[3], a.hp, a.count)
             for k in self.social.achieved(p[1], p[2], bool(res.get("ok")), sim.tick, near, res.get("to")):
                 r += L.unlock(k)
             if p[1] == "craft" and res.get("ok"):

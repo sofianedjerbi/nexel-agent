@@ -245,3 +245,17 @@ def test_a_sparring_partner_spares_you():
         if env.ledger.done & {"survive_attack", "escape_attack"}:
             break
     assert "survive_attack" in env.ledger.done
+
+
+def test_another_one_while_one_sits_in_the_pack_costs_a_little():
+    """A second mailbox while one is unused in the pack costs WASTE; planks (a material) and walls (a room) never."""
+    from nexel_agent.rl.achieve import KEEP, WASTE
+    env = SimEnv(ep_ticks=10 ** 6, roam=0)
+    env.reset(5)
+    L = env.ledger
+    assert "plank" in KEEP and "wood_wall" in KEEP and "mailbox" not in KEEP
+    assert L.result("craft", {"recipe": "mailbox"}, {"ok": True}, have=lambda k: 1) > 0           # (the first: paid)
+    assert L.result("craft", {"recipe": "mailbox"}, {"ok": True}, have=lambda k: 2) == -WASTE
+    assert L.result("craft", {"recipe": "mailbox"}, {"ok": True}, have=lambda k: 1) == 0          # (the last one went)
+    L.result("craft", {"recipe": "plank"}, {"ok": True}, have=lambda k: 4)
+    assert L.result("craft", {"recipe": "plank"}, {"ok": True}, have=lambda k: 8) == 0
