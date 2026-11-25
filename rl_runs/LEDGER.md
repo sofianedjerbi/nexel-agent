@@ -190,9 +190,9 @@ verdict: keep the shipped body (targets: goals_done; 20 min)
   the sim's craft goals (ee531ff).
 - Config: as r46, but 3 h at most and patience 6.
 
-## r48 (planned, after r47)
+## r48
 
-- From: r47's best (or r46's), `--init`, a value warmup (the craft rewards grew).
+- From: r47 best (shipped), `--init`, a 75k value warmup (the craft rewards grew).
 - Changed: a first craft pays as deep as it is, 1 to 4 (a spear 2.75, an axe 3; was 1 for all).
 
 ## gate 2026-11-25 14:29: rl_runs/r47/best.zip vs rl_runs/r46/best.zip
