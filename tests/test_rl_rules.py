@@ -214,7 +214,7 @@ def test_the_body_reads_the_game_with_the_vocabulary_it_learned():
     """A creature, an item or a recipe new in the game shifts no id the body learned (rl/vocab.py): the learned
     actions keep their rows, what is new comes after them, a char the body never learned reads as unknown."""
     from nexel_agent.rl import vocab
-    from nexel_agent.rl.encode import ACTIONS, CHAR_ID, ITEMS, KINDS, N_CHARS
+    from nexel_agent.rl.encode import CHAR_ID, ITEMS, KINDS
     assert ACTIONS[:len(vocab.ACTIONS)] == vocab.ACTIONS
-    assert ITEMS == vocab.ITEMS and KINDS == vocab.KINDS and N_CHARS == len(vocab.CHARS) + 1
+    assert ITEMS == vocab.ITEMS and KINDS == vocab.KINDS and len(vocab.CHARS) + 1 == N_CHARS
     assert CHAR_ID["@"] == vocab.CHARS.index("@") + 1
