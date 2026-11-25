@@ -9,6 +9,7 @@ import numpy as np
 
 from nexel_worlds.sim.bodies import in_reach, reach_of
 from nexel_worlds.sim.constants import FOOD_MAX, VIEW_R
+from nexel_worlds.sim.entities import CREATURES
 from nexel_worlds.sim.observe import height_char
 from . import ring
 from .facts import short
@@ -173,6 +174,7 @@ _STATION_CH = {b.name: b.char for b in BLOCKS}
 
 
 _TOOL_OF = {b.char: b.tool or b.needs_tool for b in BLOCKS if b.tool or b.needs_tool}
+_NEEDS = {b.char: b.needs_tool for b in BLOCKS if b.needs_tool}
 
 
 def tool_for(obs, d=None) -> str | None:
@@ -223,11 +225,11 @@ def legal(obs: dict, facing: str = "S", social=None, goal=None) -> np.ndarray:
             elif bare:                    # (no block there: a hoe tills it on the level, a pickaxe cuts into land)
                 m[i] = (arg == "hoe" and rel == 0) or (arg == "pickaxe" and rel != 0)
             else:
-                m[i] = arg != "hoe" and not (BLOCK_NAME.get(ch) == "ore" and arg != "pickaxe")
+                m[i] = arg != "hoe" and _NEEDS.get(ch, arg) == arg      # (ore: a pickaxe in hand, the game's needs_tool)
         elif kind == "attack":
             ents = obs.get("entities", [])
             e = (social.hitter(obs) if social else None) if arg == "back" else (ents[arg or 0] if len(ents) > (arg or 0) else None)
-            if e is not None and e.get("kind") != "wisp":
+            if e is not None and not CREATURES.get(e.get("kind"), {}).get("untouchable"):
                 dz = (LEVEL.get(hs[VIEW_R + e["dy"]][VIEW_R + e["dx"]], 0) - LEVEL.get(hs[VIEW_R][VIEW_R], 0)) if hs and abs(e["dx"]) <= VIEW_R and abs(e["dy"]) <= VIEW_R else 0
                 m[i] = in_reach(e["dx"], e["dy"], dz, reach_of("melee", weapon, e.get("kind")))   # (the server's own rule)
             else:

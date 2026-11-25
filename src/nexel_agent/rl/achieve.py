@@ -16,7 +16,7 @@ COLLECT = tuple(sorted(({"dirt", "stone_block"} | set(FOOD) | {k for b in BLOCKS
                         | {d[0] for c in CREATURES.values() for d in c["drops"]}) - _MADE))
 CRAFTS = tuple(RECIPES)
 EATS = tuple(FOOD)
-DEFEATS = tuple(k for k in CREATURES if k != "wisp")
+DEFEATS = tuple(k for k, c in CREATURES.items() if not c.get("untouchable"))
 MILESTONES = ("till", "plant", "water_crop", "feed_animal", "milk_cow", "sleep_bed", "wear_any", "wear_armor",
               "place_5_kinds", "place_10_kinds", "shelter", "light_shelter", "house", "toolkit",
               "survive_night", "survive_2_nights", "survive_3_nights", "hale_day", "swim_across",
