@@ -50,7 +50,8 @@ def test_first_time_only_and_crafts():
     assert rewards.count(1.0) == 1 and sum(rewards) == 1.0          # craft_plank once (planks came from a craft: no collect)
     assert "craft_plank" in env.ledger.done and "collect_plank" not in env.ledger.done
     r = env.step(idx("craft_workbench"))[1] + sum(env.step(0)[1] for _ in range(3))
-    assert r == 1.0 and env.ledger.counts["crafts"] >= 2
+    from nexel_agent.rl.achieve import DEEP
+    assert r == DEEP["workbench"] and env.ledger.counts["crafts"] >= 2      # (a first craft pays as deep as it is)
 
 
 def test_collect_and_hurt_penalty():

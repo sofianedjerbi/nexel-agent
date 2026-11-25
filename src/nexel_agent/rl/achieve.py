@@ -9,6 +9,7 @@ from nexel_worlds.sim.entities import CREATURES
 from nexel_worlds.tiles import ARMOR, BLOCKS, FOOD, RECIPES
 from .actions import PLACE
 from .facts import HOSTILE  # noqa: F401  (core.py, milestones.py take it from here)
+from .progress import left
 from .social import SOCIAL
 
 _MADE = {k for r in RECIPES.values() for k in r.output} - {"stone", "hay"}      # (stone, hay also come from the land)
@@ -32,6 +33,10 @@ ACHIEVEMENTS = tuple([f"collect_{x}" for x in COLLECT] + [f"craft_{x}" for x in 
 # shows these (rl/encode.py), so a first time that pays can be told from a repeat that does not.
 BY_ACT = ("till", "plant", "water_crop", "feed_animal", "milk_cow", "sleep_bed", "wear_any", "wear_armor",
           "place_5_kinds", "place_10_kinds", "fought_armed", "win_hurt")
+# A first craft pays as deep as it is: its steps from bare hands (rl/progress.py left) over 4, at least 1. All paid
+# 1, a plank and an axe were worth the same, and the wood of one axe bought several first crafts: r37-r47 made no tool
+# (the policy gave a tool craft 0.2% when it was one action away). An axe or a spear is now worth about 3.
+DEEP = {k: min(4.0, max(1.0, left(k, {}, lambda s: False) / 4)) for k in RECIPES}     # (4 at most: no one craft outweighs a life)
 KNOWN = tuple(a for a in ACHIEVEMENTS if a.startswith(("collect_", "craft_", "place_", "eat_", "defeat_")) or a in BY_ACT)
 
 
@@ -69,7 +74,7 @@ class Ledger:
         if tool == "craft":
             self.counts["crafts"] += 1
             self.crafted.add(args.get("recipe"))
-            r += self.unlock(f"craft_{args.get('recipe')}")
+            r += self.unlock(f"craft_{args.get('recipe')}") * DEEP.get(args.get("recipe"), 1.0)
         elif tool == "place":
             self.counts["places"] += 1
             item = args.get("item")

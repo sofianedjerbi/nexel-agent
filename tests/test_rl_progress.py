@@ -49,3 +49,8 @@ def test_a_long_recipe_gets_the_time_it_takes():
     g.draw()
     assert (g.goal.kind, g.goal.item) == ("craft", "axe")
     assert g.goal.until - g.goal.set_at == TIMEOUT + STEP_S * int(left("axe", {}, lambda s: False))
+
+
+def test_a_deeper_first_craft_pays_more():
+    from nexel_agent.rl.achieve import DEEP
+    assert DEEP["plank"] == 1.0 < DEEP["workbench"] < DEEP["axe"] <= 4.0
