@@ -194,3 +194,44 @@ verdict: keep the shipped body (targets: goals_done; 20 min)
 
 - From: r47's best (or r46's), `--init`, a value warmup (the craft rewards grew).
 - Changed: a first craft pays as deep as it is, 1 to 4 (a spear 2.75, an axe 3; was 1 for all).
+
+## gate 2026-11-25 14:29: rl_runs/r47/best.zip vs rl_runs/r46/best.zip
+
+| 4 passes | r46/best.zip | r47/best.zip | |
+|---|---|---|---|
+| lush score | 5.805 ± 0.109 | 6.546 ± 0.203 | better |
+| lush deaths | 0.500 ± 0.918 | 0.000 ± 0.000 | same |
+| lush fs_per_near_min | 0.003 ± 0.005 | 0.004 ± 0.007 | same |
+| lush crafts_distinct | 20.615 ± 0.149 | 22.732 ± 0.965 | better |
+| lush repeat_crafts | 0.740 ± 0.000 | 0.730 ± 0.013 | same |
+| lush fail_pct | 21.225 ± 1.482 | 21.425 ± 3.329 | same |
+| lush tools_made | 0.870 ± 0.079 | 0.823 ± 0.166 | same |
+| lush rooms | 0.083 ± 0.099 | 0.130 ± 0.075 | same |
+| lush goals_done | 0.516 ± 0.031 | 0.580 ± 0.057 | same |
+| lush goal_gather | 0.580 ± 0.037 | 0.642 ± 0.128 | same |
+| lush goal_craft | 0.545 ± 0.111 | 0.681 ± 0.084 | same |
+| lush goal_give | 0.971 ± 0.053 | 1.000 ± 0.000 | same |
+| lush goal_ask | 0.830 ± 0.033 | 0.894 ± 0.072 | same |
+| lush goal_stay | 0.639 ± 0.118 | 0.702 ± 0.105 | same |
+| lush goal_help | 0.356 ± 0.042 | 0.394 ± 0.085 | same |
+| lush goal_avoid | 0.235 ± 0.116 | 0.289 ± 0.071 | same |
+| live-like score | 5.889 ± 0.372 | 6.652 ± 0.377 | better |
+| live-like deaths | 0.000 ± 0.000 | 0.500 ± 0.918 | same |
+| live-like fs_per_near_min | 0.002 ± 0.006 | 0.003 ± 0.006 | same |
+| live-like crafts_distinct | 21.355 ± 0.621 | 23.532 ± 0.600 | better |
+| live-like repeat_crafts | 0.748 ± 0.008 | 0.728 ± 0.015 | better |
+| live-like fail_pct | 20.225 ± 1.050 | 19.600 ± 2.267 | same |
+| live-like tools_made | 0.878 ± 0.097 | 0.823 ± 0.116 | same |
+| live-like rooms | 0.080 ± 0.052 | 0.168 ± 0.145 | same |
+| live-like goals_done | 0.535 ± 0.083 | 0.569 ± 0.055 | same |
+| live-like goal_gather | 0.521 ± 0.226 | 0.549 ± 0.188 | same |
+| live-like goal_craft | 0.666 ± 0.038 | 0.784 ± 0.049 | better |
+| live-like goal_give | 0.917 ± 0.098 | 0.946 ± 0.059 | same |
+| live-like goal_ask | 0.775 ± 0.285 | 0.762 ± 0.115 | same |
+| live-like goal_stay | 0.666 ± 0.125 | 0.757 ± 0.106 | same |
+| live-like goal_help | 0.392 ± 0.129 | 0.365 ± 0.127 | same |
+| live-like goal_avoid | 0.319 ± 0.096 | 0.325 ± 0.210 | same |
+
+verdict: SHIP (targets: score; 18 min)
+- **Result (r47):** best 6.83 at +2.2M; gate against r46 (4 passes): score better on both sets (lush 5.81 -> 6.55,
+  live-like 5.89 -> 6.65), distinct crafts better, nothing worse. **Shipped.**
