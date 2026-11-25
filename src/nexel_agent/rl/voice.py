@@ -14,7 +14,7 @@ import time
 from collections import deque
 from pathlib import Path
 
-from nexel_worlds.sim.constants import sec
+from nexel_worlds.sim.constants import SAY_R, sec
 from . import acts
 from nexel_worlds.tiles import RECIPES
 from .facts import dist, named, needs, people
@@ -181,7 +181,7 @@ class Voice:
             return None
         self.last_said = t
         self.mine.append((t, line))
-        for who in [to] if to else [p.get("name") for p in people(self.now.obs) if dist(p) <= NEAR_R]:
+        for who in [to] if to else [p.get("name") for p in people(self.now.obs) if dist(p) <= SAY_R]:   # (who heard it: the game's)
             self.note(who, self.name, line)
         return await self.out(line)
 

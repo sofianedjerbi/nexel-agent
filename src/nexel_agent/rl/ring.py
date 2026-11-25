@@ -3,9 +3,12 @@ if it carries one), one place after another, as the game's own place does it. As
 the policy chooses when. Not while anyone else is on or beside those tiles (it would wall them in)."""
 
 from nexel_worlds.sim.constants import VIEW_R
+from nexel_worlds.sim.core import Simulation
+from nexel_worlds.tiles import BLOCKS
 
-WALLS = ("stone_wall", "wood_wall")          # (the pieces that close a room: the game's ENCLOSE)
-DOORS = ("door", "gate")
+_SOLID = {b.name: b.solid for b in BLOCKS}
+WALLS = tuple(k for k in Simulation.ENCLOSE if _SOLID[k])         # (the pieces that close a room: the game's ENCLOSE,
+DOORS = tuple(k for k in Simulation.ENCLOSE if not _SOLID[k])     # those you walk through are its doors)
 RING = ((0, -1), (1, 0), (0, 1), (-1, 0), (1, -1), (1, 1), (-1, 1), (-1, -1))     # (the sides first)
 
 

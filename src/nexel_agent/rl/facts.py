@@ -14,10 +14,11 @@ import math
 import re
 from typing import NamedTuple
 
+from nexel_worlds.sim.entities import CREATURES
 from nexel_worlds.tiles import RECIPES
 
 
-HOSTILE = ("tusker", "pincer", "strawman", "wyrm", "mossback", "sporeling")      # the creatures that come at you
+HOSTILE = tuple(k for k, c in CREATURES.items() if c.get("damage"))      # the creatures that come at you (the game's: they do damage)
 
 
 # ------------------------------------------------------------------ where

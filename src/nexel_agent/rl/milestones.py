@@ -15,7 +15,6 @@ def block_near(sim, a, block: str, r: int) -> bool:
     the square of r round the player."""
     return any(sim.world.block(x, y) == block for y in range(a.y - r, a.y + r + 1) for x in range(a.x - r, a.x + r + 1))
 
-ROOM_PIECES = ("wood_wall", "stone_wall", "door", "gate", "fence")
 
 # Steps toward a room, paid once an episode each, less than a room all told (shaping, not achievements): the 8 tiles
 # round it closed by its own pieces, and the wall pieces it holds at once.
@@ -84,7 +83,7 @@ class Milestones:
                 r += u("light_shelter")
             if {"door", "bed"} <= L.placed and block_near(sim, a, "door", 6) and block_near(sim, a, "bed", 6):
                 r += u("house")
-            room = self.room() if L.placed & set(ROOM_PIECES) else None
+            room = self.room() if L.placed & set(sim.ENCLOSE) else None
             if room is not None:                          # (walled all round: not just walls beside it)
                 inside, edge = room
                 r += u("room_built")
