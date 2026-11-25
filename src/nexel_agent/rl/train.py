@@ -89,7 +89,7 @@ class Check(BaseCallback):
                  f"places={m['places']} places_distinct={m['places_distinct']} nights={m['nights']} chunks={m['chunks']} fail%={m['fail_pct']} fights={m['fights']} rival={m['visits']} social={m['social']}/6 hit_neighbour={m['hit_neighbour']} unprovoked={m['hit_neighbour_unprovoked']} first_strikes={m['first_strikes']} near_min={m['near_min']} fs/near_min={m['fs_per_near_min']} attack_picks=[{m['picks']}] said/ep={m['said']} goals=[{m['goals']}] hits={m['hits']} "
                  f"kl_mean={np.mean(self.kls) if self.kls else 0:.4f} kl_max={max(self.kls, default=0):.4f} entropy={np.mean(self.ents) if self.ents else 0:.3f} "
                  f"tool_p={np.mean(self.tool_p) if self.tool_p else 0:.4f} (n={len(self.tool_p)}) "
-                 f"{gear(m)} fills={m.get('fills', '')} stock={m.get('stock', '')} multi={m.get('multi', '')} rooms={m['top'].get('room_built', 0)} "
+                 f"{gear(m)} fills={m.get('fills', '')} stock={m.get('stock', '')} multi={m.get('multi', '')} rooms={m['top'].get('room_built', 0)} build={m.get('build_grade', 0)}/{m.get('builds_5', 0)} "
                  f"train_score={tr.get('score')} train_ach={tr.get('ach')}")
         self.log("        top: " + json.dumps(m["top"]))
         self.log("        social: " + json.dumps(m["social_kinds"]))
@@ -98,7 +98,7 @@ class Check(BaseCallback):
             lk = metrics(run(ev.live_like, lambda o: pol.predict(o, deterministic=False, action_masks=np.stack(ev.live_like.masks))[0],
                             LIVE_LIKE_SEEDS))
             self.log(f"[live-like] score={lk['score']} ach={lk['ach']} deaths={lk['deaths']}/{lk['n']} crafts_distinct={lk['crafts_distinct']} "
-                     f"first_strikes={lk['first_strikes']} multi={lk['multi']} fills={lk['fills']} stock={lk['stock']} rooms={lk['top'].get('room_built', 0)} near_min={lk['near_min']} fs/near_min={lk['fs_per_near_min']} fail%={lk['fail_pct']} {gear(lk)}")
+                     f"first_strikes={lk['first_strikes']} multi={lk['multi']} fills={lk['fills']} stock={lk['stock']} rooms={lk['top'].get('room_built', 0)} build={lk.get('build_grade', 0)}/{lk.get('builds_5', 0)} near_min={lk['near_min']} fs/near_min={lk['fs_per_near_min']} fail%={lk['fail_pct']} {gear(lk)}")
         self.kls, self.ents, self.tool_p = [], [], []
         if m["score"] > self.best:
             self.best, self.flat = m["score"], 0

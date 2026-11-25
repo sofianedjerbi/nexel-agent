@@ -75,6 +75,8 @@ def metrics(eps: list) -> dict:
             "hits": sum(e["hits"] for e in eps), "hit_neighbour": sum(e.get("hit_neighbour", 0) for e in eps),
             "hit_neighbour_unprovoked": sum(e.get("hit_neighbour_unprovoked", 0) for e in eps),
             "first_strikes": sum(e.get("first_strikes", 0) for e in eps),
+            "build_grade": round(sum(e.get("build_grade", 0) for e in eps) / max(1, len(eps)), 2),     # (rl/judge.py)
+            "builds_5": round(sum(e.get("build_grade", 0) >= 5 for e in eps) / max(1, len(eps)), 3),
             "fills": "/".join(str(round(sum(e.get(f"fill_{n}", 0) for e in eps) / max(1, len(eps)), 2)) for n in (4, 6, 8)),
             "stock": "/".join(str(round(sum(e.get(f"stock_{n}", 0) for e in eps) / max(1, len(eps)), 2)) for n in (4, 8)),
             "repeat_crafts": round(1 - sum(e["distinct_crafts"] for e in eps) / max(1, sum(e["crafts"] for e in eps)), 2),

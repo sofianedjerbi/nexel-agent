@@ -14,6 +14,8 @@ Body, in the sim (held-out worlds; from train.py's checks):
 - tools: spears, axes and pickaxes made per episode - higher (#5)
 - repeat_crafts: the share of crafts that repeat one already made this life - lower (#6)
 - rooms: the share of episodes with a closed room built - higher (#6)
+- build_grade: the best build's grade by the judge (rl/judge.py, v1 of 6 checks), mean per episode - higher (#25)
+- builds_5: the share of episodes whose best build passes 5 of the 6 checks or more - higher (#25)
 Live (a QA copy, with the scripted visitors; tools/scorecard.py), beside the real people of the world:
 - lines_min, reply_p90_s, fs_hour (first strikes on people an hour), repeat_crafts_pct, tools_made, fail_pct,
   asks_met (the visitor's asks it met)."""
@@ -26,7 +28,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 ROWS, PAGE = ROOT / "docs" / "kpis.jsonl", ROOT / "docs" / "kpis.md"
-SIM = ("score", "deaths", "fs_near_min", "goals_done", "tools", "repeat_crafts", "rooms", "fail_pct")
+SIM = ("score", "deaths", "fs_near_min", "goals_done", "tools", "repeat_crafts", "rooms", "build_grade", "builds_5", "fail_pct")
 LIVE = ("lines_min", "reply_p90_s", "fs_hour", "repeat_crafts_pct", "tools_made", "fail_pct", "asks_met")
 LOWER = {"deaths", "fs_near_min", "repeat_crafts", "fail_pct", "fs_hour", "repeat_crafts_pct", "reply_p90_s"}
 
@@ -46,6 +48,7 @@ def sim_row(run: str, step, set_: str, line: str) -> dict:
             "goals_done": round(sum(d for d, _ in goals) / sum(n for _, n in goals), 3) if goals and sum(n for _, n in goals) else None,
             "tools": round(sum(tools), 2) if tools else None,
             "repeat_crafts": num(r"repeat_crafts ([\d.]+)", gear), "rooms": num(r"rooms=([\d.]+)", line),
+            "build_grade": num(r"build=([\d.]+)/", line), "builds_5": num(r"build=[\d.]+/([\d.]+)", line),
             "fail_pct": num(r"fail%=([\d.]+)", line)}
 
 

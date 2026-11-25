@@ -38,7 +38,7 @@ def rows(m: dict) -> dict:
     return {"score": m["score"], "deaths": m["deaths"], "fs_per_near_min": m["fs_per_near_min"],
             "crafts_distinct": m["crafts_distinct"], "repeat_crafts": m["repeat_crafts"], "fail_pct": m["fail_pct"],
             "tools_made": sum(top.get(f"craft_{t}", 0) for t in ("spear", "axe", "pickaxe", "sword", "hoe")),
-            "rooms": top.get("room_built", 0),
+            "rooms": top.get("room_built", 0), "build_grade": m.get("build_grade", 0), "builds_5": m.get("builds_5", 0),
             "goals_done": round(sum(d for d, _ in done) / max(1, sum(n for _, n in done)), 3),
             **{f"goal_{k}": round(int(v.split("/")[0]) / max(1, int(v.split("/")[1])), 3) for k, v in goals.items()}}
 
