@@ -283,3 +283,45 @@ verdict: keep the shipped body (targets: tools_made; 19 min)
 - Changed: another craft of a thing already unused in the pack costs 0.05 (not materials, not room pieces).
   In 3 r47 episodes: 541 crafts, 468 repeats (33 mailboxes, 31 ladders, 30 chairs, 30 troughs, 26 extra benches).
 - Target: repeat crafts down with tools and score no worse.
+
+## gate 2026-11-25 17:43: rl_runs/r49/best.zip vs rl_runs/r47/best.zip
+
+| 4 passes | r47/best.zip | r49/best.zip | |
+|---|---|---|---|
+| lush score | 6.546 ± 0.203 | 6.500 ± 0.165 | same |
+| lush deaths | 0.000 ± 0.000 | 0.750 ± 0.795 | same |
+| lush fs_per_near_min | 0.004 ± 0.007 | 0.005 ± 0.007 | same |
+| lush crafts_distinct | 22.732 ± 0.965 | 23.157 ± 0.820 | same |
+| lush repeat_crafts | 0.730 ± 0.013 | 0.775 ± 0.009 | worse |
+| lush fail_pct | 21.425 ± 3.329 | 21.350 ± 1.193 | same |
+| lush tools_made | 0.823 ± 0.166 | 0.927 ± 0.105 | same |
+| lush rooms | 0.130 ± 0.075 | 0.260 ± 0.134 | same |
+| lush goals_done | 0.580 ± 0.057 | 0.570 ± 0.049 | same |
+| lush goal_gather | 0.642 ± 0.128 | 0.624 ± 0.089 | same |
+| lush goal_craft | 0.681 ± 0.084 | 0.695 ± 0.143 | same |
+| lush goal_give | 1.000 ± 0.000 | 1.000 ± 0.000 | same |
+| lush goal_ask | 0.894 ± 0.072 | 0.926 ± 0.100 | same |
+| lush goal_stay | 0.702 ± 0.105 | 0.675 ± 0.103 | same |
+| lush goal_help | 0.394 ± 0.085 | 0.397 ± 0.050 | same |
+| lush goal_avoid | 0.289 ± 0.071 | 0.214 ± 0.130 | same |
+| live-like score | 6.652 ± 0.377 | 6.796 ± 0.223 | same |
+| live-like deaths | 0.500 ± 0.918 | 0.500 ± 1.590 | same |
+| live-like fs_per_near_min | 0.003 ± 0.006 | 0.003 ± 0.006 | same |
+| live-like crafts_distinct | 23.532 ± 0.600 | 23.010 ± 1.404 | same |
+| live-like repeat_crafts | 0.728 ± 0.015 | 0.762 ± 0.015 | worse |
+| live-like fail_pct | 19.600 ± 2.267 | 19.900 ± 1.030 | same |
+| live-like tools_made | 0.823 ± 0.116 | 0.885 ± 0.116 | same |
+| live-like rooms | 0.168 ± 0.145 | 0.220 ± 0.061 | same |
+| live-like goals_done | 0.569 ± 0.055 | 0.603 ± 0.072 | same |
+| live-like goal_gather | 0.549 ± 0.188 | 0.785 ± 0.109 | better |
+| live-like goal_craft | 0.784 ± 0.049 | 0.821 ± 0.061 | same |
+| live-like goal_give | 0.946 ± 0.059 | 1.000 ± 0.000 | same |
+| live-like goal_ask | 0.762 ± 0.115 | 0.916 ± 0.153 | same |
+| live-like goal_stay | 0.757 ± 0.106 | 0.730 ± 0.186 | same |
+| live-like goal_help | 0.365 ± 0.127 | 0.373 ± 0.104 | same |
+| live-like goal_avoid | 0.325 ± 0.210 | 0.260 ± 0.101 | same |
+
+verdict: keep the shipped body (targets: score; 18 min)
+- **Result (r49):** gate against r47: all same, repeat crafts worse (0.73 -> 0.77). The junk moved, not gone: in 3
+  episodes, mailboxes/ladders/troughs fell out of the top, stone (179) and stone walls (71, which the wall stock pays)
+  took their place. Not shipped. The repeat-crafts KPI counts materials and walls too: a crude measure of waste.
