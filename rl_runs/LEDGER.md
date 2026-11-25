@@ -235,3 +235,51 @@ verdict: keep the shipped body (targets: goals_done; 20 min)
 verdict: SHIP (targets: score; 18 min)
 - **Result (r47):** best 6.83 at +2.2M; gate against r46 (4 passes): score better on both sets (lush 5.81 -> 6.55,
   live-like 5.89 -> 6.65), distinct crafts better, nothing worse. **Shipped.**
+
+## gate 2026-11-25 16:03: rl_runs/r48/best.zip vs rl_runs/r47/best.zip
+
+| 4 passes | r47/best.zip | r48/best.zip | |
+|---|---|---|---|
+| lush score | 6.546 ± 0.203 | 6.622 ± 0.179 | same |
+| lush deaths | 0.000 ± 0.000 | 0.750 ± 1.522 | same |
+| lush fs_per_near_min | 0.004 ± 0.007 | 0.004 ± 0.005 | same |
+| lush crafts_distinct | 22.732 ± 0.965 | 23.100 ± 0.259 | same |
+| lush repeat_crafts | 0.730 ± 0.013 | 0.765 ± 0.009 | worse |
+| lush fail_pct | 21.425 ± 3.329 | 18.725 ± 1.544 | same |
+| lush tools_made | 0.823 ± 0.166 | 0.938 ± 0.053 | same |
+| lush rooms | 0.130 ± 0.075 | 0.170 ± 0.112 | same |
+| lush goals_done | 0.580 ± 0.057 | 0.595 ± 0.028 | same |
+| lush goal_gather | 0.642 ± 0.128 | 0.620 ± 0.099 | same |
+| lush goal_craft | 0.681 ± 0.084 | 0.683 ± 0.164 | same |
+| lush goal_give | 1.000 ± 0.000 | 0.974 ± 0.049 | same |
+| lush goal_ask | 0.894 ± 0.072 | 0.839 ± 0.111 | same |
+| lush goal_stay | 0.702 ± 0.105 | 0.734 ± 0.139 | same |
+| lush goal_help | 0.394 ± 0.085 | 0.430 ± 0.040 | same |
+| lush goal_avoid | 0.289 ± 0.071 | 0.261 ± 0.214 | same |
+| live-like score | 6.652 ± 0.377 | 6.832 ± 0.217 | same |
+| live-like deaths | 0.500 ± 0.918 | 0.000 ± 0.000 | same |
+| live-like fs_per_near_min | 0.003 ± 0.006 | 0.002 ± 0.005 | same |
+| live-like crafts_distinct | 23.532 ± 0.600 | 24.385 ± 0.788 | same |
+| live-like repeat_crafts | 0.728 ± 0.015 | 0.768 ± 0.015 | worse |
+| live-like fail_pct | 19.600 ± 2.267 | 19.750 ± 6.163 | same |
+| live-like tools_made | 0.823 ± 0.116 | 1.000 ± 0.073 | better |
+| live-like rooms | 0.168 ± 0.145 | 0.122 ± 0.097 | same |
+| live-like goals_done | 0.569 ± 0.055 | 0.589 ± 0.073 | same |
+| live-like goal_gather | 0.549 ± 0.188 | 0.827 ± 0.057 | better |
+| live-like goal_craft | 0.784 ± 0.049 | 0.819 ± 0.055 | same |
+| live-like goal_give | 0.946 ± 0.059 | 0.939 ± 0.065 | same |
+| live-like goal_ask | 0.762 ± 0.115 | 0.806 ± 0.082 | same |
+| live-like goal_stay | 0.757 ± 0.106 | 0.698 ± 0.033 | same |
+| live-like goal_help | 0.365 ± 0.127 | 0.376 ± 0.103 | same |
+| live-like goal_avoid | 0.325 ± 0.210 | 0.266 ± 0.130 | same |
+
+verdict: keep the shipped body (targets: tools_made; 19 min)
+- **Result (r48):** gate against r47 (target tools_made): tools better on live-like (0.82 -> 1.00), same on lush; score,
+  goals, deaths same; repeat crafts worse (0.73 -> 0.77). Not clearly smarter: r47 stays.
+
+## r49
+
+- From: r48 best, `--init`.
+- Changed: another craft of a thing already unused in the pack costs 0.05 (not materials, not room pieces).
+  In 3 r47 episodes: 541 crafts, 468 repeats (33 mailboxes, 31 ladders, 30 chairs, 30 troughs, 26 extra benches).
+- Target: repeat crafts down with tools and score no worse.
