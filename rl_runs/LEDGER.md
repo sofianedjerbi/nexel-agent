@@ -121,3 +121,11 @@ The gate kept r37: goals done is "same" (0.474 ± 0.033 against 0.445 ± 0.023).
 | live-like goal_avoid | 0.334 ± 0.068 | 0.226 ± 0.166 | same |
 
 verdict: keep the shipped body (targets: goals_done; 20 min)
+- **Result: void.** The game's new creatures and hob shifted the encoder's ids (30 tile chars, 66 actions): r44 began
+  from r43 with a scrambled view and crossed action rows (deaths 14-25/48, score about 4.3). Renamed r44-scrambled.
+  Fixed by the frozen vocabulary (5aa0548).
+
+## r45
+
+- As r44 (from r43 best, the fibre pursue), with the body's vocabulary frozen as it learned it (rl/vocab.py). Today's
+  game (nexel-worlds b5671f6): new creatures read as unknown chars, the hob craft is a new last action.
