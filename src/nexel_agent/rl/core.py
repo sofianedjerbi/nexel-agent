@@ -11,7 +11,7 @@ from pathlib import Path
 
 from nexel_worlds.sim import Simulation
 from nexel_worlds.sim.constants import DAY_TICKS, FOOD_MAX, VIEW_R
-from . import facts, starts
+from . import facts, judge, starts
 from .achieve import HOSTILE, Ledger
 from nexel_worlds.tiles import DIRS
 from .actions import RING_I
@@ -72,6 +72,7 @@ class SimEnv:
         if self.folk and rng.random() * 100 < self.shadow_pct:
             self.folk[0].shadow()
         self.social = SocialMemory(self.a.name, PACK)
+        self.build_phi = judge.Potential()
         self.piles, self.taken, self.struck = {}, {}, {}           # packs dropped by people who died here, what it picked up of them
         self.sim.listeners.append(self.on_event)
         self.t0 = self.sim.tick
@@ -202,6 +203,7 @@ class SimEnv:
             L.counts["visit_" + self.rival.outcome] = L.counts.get("visit_" + self.rival.outcome, 0) + 1
             self.rival.outcome = None
         r += self.marks.update(L, lost > 0, died)
+        r += self.build_phi.step(sim.world, self.social.home, (a.x, a.y), results)     # (rl/judge.py)
         if self.social.traded_back():
             r += L.unlock("traded")
         self.last = i

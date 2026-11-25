@@ -83,3 +83,27 @@ def told(v: dict) -> str:
              "lit" if ch["lit"] else "no light", "a bed" if ch["bed"] else "no bed",
              f"{r['area']} tiles inside"]
     return ", ".join(parts) + f" (grade {v['grade']} of {v['of']})"
+
+
+class Potential:
+    """The build reward (#29): UNIT for each check the build passes, paid as the grade changes (a wall torn down pays
+    back what it earned: potential-based, as rl/progress.py). Measured at one place - the home (rl/build.py), else the
+    last closed build it stood in - so walking out of the room is no loss. Read after a place or a dig only."""
+
+    UNIT = 0.25
+
+    def __init__(self):
+        self.at, self.phi = None, 0.0
+
+    def step(self, world, home, me: tuple, results) -> float:
+        if not any(t in ("place", "dig") and r.get("ok") for t, _, r in results):
+            return 0.0
+        at = (home[0] + 1, home[1] + 1) if home else self.at or me
+        v = verdict(world, *at)
+        if not home and not v["checks"]["closed"] and at != me:     # (the old spot is gone: where it stands now?)
+            at, v = me, verdict(world, *me)
+        if v["checks"]["closed"] and not home:
+            self.at = at
+        phi = self.UNIT * v["grade"]
+        r, self.phi = phi - self.phi, phi
+        return r
