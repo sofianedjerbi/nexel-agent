@@ -181,3 +181,11 @@ verdict: keep the shipped body (targets: goals_done; 20 min)
 - **Result (r46):** the strongest body yet against r37 on today's game: goals_done better on lush (0.537 vs 0.430),
   same on live-like (0.506 vs 0.442); tools_made, fail%, first strikes better on both; repeat crafts worse; no guard
   worse. Verdict by the rule: keep r37 (the target must be better on both sets). Shipping r46 is the owner's call.
+- **Shipped (owner's call: the smartest body wins):** r46 is models/rook.npz (f1af1e4).
+
+## r47
+
+- From: r46 best (shipped), `--init`.
+- Changed: a craft goal gets 20 s more per step of its recipe tree (a tool: ~420 s, was 180 s); the spear is among
+  the sim's craft goals (ee531ff).
+- Config: as r46, but 3 h at most and patience 6.
