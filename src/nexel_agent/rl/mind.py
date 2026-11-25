@@ -52,6 +52,7 @@ class Mind:
         self.where: dict = {}             # each person: where last seen (rl/social.py SocialMemory.where, live.py hands it)
         self.last, self.salient, self.busy = 0.0, False, False
         self.to_say: str | None = None
+        self.tried: dict = {}                # goal text: [set, done] this session
         self.names: dict = {}
         self.asks = ""                   # an ask open now, with what it carries of that item
         self.log = self.path.with_name("mind.jsonl")   # each thought: the facts it got, what it answered
@@ -110,6 +111,10 @@ class Mind:
             self.now.remember(g.person, "you kept a promise to them" if kept else "you broke a promise to them")
             how += "; it was a promise"
         self.ended = f"{goal_text(g)}: {how}"
+        if g.kind != "free":                                    # (how each goal it set went, this session)
+            tally = self.tried.setdefault(goal_text(g), [0, 0])
+            tally[0] += 1
+            tally[1] += how.startswith("done")
         self.goal, self.goal_at, self.salient = Goal(start=self.tick), time.monotonic(), True
 
     def due(self) -> bool:
@@ -133,6 +138,9 @@ class Mind:
             lines.append("What your aims lack, and who had it: " + "; ".join(lacks) + ".")
         if self.ended:
             lines.append(f"Your last goal: {self.ended}.")
+        if self.tried:
+            lines.append("Your goals so far, and how often done: " + "; ".join(
+                f"{t}: {d} of {n}" for t, (n, d) in sorted(self.tried.items(), key=lambda kv: -kv[1][0])[:5]) + ".")
         if me.get("craftable"):
             lines.append("Your pack has enough to make: " + ", ".join(list(me["craftable"])[:8]) + ".")
         if close:
@@ -162,10 +170,13 @@ class Mind:
 
     def messages(self, obs: dict) -> list:
         sys_ = (f"You are {self.name}, a player in a survival sandbox game. Your character: {self.persona}\n"
-                "Your body plays by itself (moving, gathering, crafting, fighting back); you choose what it is after. "
+                "Your body plays by itself (moving, eating, fighting back) and goes after the goal you set: gather sends "
+                "it to get an item from the land (it knows what gives what: a tree wood, a rock stone), craft to make one "
+                "(it fetches what the recipe takes), ask to ask a person for one, give to hand one over. "
                 f"{GOALS_DOC}. The other players know the game too: what a thing takes, where it is found; your line can ask them. "
                 "Reply with JSON only: "
-                '{"aims": ["1 to 3 items you want to own or build, from your character (kept: repeat them, or change them)"], '
+                '{"why": "one sentence first: what you want most now, and the quickest way to it from these facts", '
+                '"aims": ["1 to 3 items you want to own or build, from your character (kept: repeat them, or change them)"], '
                 '"goal": "gather|craft|give|ask|stay|help|avoid|free", "with": "a name you see, or empty", "item": "a game item name, or empty", "say": "a short chat line or empty", '
                 '"relation_update": {"PERSON": {"ally": true|false}}, '
                 '"learned": {"ITEM": {"by": "who told you", "what": "what they said it takes or where it is found, short"}}}. '

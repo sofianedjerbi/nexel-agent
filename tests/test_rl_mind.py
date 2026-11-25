@@ -259,3 +259,13 @@ def test_its_own_ask_line_is_on_the_record_and_a_tree_in_sight_gives_wood(tmp_pa
             return {"ok": True}
     asyncio.run(m.speak(Voice(), "got wood?"))
     assert m.goal.asked == 1 and ("Rook", "Mira") in m.now.asks
+
+
+def test_the_facts_tell_how_its_goals_went(tmp_path):
+    from nexel_agent.rl.goals import Goal
+    m = Mind("Rook", "a quiet player", "http://x", FakeHTTP("{}"), tmp_path / "memory.json")
+    for _ in range(3):
+        m.end(Goal("ask", "wood", "Mira"), "timed out, not done")
+    m.end(Goal("gather", "wood"), "done")
+    m.now.see(OBS)
+    assert "ask wood (with Mira): 0 of 3; gather wood: 1 of 1" in m.messages(OBS)[1]["content"]

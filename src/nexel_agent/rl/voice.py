@@ -27,7 +27,7 @@ CHAT_STYLE = ("Type the way people really type in a game chat: mostly lowercase,
               "never formal or robotic. You have your own things going on: friendly and easy, but not needy, you never "
               "fish for attention or keep the talk going for its own sake.")
 
-WORDS_TOKENS, THOUGHT_TOKENS = 70, 140         # (a thought: its JSON, and what it learned, if anything)
+WORDS_TOKENS, THOUGHT_TOKENS = 70, 200         # (a thought: its why, its JSON, and what it learned, if anything)
 # The model to serve for the words and the planner (rl_runs/bench, 2026-11-23, with training at 4 envs): the 30B-A3B
 # answered fastest (p90 0.6 s), never off-topic, and planned as well as any; the 8B broke the planner's JSON at 100
 # tokens (19 of 20). It needs ~16 GB: with less free, the 4B (p90 0.8 s) is the fallback.

@@ -209,3 +209,4 @@
 {"kind": "sim", "run": "r48", "step": 1425267, "set": "lush", "score": 6.648, "deaths": 0, "fs_near_min": 0.003, "goals_done": 0.661, "tools": 0.1, "repeat_crafts": 0.76, "rooms": 0.17, "fail_pct": 19.1}
 {"kind": "sim", "run": "r48", "step": 1425267, "set": "live-like", "score": 6.389, "deaths": 0, "fs_near_min": 0.0, "goals_done": null, "tools": 0.08, "repeat_crafts": 0.75, "rooms": 0.08, "fail_pct": 19.7}
 {"kind": "live", "run": "20261125-174442", "who": "Rook", "model": "words", "minutes": 31, "lines_min": 0.81, "reply_p90_s": 3.21, "fs_hour": 0.0, "repeat_crafts_pct": 82, "tools_made": 2, "fail_pct": 23.9, "asks_met": "4/6"}
+{"kind": "live", "run": "20261125-181950", "who": "Rook", "model": "words", "minutes": 31, "lines_min": 0.81, "reply_p90_s": 2.56, "fs_hour": 0.0, "repeat_crafts_pct": 85, "tools_made": 6, "fail_pct": 23.0, "asks_met": "6/6"}
