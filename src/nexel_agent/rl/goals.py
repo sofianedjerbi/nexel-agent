@@ -1,10 +1,13 @@
 """Goals: what the player is after right now, set from outside the policy (in the sim at random, so every kind gets
 trained; live, by the LLM: rl/mind.py). The policy sees the goal (kind, item, the person and where they are) and is
-paid once when it is done, read from the game: never per step of trying. Free play (no goal) is common."""
+paid when it is done, read from the game: never per step of trying (the progress of a long recipe chain is paid
+sooner, and paid back when the goal ends: rl/progress.py, a shaping that sums to nothing). Free play is common."""
 
 import math
 
 from nexel_worlds.sim.constants import sec
+
+from .progress import potential
 
 KINDS = ("free", "gather", "craft", "give", "ask", "stay", "help", "avoid")
 WITH_PERSON = ("give", "ask", "stay", "help", "avoid")
@@ -29,6 +32,7 @@ class Goal:
         self.seen = None                # (the person: where last seen, (x, y, hp); rl/actions.py person keeps it)
         self.blocked: set = set()       # (places a walk to them found no way: rl/pursue.py tries the next one)
         self.promise = False            # it said it would (rl/mind.py commit): kept or broken goes on the record
+        self.left0 = None               # (steps of its recipe tree left when it was set: rl/progress.py)
 
 
 def judge(g: Goal, tick: int, count, results, got_from: dict, d: float, pid=None, rival=None) -> bool:
@@ -88,7 +92,7 @@ class Goals:
         self.sim, self.a, self.rng = sim, a, rng
         self.peaceful = peaceful or (lambda: [o.name for o in sim.agents.values() if o is not a])
         self.where = where or (lambda name: None)
-        self.goal, self.paid = Goal(start=sim.tick, until=sim.tick + sec(20)), 0
+        self.goal, self.paid, self.phi = Goal(start=sim.tick, until=sim.tick + sec(20)), 0, 0.0
         self.counts = {k: [0, 0] for k in KINDS if k != "free"}          # kind: [done, set]
 
     def agent(self, name):
@@ -113,7 +117,14 @@ class Goals:
 
     def step(self, results, got_from: dict, rival) -> float:
         """results: the player's actions that came back [(tool, args, result)]; got_from: {giver: {item: n}} since
-        the last look; rival: the sparring partner (help). Returns the goal reward."""
+        the last look; rival: the sparring partner (help). Returns the goal reward, with the progress shaping: the
+        potential's change (a new goal's starts at 0, so the one that ended is paid back)."""
+        r = self.paid_now(results, got_from, rival)
+        phi = potential(self.goal, self.a.inventory, lambda s: self.sim.near_block(self.a, s), GATHER_N)
+        r, self.phi = r + phi - self.phi, phi
+        return r
+
+    def paid_now(self, results, got_from: dict, rival) -> float:
         sim, a, g = self.sim, self.a, self.goal
         if sim.tick >= g.until:
             self.draw()
