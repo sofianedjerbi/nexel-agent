@@ -74,3 +74,50 @@ The gate kept r37: goals done is "same" (0.474 ± 0.033 against 0.445 ± 0.023).
 - From: r42 best (at +225k, already playing today's game), `--init` (same shapes).
 - Changed: only pursue's craft step (dc43c36): any input it lacks that is at hand, gathered before it is made.
 - Config: the recipe, 3 envs, 2 h at most, `nice -n 10`.
+
+## r44
+
+- From: r43 best, `--init` (same shapes).
+- Changed: pursue finds fibre in a picked berry bush and leaves ore it cannot break (6431d2a); the masks read the
+  game's needs_tool, untouchable, ENCLOSE (21028ee, 9fef5f9). r43 made 0 tools: 5 of 7 worlds had no fibre source
+  pursue knew of within 60 tiles. Probe, pursue alone: tools 3/18 -> 11/18.
+- Config: as r43 (3 envs, 2 h at most, `nice -n 10`). Target: tools (and goals_done).
+
+## gate 2026-11-25 04:06: rl_runs/r43/best.zip vs rl_runs/r37/at_600k.zip
+
+| 4 passes | r37/at_600k.zip | r43/best.zip | |
+|---|---|---|---|
+| lush score | 5.526 ± 0.105 | 5.877 ± 0.243 | better |
+| lush deaths | 4.000 ± 2.903 | 0.750 ± 0.795 | better |
+| lush fs_per_near_min | 0.042 ± 0.023 | 0.020 ± 0.007 | same |
+| lush crafts_distinct | 18.828 ± 1.300 | 20.483 ± 0.523 | better |
+| lush repeat_crafts | 0.712 ± 0.008 | 0.742 ± 0.008 | worse |
+| lush fail_pct | 42.150 ± 4.322 | 23.500 ± 2.567 | better |
+| lush tools_made | 0.510 ± 0.099 | 0.688 ± 0.157 | same |
+| lush rooms | 0.015 ± 0.030 | 0.035 ± 0.016 | same |
+| lush goals_done | 0.445 ± 0.023 | 0.513 ± 0.079 | same |
+| lush goal_gather | 0.336 ± 0.038 | 0.522 ± 0.102 | better |
+| lush goal_craft | 0.428 ± 0.118 | 0.617 ± 0.121 | better |
+| lush goal_give | 0.848 ± 0.070 | 0.920 ± 0.155 | same |
+| lush goal_ask | 0.735 ± 0.096 | 0.687 ± 0.201 | same |
+| lush goal_stay | 0.542 ± 0.067 | 0.599 ± 0.046 | same |
+| lush goal_help | 0.357 ± 0.013 | 0.392 ± 0.075 | same |
+| lush goal_avoid | 0.263 ± 0.172 | 0.259 ± 0.224 | same |
+| live-like score | 5.853 ± 0.341 | 5.913 ± 0.109 | same |
+| live-like deaths | 1.250 ± 0.795 | 0.250 ± 0.795 | same |
+| live-like fs_per_near_min | 0.044 ± 0.038 | 0.016 ± 0.026 | same |
+| live-like crafts_distinct | 19.940 ± 0.151 | 20.635 ± 0.378 | better |
+| live-like repeat_crafts | 0.705 ± 0.009 | 0.742 ± 0.008 | worse |
+| live-like fail_pct | 40.525 ± 10.656 | 19.550 ± 1.715 | better |
+| live-like tools_made | 0.520 ± 0.110 | 0.742 ± 0.149 | better |
+| live-like rooms | 0.010 ± 0.032 | 0.010 ± 0.032 | same |
+| live-like goals_done | 0.423 ± 0.044 | 0.488 ± 0.078 | same |
+| live-like goal_gather | 0.265 ± 0.105 | 0.431 ± 0.289 | same |
+| live-like goal_craft | 0.347 ± 0.098 | 0.471 ± 0.079 | same |
+| live-like goal_give | 0.749 ± 0.093 | 0.979 ± 0.066 | better |
+| live-like goal_ask | 0.825 ± 0.376 | 0.708 ± 0.328 | same |
+| live-like goal_stay | 0.607 ± 0.119 | 0.512 ± 0.289 | same |
+| live-like goal_help | 0.370 ± 0.051 | 0.430 ± 0.075 | same |
+| live-like goal_avoid | 0.334 ± 0.068 | 0.226 ± 0.166 | same |
+
+verdict: keep the shipped body (targets: goals_done; 20 min)
