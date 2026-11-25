@@ -6,7 +6,7 @@ a foe that came close and did no harm. What happened, never how."""
 import math
 
 from nexel_worlds.gen import CHUNK
-from nexel_worlds.tiles import DIRS
+from . import judge
 from .achieve import HOSTILE
 
 
@@ -32,28 +32,6 @@ class Milestones:
         self.near_since, self.last_hit = None, -10 ** 9
         self.been = set()          # cave, depth_5, depth_10: been there, not yet back up in the open
         self.mine, self.paid = set(), set()        # tiles it put a wall, door or gate on; ladder steps paid
-
-    def room(self, most=60):
-        """The space round the player closed off by walls, doors and gates (the game's ENCLOSE), small and compact
-        (as the game's own rooms): (the tiles inside, the pieces round it), or None."""
-        sim, a = self.sim, self.a
-        seen, edge, stack = {(a.x, a.y)}, set(), [(a.x, a.y)]
-        while stack:
-            cx, cy = stack.pop()
-            if len(seen) > most:
-                return None
-            for dx, dy in DIRS.values():
-                n = (cx + dx, cy + dy)
-                if n in seen or n in edge:
-                    continue
-                if sim.world.block(*n) in sim.ENCLOSE:
-                    edge.add(n)
-                elif not sim.stand(*n) and sim.world.block(*n) not in ("bed", "chair", "table", "chest", "workbench", "campfire"):
-                    return None                           # (a cliff or a rock is not a wall it built)
-                else:
-                    seen.add(n)
-                    stack.append(n)
-        return seen, edge
 
     def ladder(self, L, name: str, have: int) -> float:
         """The steps of ladder `name` reached at `have`, each paid once an episode (broken and redone: not again)."""
@@ -83,13 +61,14 @@ class Milestones:
                 r += u("light_shelter")
             if {"door", "bed"} <= L.placed and block_near(sim, a, "door", 6) and block_near(sim, a, "bed", 6):
                 r += u("house")
-            room = self.room() if L.placed & set(sim.ENCLOSE) else None
-            if room is not None:                          # (walled all round: not just walls beside it)
-                inside, edge = room
+            v = judge.verdict(sim.world, a.x, a.y) if L.placed & set(sim.ENCLOSE) else None
+            if v is not None and v["checks"]["closed"]:     # (walled all round: the game's own reading, rl/judge.py)
+                ch = v["checks"]
+                L.counts["build_grade"] = max(L.counts.get("build_grade", 0), v["grade"])
                 r += u("room_built")
-                r += u("roofed_room") if sim.world.roof(a.x, a.y) else 0
-                r += u("room_with_door") if any(sim.world.block(*p) in ("door", "gate") for p in edge) else 0
-                r += u("bed_in_room") if any(sim.world.block(*p) == "bed" for p in inside) else 0
+                r += u("roofed_room") if ch["roofed"] else 0
+                r += u("room_with_door") if ch["door"] else 0
+                r += u("bed_in_room") if ch["bed"] else 0
         r += self.ladder(L, "fill", sum((a.x + dx, a.y + dy) in self.mine and sim.world.block(a.x + dx, a.y + dy) in
                                         sim.ENCLOSE for dx in (-1, 0, 1) for dy in (-1, 0, 1) if dx or dy))
         r += self.ladder(L, "stock", sum(a.count(w) for w in ("stone_wall", "wood_wall")))
