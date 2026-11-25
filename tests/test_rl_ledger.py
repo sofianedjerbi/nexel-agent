@@ -39,3 +39,12 @@ def test_a_lacking_aim_names_who_had_it(tmp_path):
     assert "3 stone (doben00 (here))" in line and "1 fiber (Mira, trust +0." in line and "you owe them 1 item)" in line
     m.apply({"goal": "free"})                                              # (kept across sessions)
     assert "seen_with" in Mind("Rook", "", "", None, tmp_path / "memory.json").relations["doben00"]
+
+
+def test_a_person_who_never_gave_says_so():
+    from nexel_agent.rl.now import Now
+    n = Now("Rook")
+    n.remember("Mira", "you asked them for wood")
+    assert "they have given you nothing yet" in n.person("Mira")
+    n.remember("Mira", "gave you wood")
+    assert "nothing yet" not in n.person("Mira")

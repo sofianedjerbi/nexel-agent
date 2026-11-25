@@ -135,6 +135,8 @@ class Now:
         """What happened between it and `name` so far, whether it calls them an ally, how far it trusts them, who owes."""
         rel = self.relations.get(name) or {}
         rec = [f"{w} x{n:g}" if n != 1 else w for w, n in (rel.get("record") or {}).items()]
+        if rel.get("record") and not any(w.startswith("gave you") for w in rel["record"]):
+            rec.append("they have given you nothing yet")       # (live: 'Mira already agreed to help', 28 asks, nothing given)
         ally = {True: "your ally", False: "not your ally"}.get(rel.get("ally"))
         return "; ".join(([ally] if ally else []) + self.standing(name) + rec) or "nothing between you yet"
 
