@@ -20,7 +20,7 @@ from nexel_worlds.client import Client
 from .achieve import Ledger, from_wire
 from .brain import Brain
 from .core import split
-from .encode import ACTIONS, ITEMS, N_NEAR, action_name, encode, legal, to_command
+from .encode import ACTIONS, N_NEAR, PACK, action_name, encode, legal, to_command
 from .facts import HOSTILE, Join, Say, dist, events
 from .social import SocialMemory
 from .mind import goal_text
@@ -43,10 +43,10 @@ class LiveBody:
         self.crafts, self.reactions, self.foes, self.fails_by = set(), {}, {}, {}
         self.results: list = []                                 # (the actions that came back since the last look)
         self.ledger, self.made, self.pack = Ledger(), {}, None      # what it has done this life, as in the sim (rl/achieve.py)
-        self.social, self.social_done, self.http, self.game = SocialMemory(a.name, ITEMS), set(), None, None
+        self.social, self.social_done, self.http, self.game = SocialMemory(a.name, PACK), set(), None, None
         self.tick, self.me, self.obs_entities, self.fighting = 0, {}, [], False
         self.mind = self.voice = None                       # (the LLM planner that sets goals: rl/mind.py; words: voice.py)
-        self.now = Now(a.name, ITEMS)                            # (what is happening to it, for every prompt: rl/voice.py)
+        self.now = Now(a.name, PACK)                            # (what is happening to it, for every prompt: rl/voice.py)
         self.log = open(a.log, "a") if a.log else None
         self.brain = Brain(a.brain, a.log and Path(a.log).with_name("brain.jsonl"), a.name, a.persona) if getattr(a, "brain", 0) else None
 

@@ -15,7 +15,7 @@ from . import facts, starts
 from .achieve import HOSTILE, Ledger
 from nexel_worlds.tiles import DIRS
 from .actions import RING_I
-from .encode import ACTIONS, ITEMS, N_ACTIONS, N_NEAR, VEC, encode, legal, to_command
+from .encode import ACTIONS, N_ACTIONS, N_NEAR, PACK, VEC, encode, legal, to_command
 from .milestones import Milestones
 from .folk import Folk
 from .goals import Goals
@@ -71,7 +71,7 @@ class SimEnv:
         town += self.folk
         if self.folk and rng.random() * 100 < self.shadow_pct:
             self.folk[0].shadow()
-        self.social = SocialMemory(self.a.name, ITEMS)
+        self.social = SocialMemory(self.a.name, PACK)
         self.piles, self.taken, self.struck = {}, {}, {}           # packs dropped by people who died here, what it picked up of them
         self.sim.listeners.append(self.on_event)
         self.t0 = self.sim.tick

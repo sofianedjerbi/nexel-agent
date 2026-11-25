@@ -9,14 +9,13 @@ import numpy as np
 
 from nexel_worlds.sim.constants import DAY_TICKS, VIEW_R
 from nexel_worlds.sim.entities import CREATURES
-from nexel_worlds.sim.specs import LEGEND
 from nexel_worlds.tiles import BLOCKS, FOOD, RECIPES
-from .achieve import KNOWN
 from .actions import ACTIONS, DIRS, LEVEL, N_ACTIONS, action_name, legal, person, to_command  # noqa: F401 (one place to import from)
+from . import vocab
 from .goals import KINDS as GOAL_KINDS
 
 SIDE = 2 * VIEW_R + 1
-CHARS = "".join(sorted(set(LEGEND) | set("@P$~")))
+CHARS = vocab.CHARS                                             # (the body's own, frozen: rl/vocab.py)
 CHAR_ID = {ch: i + 1 for i, ch in enumerate(CHARS)}           # 0: a character the legend does not know
 N_CHARS = len(CHARS) + 1
 
@@ -32,9 +31,10 @@ def _items():
     return tuple(sorted(items))
 
 
-ITEMS = _items()                     # every thing a pack can hold: what is made, dug, picked, dropped
+PACK = _items()                      # every thing a pack can hold, in the game now: what is made, dug, picked, dropped
+ITEMS = vocab.ITEMS                  # those the body has a slot for (rl/vocab.py)
 ITEM_ID = {k: i for i, k in enumerate(ITEMS)}
-KINDS = tuple(CREATURES) + ("agent",)
+KINDS = vocab.KINDS                  # (tuple(CREATURES) + ("agent",) when it was learned: rl/vocab.py)
 N_NEAR = 3
 BODY = 16
 SOCIAL_FLAGS = 3                     # spoken to just now, asked for something I carry, given something (rl/social.py)
@@ -46,8 +46,8 @@ ACTIONS_V2 = 181                     # the actions an r13-r15 policy knew (their
 ACTIONS_V3 = 185                     # the actions an r28-r36 policy knew (their slots before the done bits)
 V3 = (BODY + len(ITEMS) + N_NEAR * (3 + len(KINDS)) + ACTIONS_V1 + SOCIAL_FLAGS + (ACTIONS_V2 - ACTIONS_V1) + GOAL + PEOPLE
       + (ACTIONS_V3 - ACTIONS_V2))
-DONE_ID = {a: i for i, a in enumerate(KNOWN)}        # done already, this life: what its own acts tell it (rl/achieve.py)
-VEC = V3 + len(KNOWN) + (N_ACTIONS - ACTIONS_V3)
+DONE_ID = {a: i for i, a in enumerate(vocab.KNOWN)}        # done already, this life: what its own acts tell it (rl/achieve.py)
+VEC = V3 + len(vocab.KNOWN) + (N_ACTIONS - ACTIONS_V3)
 
 _GRID_LUT = np.zeros(128, np.uint8)
 for _ch, _i in CHAR_ID.items():

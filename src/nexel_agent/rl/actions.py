@@ -11,7 +11,7 @@ from nexel_worlds.sim.bodies import in_reach, reach_of
 from nexel_worlds.sim.constants import FOOD_MAX, VIEW_R
 from nexel_worlds.sim.entities import CREATURES
 from nexel_worlds.sim.observe import height_char
-from . import ring
+from . import ring, vocab
 from .facts import short
 from nexel_worlds.tiles import ARMOR, BLOCKS, FEED, FILLERS, FOOD, GROUNDS, PLACEABLE, RECIPES, REACH, WEAPONS, WEAR
 USE_R = REACH["use"]   # (the game's one reach table: tiles.py REACH; USE_R was its old name)
@@ -49,7 +49,8 @@ def _actions():
     return tuple(acts)
 
 
-ACTIONS = _actions()
+ACTIONS = vocab.ACTIONS + tuple(a for a in _actions() if a not in vocab.ACTIONS)     # (the learned ones in their rows,
+#  what the game has added since after them: rl/vocab.py)
 N_ACTIONS = len(ACTIONS)
 RING_I = next(i for i, a in enumerate(ACTIONS) if a[0] == "ring")
 
