@@ -325,3 +325,8 @@ verdict: keep the shipped body (targets: score; 18 min)
 - **Result (r49):** gate against r47: all same, repeat crafts worse (0.73 -> 0.77). The junk moved, not gone: in 3
   episodes, mailboxes/ladders/troughs fell out of the top, stone (179) and stone walls (71, which the wall stock pays)
   took their place. Not shipped. The repeat-crafts KPI counts materials and walls too: a crude measure of waste.
+
+## r50
+
+- From: r47 best (shipped), `--init`. With both craft rewards (depth pay, the spare-craft cost), from the shipped body
+  rather than r48's; 4 h at most, lr 2e-5. Queued behind another agent's job.
