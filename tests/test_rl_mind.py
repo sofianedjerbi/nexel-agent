@@ -239,3 +239,23 @@ def test_an_aim_said_as_a_phrase_is_the_items_it_names(tmp_path):
     m.see(OBS)
     asyncio.run(m.think(OBS))
     assert m.aims == ["door", "bed", "hoe"]
+
+
+def test_its_own_ask_line_is_on_the_record_and_a_tree_in_sight_gives_wood(tmp_path):
+    """Live trial 4: 25 lines asking Mira for wood, none recorded; the goal read 'you have not asked yet' for 96 plans,
+    a tree in sight all along. Its line to the person of an ask goal is the ask; the facts name what in sight gives
+    an item its aims lack."""
+    reply = '{"goal": "ask", "with": "Mira", "item": "wood", "say": "got wood?", "aims": ["door"]}'
+    m = Mind("Rook", "a quiet player", "http://x", FakeHTTP(reply), tmp_path / "memory.json")
+    m.now.items = ("wood", "door", "plank")
+    obs = {**OBS, "self": {**OBS["self"], "inventory": {}}, "grid": ["....", ".T..", "...."]}
+    m.now.see(obs)
+    m.see(obs)
+    asyncio.run(m.think(obs))
+    assert "in sight, tree gives it" in m.messages(obs)[1]["content"]
+
+    class Voice:
+        async def speak(self, line, to):
+            return {"ok": True}
+    asyncio.run(m.speak(Voice(), "got wood?"))
+    assert m.goal.asked == 1 and ("Rook", "Mira") in m.now.asks

@@ -16,7 +16,9 @@ from pathlib import Path
 from nexel_worlds.sim.constants import sec
 from nexel_worlds.tiles import RECIPES
 from .facts import Attack, Give, Say, dist, events, named, needs, people, short
+from .actions import BLOCK_NAME
 from .goals import KINDS, Goal, account, judge
+from .pursue import DROPS
 from .now import Now
 from .voice import CHAT_STYLE, THOUGHT_TOKENS
 
@@ -92,6 +94,17 @@ class Mind:
         self.goal, self.goal_at = g, time.monotonic()
         self.stats["promises"] = self.stats.get("promises", 0) + 1
 
+    async def speak(self, voice, line: str):
+        """Its own line, through the one speaker. Said to the person of an ask goal, it is the ask: on the record, as
+        the body's own asks are (live trial 4: 25 lines asking Mira for wood went unrecorded, the goal read 'you have
+        not asked yet', and it asked again 96 plans running)."""
+        g = self.goal
+        r = await voice.speak(line, g.person)
+        if r is not None and g.kind == "ask" and g.item and g.person:
+            g.asked += 1
+            self.now.ask(self.name, g.person, g.item)
+        return r
+
     def end(self, g: Goal, how: str, kept: bool = False):
         if g.promise:
             self.now.remember(g.person, "you kept a promise to them" if kept else "you broke a promise to them")
@@ -115,7 +128,7 @@ class Mind:
                   else "You have set yourself no aims yet."),
                  (f"Your goal now: {goal_text(self.goal)}: {account(self.goal, self.tick)}."
                   if self.goal.kind != "free" else "You have no goal now.")]
-        lacks = self.lacks(have, {p.get("name") for p in people(obs)})
+        lacks = self.lacks(have, {p.get("name") for p in people(obs)}, obs)
         if lacks:
             lines.append("What your aims lack, and who had it: " + "; ".join(lacks) + ".")
         if self.ended:
@@ -135,14 +148,16 @@ class Mind:
             lines.append("People you know, not here: " + "; ".join(f"{n} ({self.now.person(n)})" for n in others[:6]))
         return "\n".join(lines)
 
-    def lacks(self, have: dict, here: set) -> list:
+    def lacks(self, have: dict, here: set, obs: dict | None = None) -> list:
         """Each input its aims lack (the game's recipes), with the people it knows had some (rl/now.py who_has: seen
-        with it or gave it some), how far it trusts each and who owes whom, and who of them is here. Facts only:
-        whether to ask, trade or go and get it is the model's call."""
-        out = []
+        with it or gave it some), how far it trusts each and who owes whom, who of them is here, and what in sight gives
+        it (the game's drops: a tree, wood). Facts only: whether to ask, trade or go and get it is the model's call."""
+        out, seen = [], set("".join((obs or {}).get("grid") or []))
         for item, n in {k: n for a in self.aims if a in RECIPES for k, n in short(RECIPES[a], have).items()}.items():
             had = [", ".join([p + (" (here)" if p in here else "")] + self.now.standing(p)) for p in self.now.who_has(item)[:2]]
-            out.append(f"{n} {item} (" + ("; ".join(had) if had else "nobody you know had any") + ")")
+            src = sorted({BLOCK_NAME[c].replace("_", " ") for c in DROPS.get(item, ()) & seen})
+            out.append(f"{n} {item} (" + ("; ".join(had) if had else "nobody you know had any")
+                       + (f"; in sight, {' or '.join(src)} gives it" if src else "") + ")")
         return out[:4]
 
     def messages(self, obs: dict) -> list:

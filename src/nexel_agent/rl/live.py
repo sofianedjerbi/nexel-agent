@@ -199,7 +199,7 @@ class LiveBody:
                         asyncio.create_task(self.mind.think(obs))
                     if self.mind.to_say:                    # (its own line: through the one speaker, at its pace)
                         line, self.mind.to_say = self.mind.to_say, None
-                        asyncio.create_task(self.voice.speak(line, self.mind.goal.person))
+                        asyncio.create_task(self.mind.speak(self.voice, line))
                 self.hurt = max(0.0, hp - me["hp"]) if me["deaths"] == deaths else hp
                 for k, n in self.social.got_now.items():           # (given, not found)
                     self.made[k] = self.made.get(k, 0) + n
