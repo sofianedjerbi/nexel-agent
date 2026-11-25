@@ -3,8 +3,8 @@ policy chooses pursue or anything else: flee, eat, fight back, and when to come 
 tables: what a recipe takes and where it is made (tiles.RECIPES), what a block drops (tiles.BLOCKS), the server's
 own path finding (move_to).
 
-- gather X: a pile with X on the ground (walk there, pick it up), else the nearest block in view that drops X (walk
-  beside it, dig it with the right tool from the pack);
+- gather X: a pile with X on the ground (walk there, pick it up), else the nearest block in view that drops X, or that
+  picked leaves one that does (tiles.PICKED) (walk beside it, dig it with the right tool from the pack);
 - craft X: what X still lacks, one step down, the first it can get at now (gathered where something in view gives
   it - stone from a rock, though stone is made too -, else crafted); its
   station within reach (walk to one in view; carried, put down; else make one); then the craft;
@@ -17,15 +17,17 @@ import math
 
 from nexel_worlds.sim.bodies import in_reach, reach_of
 from nexel_worlds.sim.constants import VIEW_R
-from nexel_worlds.tiles import BLOCKS, RECIPES
+from nexel_worlds.tiles import BLOCKS, PICKED, RECIPES
 
 ASK_R = 4                 # an ask is said this near the person (as a player walks up to someone to ask)
 DEPTH = 4                 # a recipe chain this deep at most (pickaxe: workbench: wood)
-DROPS = {}                # item: the chars of the blocks that drop it
+DROPS = {}                # item: the chars of the blocks that drop it, or that picked leave one that does (a berry
+_BY_NAME = {b.name: b for b in BLOCKS}        # bush picked is a bare bush, dug for fibre: the most fibre away from swamps)
 for _b in BLOCKS:
-    for _it in _b.drops:
+    for _it in {**_b.drops, **(_BY_NAME[PICKED[_b.name][0]].drops if _b.name in PICKED else {})}:
         DROPS.setdefault(_it, set()).add(_b.char)
 STATION_CH = {b.name: b.char for b in BLOCKS}
+NEEDS = {b.char: b.needs_tool for b in BLOCKS if b.needs_tool}     # (ore: no stone from it by hand)
 
 
 def _cells(obs, chars, blocked=()):
@@ -46,7 +48,8 @@ def gather(obs, item, ground_ch, tool_for, dirs, blocked=()):
     pile = next(((dx, dy) for dx, dy, items in _piles(obs) if items.get(item) and (me["x"] + dx, me["y"] + dy) not in blocked), None)
     if pile is not None:
         return ("pick_up", {}) if pile == (0, 0) else ("move_to", {"x": obs["self"]["x"] + pile[0], "y": obs["self"]["y"] + pile[1]})
-    cell = next(iter(_cells(obs, DROPS.get(item, ()), blocked)), None)
+    inv = me.get("inventory", {})
+    cell = next(iter(_cells(obs, {c for c in DROPS.get(item, ()) if c not in NEEDS or inv.get(NEEDS[c])}, blocked)), None)
     if cell is None:
         return None
     d = next((k for k, v in dirs.items() if v == cell), None)

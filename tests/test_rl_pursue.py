@@ -46,6 +46,27 @@ def test_gather_walks_to_what_drops_it_and_digs():
     assert env.a.count("wood") >= 3
 
 
+def test_fibre_from_a_berry_bush_picked_then_dug():
+    """No thicket (they grow in swamps): a berry bush picked is a bare bush, dug for fibre (tiles.PICKED)."""
+    env = env_with("gather", "fiber")
+    assert not env.encoded()["mask"][PURSUE]
+    env.sim.world.set(env.a.x + 3, env.a.y, block="berry_bush")
+    env.obs = env.sim.observe(env.a)
+    run(env, 300, done=lambda e: e.a.count("fiber"))
+    assert env.a.count("fiber") >= 1
+
+
+def test_no_dig_that_needs_a_tool_it_lacks():
+    """Ore gives stone but needs a pickaxe in hand: without one, pursue leaves it for rock it can break."""
+    env = env_with("gather", "stone")
+    env.sim.world.set(env.a.x + 1, env.a.y, block="ore")
+    env.obs = env.sim.observe(env.a)
+    assert not env.encoded()["mask"][PURSUE]
+    env.a.inventory["pickaxe"] = 1
+    env.obs = env.sim.observe(env.a)
+    assert env.encoded()["mask"][PURSUE]
+
+
 def test_no_step_no_pursue():
     env = env_with("craft", "no_such_thing")
     assert not env.encoded()["mask"][PURSUE]
