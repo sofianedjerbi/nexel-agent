@@ -9,6 +9,7 @@ import numpy as np
 
 from nexel_worlds.sim.bodies import in_reach, reach_of
 from nexel_worlds.sim.constants import FOOD_MAX, VIEW_R
+from nexel_worlds.sim.observe import height_char
 from . import ring
 from .facts import short
 from nexel_worlds.tiles import ARMOR, BLOCKS, FEED, FILLERS, FOOD, GROUNDS, PLACEABLE, RECIPES, REACH, WEAPONS, WEAR
@@ -167,15 +168,7 @@ def pursued(obs, goal, social):
                      ground_ch=GROUND_CH, dirs=STEP)
 
 
-def _level(ch: str) -> int:
-    if ch.isdigit():
-        return int(ch)
-    if "A" <= ch <= "Z":
-        return ord(ch) - 55
-    return 96 - ord(ch)
-
-
-LEVEL = {chr(c): _level(chr(c)) for c in range(48, 123) if chr(c).isalnum()}
+LEVEL = {height_char(lv): lv for lv in range(-26, 36)}     # (a height char of the grid: the game's height_char, read back)
 _STATION_CH = {b.name: b.char for b in BLOCKS}
 
 
