@@ -139,3 +139,45 @@ verdict: keep the shipped body (targets: goals_done; 20 min)
 - Changed: the progress shaping of craft and gather goals (rl/progress.py): potential-based, 0.05 a step of the
   recipe tree, paid back when the goal ends. r43 picked pursue 7% of the times it was legal under a tool goal.
 - Target: tools_made (and goals_done); the guards as ever.
+
+## gate 2026-11-25 10:38: rl_runs/r46/best.zip vs rl_runs/r37/at_600k.zip
+
+| 4 passes | r37/at_600k.zip | r46/best.zip | |
+|---|---|---|---|
+| lush score | 5.518 ± 0.306 | 5.712 ± 0.151 | same |
+| lush deaths | 3.500 ± 4.590 | 0.500 ± 0.918 | same |
+| lush fs_per_near_min | 0.038 ± 0.031 | 0.003 ± 0.006 | better |
+| lush crafts_distinct | 19.200 ± 0.788 | 20.553 ± 0.356 | better |
+| lush repeat_crafts | 0.718 ± 0.015 | 0.738 ± 0.008 | worse |
+| lush fail_pct | 39.625 ± 5.691 | 20.875 ± 0.457 | better |
+| lush tools_made | 0.623 ± 0.158 | 0.883 ± 0.038 | better |
+| lush rooms | 0.015 ± 0.016 | 0.092 ± 0.105 | same |
+| lush goals_done | 0.430 ± 0.037 | 0.537 ± 0.035 | better |
+| lush goal_gather | 0.361 ± 0.091 | 0.582 ± 0.063 | better |
+| lush goal_craft | 0.314 ± 0.067 | 0.684 ± 0.053 | better |
+| lush goal_give | 0.732 ± 0.219 | 0.909 ± 0.055 | same |
+| lush goal_ask | 0.761 ± 0.072 | 0.789 ± 0.130 | same |
+| lush goal_stay | 0.533 ± 0.245 | 0.677 ± 0.171 | same |
+| lush goal_help | 0.387 ± 0.017 | 0.373 ± 0.057 | same |
+| lush goal_avoid | 0.255 ± 0.069 | 0.231 ± 0.061 | same |
+| live-like score | 5.562 ± 0.293 | 5.890 ± 0.349 | same |
+| live-like deaths | 2.250 ± 1.522 | 0.250 ± 0.795 | better |
+| live-like fs_per_near_min | 0.056 ± 0.032 | 0.010 ± 0.006 | better |
+| live-like crafts_distinct | 19.605 ± 1.010 | 21.125 ± 0.354 | better |
+| live-like repeat_crafts | 0.695 ± 0.016 | 0.750 ± 0.013 | worse |
+| live-like fail_pct | 39.325 ± 13.856 | 20.750 ± 2.539 | better |
+| live-like tools_made | 0.510 ± 0.109 | 0.887 ± 0.068 | better |
+| live-like rooms | 0.020 ± 0.037 | 0.073 ± 0.103 | same |
+| live-like goals_done | 0.442 ± 0.054 | 0.506 ± 0.042 | same |
+| live-like goal_gather | 0.259 ± 0.124 | 0.505 ± 0.200 | better |
+| live-like goal_craft | 0.229 ± 0.076 | 0.536 ± 0.125 | better |
+| live-like goal_give | 0.936 ± 0.122 | 0.877 ± 0.201 | same |
+| live-like goal_ask | 0.525 ± 0.654 | 0.732 ± 0.494 | same |
+| live-like goal_stay | 0.584 ± 0.255 | 0.671 ± 0.059 | same |
+| live-like goal_help | 0.425 ± 0.088 | 0.397 ± 0.077 | same |
+| live-like goal_avoid | 0.354 ± 0.169 | 0.284 ± 0.076 | same |
+
+verdict: keep the shipped body (targets: goals_done; 20 min)
+- **Result (r46):** the strongest body yet against r37 on today's game: goals_done better on lush (0.537 vs 0.430),
+  same on live-like (0.506 vs 0.442); tools_made, fail%, first strikes better on both; repeat crafts worse; no guard
+  worse. Verdict by the rule: keep r37 (the target must be better on both sets). Shipping r46 is the owner's call.
