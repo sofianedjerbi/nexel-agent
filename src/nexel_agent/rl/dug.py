@@ -75,7 +75,8 @@ class Dug(Structure):
 
 def design_of(spec: dict) -> Structure:
     """A design drawn: dug into the land when it says so, else built up."""
-    return Dug(spec) if spec.get("underground") else Structure(spec)
+    from .garden import Garden
+    return Dug(spec) if spec.get("underground") else Garden(spec) if spec.get("garden") else Structure(spec)
 
 
 class DugView:

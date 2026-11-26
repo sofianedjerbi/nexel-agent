@@ -16,7 +16,7 @@ import math
 from nexel_worlds.sim.constants import VIEW_R
 from nexel_worlds.sim.observe import ITEMS, YOU
 from nexel_worlds.sim.storeys import EARTH, STOREY
-from nexel_worlds.tiles import GROUNDS
+from nexel_worlds.tiles import GROUNDS, TILL_TOOL
 from nexel_worlds.tiles import REACH as TILE_REACH
 from nexel_worlds.tiles import BLOCKS
 
@@ -37,6 +37,8 @@ DOORS = tuple(k for k in ENCLOSE if not _SOLID[k])
 WALL_CH, DOOR_CH = {CH[k] for k in WALLS}, {CH[k] for k in DOORS}
 DIRS4 = {"N": (0, -1), "E": (1, 0), "S": (0, 1), "W": (-1, 0)}
 TIER = {"wood_pickaxe": 1, "pickaxe": 2, "iron_pickaxe": 3, "titanium_pickaxe": 4}      # (the best digs fastest)
+TILLED_CH = {g.char for g in GROUNDS if g.name in ("tilled", "wet_tilled")}
+SOWN_CH = {CH[k] for k in ("sprout", "crop", "ripe_crop")}
 LIQUID_CH = {g.char for g in GROUNDS if g.liquid}                                       # (no home on water, nor its path)
 PATH_CH = next(g.char for g in GROUNDS if g.name == "cobble")                           # (what the path item lays)
 BLOCK_CH = {b.char for b in BLOCKS if b.name != "none" and b.hardness > 0}   # (what stands in the way and can be dug: a
@@ -132,6 +134,10 @@ def laid(obs, X, Y, piece) -> bool:
     ch = _at(obs, "grid", X, Y)
     if piece == "path":
         return ch == PATH_CH
+    if piece == "till":                                     # (tilled, or sown already)
+        return ch in TILLED_CH or ch in SOWN_CH
+    if piece == "seed":
+        return ch in SOWN_CH
     return ch in WALL_CH if piece == "wall" else ch in DOOR_CH if piece == "door" else ch == CH.get(piece)
 
 
@@ -194,6 +200,8 @@ def next_step(obs, social, *, ground_ch, tool_for, dirs):
         if dz <= 0 and piece not in (*CELL_BLOCKS, "dig") and _at(obs, "grid", X, Y) not in ground_ch:
             continue                                         # (someone or something on it: the next piece)
         if piece != "dig" and _item(piece, inv) is None:
+            if piece == "till" and (step := craft(obs, TILL_TOOL, ground_ch, tool_for, dirs)):
+                return step                                  # (no hoe: one made)
             step = next((s for w in (WALLS if piece == "wall" else (piece,)) if (s := craft(obs, w, ground_ch, tool_for, dirs))), None)
             if step is not None:
                 return step
@@ -240,7 +248,10 @@ def laid_by(obs, social, plan):
 
 
 def _item(piece, inv):
-    """What the pack lays the piece with: a wall its most plentiful wall, else the piece itself; None when it lacks it."""
+    """What the pack lays the piece with: a wall its most plentiful wall, soil tilled with a hoe, else the piece itself;
+    None when it lacks it."""
+    if piece == "till":
+        return TILL_TOOL if inv.get(TILL_TOOL) else None
     if piece == "wall":
         return max((w for w in WALLS if inv.get(w)), key=inv.get, default=None)
     return piece if inv.get(piece) else None
@@ -266,6 +277,11 @@ def _run(obs, hx, hy, ground_ch, inv, plan, stand, is_laid, land=0) -> list:
             out.append((X, Y, "dig", land + dz, d, pick))
             continue
         if dz <= 0 and piece not in CELL_BLOCKS and _at(obs, "grid", X, Y) not in ground_ch:
+            continue
+        if piece == "till":                                  # (the hoe stays in the pack: soil after soil)
+            if left.get(TILL_TOOL):
+                going.add(cell)
+                out.append((X, Y, "till", TILL_TOOL))
             continue
         if piece in LAND_IN_CELL and _at(obs, "grid", X, Y) not in ground_ch | {YOU}:
             continue                                         # (earth over a thing grown on the land: the game refuses it)

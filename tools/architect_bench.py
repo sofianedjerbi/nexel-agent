@@ -20,7 +20,7 @@ BRIEFS = (("a home for one", 82), ("a small home for one by a river", 82), ("a c
           ("a two-storey house: a bedroom upstairs", 150), ("a watchtower, three storeys high", 170),
           ("a stone cottage", 82), ("a cottage under a gable roof of shingles with stone eaves", 140),
           ("a sod-roofed hut: earth on the roof", 150), ("a round house with a domed roof", 200),
-          ("a home dug underground, hidden from the glooms", 82))
+          ("a home dug underground, hidden from the glooms", 82), ("a vegetable garden by the house", 40))
 
 
 def main():

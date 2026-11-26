@@ -46,6 +46,9 @@ def stamp(sim, s: Structure, x0, y0) -> int:
         if p == "dig":
             sim.world.set_cell(X, Y, lv + dz, False)
             continue
+        if p in ("till", "seed"):                         # (soil tilled; a seed sown is a sprout)
+            sim.world.set(X, Y, **({"ground": "tilled"} if p == "till" else {"block": "sprout"}))
+            continue
         if dz < 0:                                        # (on a dug floor: the tile's lowest ground)
             sim.world.set(X, Y, block=p)
             continue
@@ -82,6 +85,8 @@ def judged(spec) -> dict:
 
 def judge_at(sim, s: Structure, x0, y0, lv) -> dict:
     """The build `s` as it stands in `sim` at (x0, y0) (its walls' top-left), its land at level `lv`, judged."""
+    if hasattr(s, "beds"):
+        return garden_at(sim, s, x0, y0)
     from .dug import DEPTH, DugView
     inside = sorted(s.inside)
     dug = hasattr(s, "digs")
@@ -153,6 +158,8 @@ def built(spec, seed=5, picks=800) -> dict:
     s = design_of(spec)
     kit = Counter("stone_wall" if p == "wall" else p for *_, p in s.cells() if p != "dig")
     kit["pickaxe"] = 1
+    kit.pop("till", None)
+    kit["hoe"] = 1
     kit["stairs"] = sum(len(steps) for _, steps, _, _ in s.stairs)
     env = SimEnv(ep_ticks=10 ** 6, roam=0, rivals=0)
     env.reset(seed)
@@ -175,3 +182,21 @@ def built(spec, seed=5, picks=800) -> dict:
         lv = env.sim.world.level(hx + s.top[0], hy + s.top[1])
     j = judge_at(env.sim, s, hx, hy, lv)
     return {"sited": True, "picks": n, **{k: j[k] for k in ("grade", "of", "failed")}}
+
+
+def garden_at(sim, s, x0, y0) -> dict:
+    """A garden as it stands: fenced all round (a fence closes a plot, if not a room: judge.LOOK_CLOSERS), a gate,
+    its beds tilled and sown (nine in ten at least), a path out of the gate."""
+    w = sim.world
+    walk = next(iter(s.walks or s.beds))
+    tiles = judge.inside(w, x0 + walk[0], y0 + walk[1], judge.LOOK_CLOSERS)
+    beds = [(x0 + x, y0 + y) for x, y in s.beds]
+    gate = (x0 + s.doors[0][0], y0 + s.doors[0][1])
+    tilled = sum(w.ground(*p) in ("tilled", "wet_tilled") for p in beds) / max(1, len(beds))
+    sown = sum(w.block(*p) in ("sprout", "crop", "ripe_crop") for p in beds) / max(1, len(beds))
+    checks = {"fenced": tiles is not None, "gate": w.block(*gate) == "gate", "tilled": tilled >= .9,
+              "sown": sown >= .9, "path": judge._path(w, gate, (tiles or set()) | {gate}) >= 2 if tiles else False,
+              "room_to_grow": len(beds) >= 4}
+    failed = [k for k, ok in checks.items() if not ok]
+    return {"ok": True, "grade": len(checks) - len(failed), "of": len(checks), "failed": failed, "checks": checks,
+            "told": "; ".join(failed) or "nothing failed", "kind": "garden"}

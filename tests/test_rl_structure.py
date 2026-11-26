@@ -160,3 +160,26 @@ def test_a_home_is_dug_whole_by_building_alone(spec, seed):
     own trench never filled as a pit; what the view cannot show, known from the game's answers."""
     b = judge3d.built(spec, seed=seed)
     assert b["sited"] and b["failed"] == [], b
+
+
+GARDEN = {"garden": True, "width": 5, "depth": 4, "door": "south"}
+
+
+def test_a_garden_is_fenced_with_a_gate_and_its_beds_each_beside_a_walk():
+    from nexel_agent.rl.garden import Garden
+    g = Garden(GARDEN)
+    near = lambda p: [(p[0] + 1, p[1]), (p[0] - 1, p[1]), (p[0], p[1] + 1), (p[0], p[1] - 1)]   # noqa: E731
+    assert all(any(q in g.walks or q in g.ring for q in near(b)) for b in g.beds)     # (each bed reached)
+    assert list(g.storeys[0].values()).count("gate") == 1 and g.cost() == len(g.ring)
+    cells = g.cells()
+    assert all(cells.index((*b, 0, "till")) < cells.index((*b, 0, "seed")) for b in g.beds)
+    assert judge3d.judged(GARDEN)["failed"] == []
+    assert "beds are" in judge3d.judged({**GARDEN, "beds": "maze"})["error"]
+
+
+@pytest.mark.parametrize("spec", [GARDEN, {"garden": True, "shape": "round", "radius": 3, "door": "east"},
+                                  {"garden": True, "width": 3, "depth": 3, "door": "north", "beds": "full"}])
+def test_a_garden_is_fenced_tilled_and_sown_by_building_alone(spec):
+    """The fence and gate laid, each bed tilled with the hoe from the pack, then sown: the seed only takes on soil."""
+    b = judge3d.built(spec, seed=20)
+    assert b["sited"] and b["failed"] == [], b

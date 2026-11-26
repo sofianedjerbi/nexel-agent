@@ -26,6 +26,8 @@ the ground (the default); two of a piece: "bed": [[x, y], [x, y]]. Furniture: {f
 only {upstairs} (the game stands nothing else on a floor).
 Or dug into the land: "underground": true - a trench stepping down to its door and a room tunnelled behind it,
 the land its walls and its roof (no storeys, no roof to choose; nothing to gather: the land dug is the walls).
+Or a garden: "garden": true - a plot fenced round, a gate in the middle of the "door" side, beds of tilled soil
+sown with seed, "beds": "rows" (a walk between each two beds) or "full"; no furniture, no roof.
 A roof is made of blocks, as a builder makes one: "flat" is one layer; "gable" steps up a layer a row to a ridge
 along the long side; "hip" steps up on all four sides (on a round: a dome). Its material: {materials} ("roof" is
 shingles; stone or earth sits on a deck of planks); "eaves" (the lowest ring) and "ridge" (the top) in another

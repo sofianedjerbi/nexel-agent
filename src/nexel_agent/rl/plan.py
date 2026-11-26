@@ -71,6 +71,8 @@ class Plan:
         """A block over a storey goes down once that storey's walls and door all stand (a roof on an open ring is a
         roof on air: r61); a thing up a storey once the floor under it is laid; anything else, at once."""
         dx, dy, dz, p = cell
+        if p == "seed":                                   # (sown in the soil tilled for it)
+            return laid((dx, dy, dz, "till"))
         if p == "dig":
             return True                                   # (dug from its own stand, once that is dug: stand_for)
         if p not in BLOCKS:                               # (a thing up a storey stands on the floor laid under it)
