@@ -17,13 +17,11 @@ import time
 from pathlib import Path
 
 import numpy as np
-import torch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
-from nexel_agent.rl.evaluate import EVAL_SEEDS, LIVE_LIKE_SEEDS, metrics, names_from, run  # noqa: E402
-from nexel_agent.rl.net import HybridMaskablePPO, load  # noqa: E402
-from nexel_agent.rl.vec import PipeVecEnv  # noqa: E402
+# (torch and the trainer's modules are imported where a body is played: what judges the numbers is plain Python, tested
+# in the game's suite: tests/test_ship_gate.py)
 
 T95 = {2: 12.71, 3: 4.30, 4: 3.18, 5: 2.78, 6: 2.57, 8: 2.36, 10: 2.26}     # Student's t, two-sided 95%, by n
 LOWER_IS_BETTER = {"deaths", "fs_per_near_min", "repeat_crafts", "fail_pct"}
@@ -43,12 +41,23 @@ def rows(m: dict) -> dict:
             **{f"goal_{k}": round(int(v.split("/")[0]) / max(1, int(v.split("/")[1])), 3) for k, v in goals.items()}}
 
 
+def trim(o: dict, masks, dim: int, n_act: int) -> tuple:
+    """What a body from before the vector or the actions grew is shown: its own part of the vector and of the action
+    masks, as npolicy plays it live. -> (the observation, the masks stacked)"""
+    return {**o, "vec": o["vec"][:, :dim]}, np.stack(masks)[:, :n_act]
+
+
 def passes(path: str, venvs: dict, n: int) -> dict:
     """{set: [rows of each pass]} for one checkpoint."""
+    import torch
+    from nexel_agent.rl.evaluate import metrics, run
+    from nexel_agent.rl.net import HybridMaskablePPO, load
     pol, out = load(HybridMaskablePPO, path), {}
-    dim, n_act = pol.observation_space["vec"].shape[0], pol.action_space.n      # (a body from before the vector or the
-    act = lambda o, v: pol.predict({**o, "vec": o["vec"][:, :dim]}, deterministic=False,     # actions grew: its own part,
-                                   action_masks=np.stack(v.masks)[:, :n_act])[0]            # as npolicy plays it live)
+    dim, n_act = pol.observation_space["vec"].shape[0], pol.action_space.n
+
+    def act(o, v):
+        obs, masks = trim(o, v.masks, dim, n_act)
+        return pol.predict(obs, deterministic=False, action_masks=masks)[0]
     for name, (venv, seeds) in venvs.items():
         out[name] = []
         for k in range(n):
@@ -74,7 +83,23 @@ def verdict(k, base, cand) -> str:
     return "better" if d - h > 0 else "worse" if d + h < 0 else "same"
 
 
+def judge(B: dict, C: dict, targets) -> tuple:
+    """The table's rows and the verdict, from each set's passes of the shipped body (B) and the candidate (C): it ships
+    when every target row is better and no guard (GUARDS) is worse. -> ([table rows], ships)"""
+    lines, ok = [], True
+    for s in B:
+        for k in B[s][0]:
+            b, c = [r[k] for r in B[s]], [r[k] for r in C[s]]
+            v = verdict(k, b, c)
+            (mb, hb), (mc, hc) = ci(b), ci(c)
+            lines.append(f"| {s} {k} | {mb:.3f} ± {hb:.3f} | {mc:.3f} ± {hc:.3f} | {v} |")
+            ok &= not (k in GUARDS and v == "worse") and not (k in targets and v != "better")
+    return lines, ok
+
+
 def main():
+    from nexel_agent.rl.evaluate import EVAL_SEEDS, LIVE_LIKE_SEEDS, names_from
+    from nexel_agent.rl.vec import PipeVecEnv
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("base")
     ap.add_argument("cand")
@@ -94,15 +119,9 @@ def main():
     finally:
         lush.close()
         like.close()
-    lines, ok = [f"| {a.passes} passes | {Path(a.base).parent.name}/{Path(a.base).name} | {Path(a.cand).parent.name}/{Path(a.cand).name} | |",
-                 "|---|---|---|---|"], True
-    for s in venvs:
-        for k in B[s][0]:
-            b, c = [r[k] for r in B[s]], [r[k] for r in C[s]]
-            v = verdict(k, b, c)
-            (mb, hb), (mc, hc) = ci(b), ci(c)
-            lines.append(f"| {s} {k} | {mb:.3f} ± {hb:.3f} | {mc:.3f} ± {hc:.3f} | {v} |")
-            ok &= not (k in GUARDS and v == "worse") and not (k in a.target and v != "better")
+    rows_, ok = judge(B, C, a.target)
+    lines = [f"| {a.passes} passes | {Path(a.base).parent.name}/{Path(a.base).name} | {Path(a.cand).parent.name}/{Path(a.cand).name} | |",
+             "|---|---|---|---|", *rows_]
     out = "\n".join(lines) + f"\n\nverdict: {'SHIP' if ok else 'keep the shipped body'} (targets: {', '.join(a.target)}; " \
                              f"{round((time.time() - t0) / 60)} min)"
     print(out)
