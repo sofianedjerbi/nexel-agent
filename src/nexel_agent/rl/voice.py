@@ -1,7 +1,7 @@
 """The live body's words, and the one speaker: every line the player says goes out through Voice.speak - its replies,
 the planner's own line (rl/mind.py), the policy's say and ask (rl/live.py) - so one place keeps the pace of its talk
-and the record of what it said. One small local model, one request at a time, chat lines first (a planner thought
-waits for them). Every prompt (the words, the planner) is built on one text, rl/now.py Now.text(), what is happening to
+and the record of what it said. One small local model, its words and its thoughts in a lane each: a reply never waits
+behind a thought (#11), and no thought starts while a reply is on its way. Every prompt (the words, the planner) is built on one text, rl/now.py Now.text(), what is happening to
 it now; the words also get the talk lately with whoever spoke, its own lines in it. It answers what is said to it
 (its name in the line, a talk it is in, the only one near it in earshot), not two others talking; lines heard while it
 is answering join the next answer: a burst gets one reply. The model's reply - possibly nothing: it chooses - is
@@ -42,7 +42,7 @@ class Voice:
     def __init__(self, name, persona, url, http, log: Path, now: Now | None = None):
         self.name, self.persona, self.url, self.http, self.log = name, persona, url, http, Path(log)
         self.now = now or Now(name)
-        self.lock = asyncio.Lock()
+        self.lanes = {True: asyncio.Lock(), False: asyncio.Lock()}   # words, thoughts: each one at a time, never one behind the other
         self.words_waiting = 0
         self.inbox: list = []                # lines said to it, not answered yet: (who, text, heard_at)
         self.answering = False
@@ -60,7 +60,9 @@ class Voice:
         self.asked_pack = False                           # (the last answer was to someone asking what it carries)
 
     async def post(self, messages, max_tokens, words: bool) -> tuple[str, dict]:
-        """A call to the model; chat lines go before thoughts."""
+        """A call to the model. Words and thoughts each have a lane of their own: a reply never waits behind a thought
+        in flight (#11: the server decodes the two together, mlx-lm's batching, as players.py starts it), and no
+        thought starts while a reply waits or is being made."""
         t0 = time.monotonic()
         if words:
             self.words_waiting += 1
@@ -68,7 +70,7 @@ class Voice:
             while self.words_waiting:
                 await asyncio.sleep(0.05)
         try:
-            async with self.lock:
+            async with self.lanes[words]:
                 t1 = time.monotonic()
                 r = await self.http.post(self.url, timeout=40, json={"model": "default_model", "messages": messages,
                                                                      "max_tokens": max_tokens, "temperature": 0.7})

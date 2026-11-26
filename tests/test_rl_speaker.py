@@ -103,3 +103,33 @@ def test_a_claimed_deed_with_none_behind_it_goes_unsaid(tmp_path):
         await settle(v)
         assert said == ["I gave you the wood already"]
     asyncio.run(go())
+
+
+def test_a_reply_never_waits_behind_a_thought_in_flight(tmp_path):
+    """(#11) A thought is with the model when a line comes to answer: the reply goes out at once, beside it (the server
+    decodes the two together), not after it; and no new thought starts while a reply is on its way."""
+    gate, order = asyncio.Event(), []
+
+    class Server:
+        async def post(self, url, timeout, json):
+            words = json["max_tokens"] == V.WORDS_TOKENS
+            order.append("reply asked" if words else "thought asked")
+            if not words:
+                await gate.wait()                      # (a long thought: held until the reply is made)
+            order.append("reply made" if words else "thought made")
+
+            class R:
+                def json(self):
+                    return {"choices": [{"message": {"content": "ok"}}], "usage": {}}
+            return R()
+
+    async def go():
+        v = Voice("Rook", "a builder", "http://fake", Server(), tmp_path / "lat.jsonl")
+        thought = asyncio.ensure_future(v.post([], V.THOUGHT_TOKENS, words=False))
+        await asyncio.sleep(0)
+        out, t = await asyncio.wait_for(v.post([], V.WORDS_TOKENS, words=True), 1)
+        assert out == "ok" and t["queue_s"] < .1 and not thought.done()
+        gate.set()
+        await thought
+    asyncio.run(go())
+    assert order == ["thought asked", "reply asked", "reply made", "thought made"]
