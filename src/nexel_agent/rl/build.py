@@ -14,13 +14,15 @@ pieces from the grid's top-left and the floor tiles it is laid from, each piece 
 import math
 
 from nexel_worlds.sim.constants import VIEW_R
-from nexel_worlds.sim.observe import YOU
-from nexel_worlds.sim.storeys import EARTH
+from nexel_worlds.sim.observe import ITEMS, YOU
+from nexel_worlds.sim.storeys import EARTH, STOREY
 from nexel_worlds.tiles import GROUNDS
 from nexel_worlds.tiles import REACH as TILE_REACH
 from nexel_worlds.tiles import BLOCKS
 
 from .judge import ENCLOSE
+from .plan import BLOCKS as CELL_BLOCKS
+from .plan import Plan, of_pieces
 from .pursue import craft
 
 W = H = 3                                                   # the inside
@@ -32,6 +34,7 @@ CH = {b.name: b.char for b in BLOCKS}
 WALLS = tuple(k for k in ENCLOSE if _SOLID[k])
 DOORS = tuple(k for k in ENCLOSE if not _SOLID[k])
 WALL_CH, DOOR_CH = {CH[k] for k in WALLS}, {CH[k] for k in DOORS}
+LIQUID_CH = {g.char for g in GROUNDS if g.liquid}                                       # (no home on water, nor its path)
 PATH_CH = next(g.char for g in GROUNDS if g.name == "cobble")                           # (what the path item lays)
 BLOCK_CH = {b.char for b in BLOCKS if b.name != "none" and b.hardness > 0}   # (what stands in the way and can be dug: a
 #                                                                             tree, a stump, a flower grown on the spot)
@@ -49,36 +52,7 @@ PLAN = blueprint()
 REACH = TILE_REACH["use"]          # (a piece is laid from where it stands: the hut's corners are this far from its middle)
 
 
-class Plan(tuple):
-    """(pieces, stands[, spare]): the pieces (dx, dy, piece) in the order laid, the tiles (dx, dy) it is laid from, and
-    spare ones it may be laid from when they are open ground (round the walls outside: a roof's corner over a bed)."""
-
-    @property
-    def pieces(self):
-        return self[0]
-
-    @property
-    def stands(self):
-        return self[1]
-
-    def box(self):
-        """(x0, y0, x1, y1) of what stands on the ground (the roof left out)."""
-        ps = [(dx, dy) for dx, dy, p in self.pieces if p != "roof"] + list(self.stands)
-        return min(x for x, _ in ps), min(y for _, y in ps), max(x for x, _ in ps), max(y for _, y in ps)
-
-    @property
-    def spare(self):
-        return self[2] if len(self) > 2 else ()
-
-    def stand_for(self, dx, dy, open_=lambda s: True):
-        """The stand nearest (dx, dy) that reaches it (not on it; a spare one only when `open_`), or None."""
-        d = lambda s: max(abs(s[0] - dx), abs(s[1] - dy))                     # noqa: E731
-        ok = [s for s in self.stands if s != (dx, dy)] + [s for s in self.spare if s != (dx, dy) and open_(s)]
-        s = min(ok, key=d, default=None)
-        return s if s is not None and d(s) <= REACH else None
-
-
-HUT = Plan((PLAN, ((W // 2, H // 2),)))
+HUT = of_pieces(PLAN, ((W // 2, H // 2),))
 
 
 def drawn(rows) -> Plan:
@@ -102,7 +76,7 @@ def drawn(rows) -> Plan:
     x1, y1 = max(x for x, _ in shell) + 1, max(y for _, y in shell) + 1
     spare = tuple((x, y) for y in range(y0, y1 + 1) for x in range(x0, x1 + 1)
                   if (x in (x0, x1) or y in (y0, y1)) and (x, y) not in path)
-    return Plan((ps, tuple(sorted(walked, key=lambda q: (q[1], q[0]))) + tuple(path), spare))
+    return of_pieces(ps, tuple(sorted(walked, key=lambda q: (q[1], q[0]))) + tuple(path), spare)
 
 
 def plan_of(social) -> Plan:
@@ -123,7 +97,7 @@ def flat(obs, X, Y, plan=HUT) -> bool:
     from .actions import LEVEL
     if not obs.get("heights"):
         return True                                          # (no relief in view at all)
-    sx, sy = plan.stands[0]
+    sx, sy = plan.ground[0]
     lv = LEVEL.get(_at(obs, "heights", X + sx, Y + sy))
     if lv is None:
         return False
@@ -141,13 +115,13 @@ def flat(obs, X, Y, plan=HUT) -> bool:
 def _pit(obs, X, Y, plan=HUT):
     """A tile in reach of a stand that is lower than the spot, on or beside it: ((x, y), the stand), or None."""
     from .actions import LEVEL
-    sx, sy = plan.stands[0]
+    sx, sy = plan.ground[0]
     lv = LEVEL.get(_at(obs, "heights", X + sx, Y + sy))
     x0, y0, x1, y1 = plan.box()
     for dx in range(x0 - 1, x1 + 2):
         for dy in range(y0 - 1, y1 + 2):
             h = LEVEL.get(_at(obs, "heights", X + dx, Y + dy))
-            s = next((s for s in plan.stands if max(abs(s[0] - dx), abs(s[1] - dy)) <= REACH), None)
+            s = next((s for s in plan.ground if max(abs(s[0] - dx), abs(s[1] - dy)) <= REACH), None)
             if h is not None and lv is not None and h < lv and s is not None:
                 return (X + dx, Y + dy), s
     return None
@@ -159,12 +133,12 @@ def site(obs, ground_ch, plan=HUT) -> tuple | None:
     me = obs["self"]
     best = None
     x0, y0, x1, y1 = plan.box()
-    sx, sy = plan.stands[0]
+    sx, sy = plan.ground[0]
     for oy in range(-VIEW_R + 1 - y0, VIEW_R - 1 - y1):
         for ox in range(-VIEW_R + 1 - x0, VIEW_R - 1 - x1):
             X, Y = me["x"] + ox, me["y"] + oy
-            if all(_at(obs, "grid", X + dx, Y + dy) in ground_ch | {YOU} for dx, dy, p in plan.pieces if p != "roof") \
-                    and all(_at(obs, "grid", X + dx, Y + dy) in ground_ch | {YOU} for dx, dy in plan.stands) and flat(obs, X, Y, plan):
+            if all(_at(obs, "grid", X + dx, Y + dy) in (ground_ch - LIQUID_CH) | {YOU} for dx, dy in plan.clear) \
+                    and flat(obs, X, Y, plan):
                 d = math.hypot(ox + sx, oy + sy)
                 if best is None or d < best[0]:
                     best = (d, (X, Y))
@@ -192,7 +166,7 @@ def next_step(obs, social, *, ground_ch, tool_for, dirs):
     again = lambda: next_step(obs, social, ground_ch=ground_ch, tool_for=tool_for, dirs=dirs)    # noqa: E731
     hx, hy = social.home
     me, inv = obs["self"], obs["self"].get("inventory", {})
-    cx, cy = hx + plan.stands[0][0], hy + plan.stands[0][1]
+    cx, cy = hx + plan.ground[0][0], hy + plan.ground[0][1]
     if _at(obs, "grid", cx, cy) is None:                     # (out of view: walk home, a view at a time)
         dx, dy = cx - me["x"], cy - me["y"]
         d = math.hypot(dx, dy)
@@ -201,10 +175,11 @@ def next_step(obs, social, *, ground_ch, tool_for, dirs):
             return again()
         k = (VIEW_R - 1) / d
         return "move_to", {"x": me["x"] + round(dx * k), "y": me["y"] + round(dy * k)}
+    is_laid = laid_by(obs, social, plan)
     if not flat(obs, hx, hy, plan):                          # (dug into since: the game refuses a wall by a pit)
         pit = _pit(obs, hx, hy, plan)
         earth = next((k for k in EARTH if inv.get(k)), None)
-        if not any(laid(obs, hx + dx, hy + dy, p) for dx, dy, p in plan.pieces):
+        if not any(is_laid(c) for c in plan.cells):
             social.home = None                               # (nothing laid on it yet: another spot)
             return again() if site(obs, ground_ch, plan) else None
         if pit is not None and earth:                        # (a home begun is kept and mended: the pit filled, as a
@@ -212,10 +187,15 @@ def next_step(obs, social, *, ground_ch, tool_for, dirs):
             if (me["x"], me["y"]) != (hx + sx, hy + sy):     # the pack; without earth it goes on with what still goes
                 return "move_to", {"x": hx + sx, "y": hy + sy}       # down - r63 left a closed room for a pit 4 tiles off)
             return "place", {"item": earth, "x": px, "y": py}
-    for dx, dy, piece in plan.pieces:                        # (the ground cleared first, as a player clears it:
-        X, Y = hx + dx, hy + dy                              # a tree, a stump or a bush grown on the spot since)
-        ch = _at(obs, "grid", X, Y)
-        if piece != "roof" and ch in BLOCK_CH and not laid(obs, X, Y, piece) and ch not in WALL_CH | DOOR_CH:
+    on_land = {(x, y): p for x, y, z, p in plan.cells if z == 0 and p not in CELL_BLOCKS}
+    for dx, dy in sorted(plan.clear, key=lambda q: (q[1], q[0])):      # (the ground cleared first, as a player clears
+        X, Y = hx + dx, hy + dy                                           # it: a tree, a stump, a flower grown since)
+        ch, piece = _at(obs, "grid", X, Y), on_land.get((dx, dy))
+        if ch == ITEMS:                                      # (a pile on it - what was dug there dropped: taken up)
+            return "move_to", {"x": X, "y": Y}
+        if ch == YOU and any(i.get("dx") == 0 and i.get("dy") == 0 for i in obs.get("items") or []):
+            return "pick_up", {}
+        if ch in BLOCK_CH and not (piece and laid(obs, X, Y, piece)) and ch not in WALL_CH | DOOR_CH:
             d = next((k for k, v in dirs.items() if v == (X - me["x"], Y - me["y"])), None)
             if d is None:                                    # (to a tile beside it: a flower is walked onto, and
                 by = next(((X + i, Y + j) for i, j in dirs.values()            # the tile one stands on shows it, not
@@ -223,28 +203,58 @@ def next_step(obs, social, *, ground_ch, tool_for, dirs):
                 return "move_to", {"x": by[0], "y": by[1]}
             w = tool_for(obs, d)
             return "dig", {"dir": d, **({"with": w} if w else {})}
-    for dx, dy, piece in plan.pieces:
+    land = level_at(obs, hx + plan.ground[0][0], hy + plan.ground[0][1])
+    open_ = lambda s: _at(obs, "grid", hx + s[0], hy + s[1]) in ground_ch | {YOU}       # noqa: E731
+    up = lambda dz: (t := plan.ups.get(dz)) is None or is_laid((t[0], t[1], 0, "stairs"))  # noqa: E731
+    for cell in plan.cells:
+        dx, dy, dz, piece = cell
         X, Y = hx + dx, hy + dy
-        open_ = lambda s: _at(obs, "grid", hx + s[0], hy + s[1]) in ground_ch | {YOU}     # noqa: E731
-        if (me["x"], me["y"]) == (X, Y) and piece != "roof":
+        if is_laid(cell) or not plan.held(cell, is_laid) or (dz == 0 and (me["x"], me["y"]) == (X, Y) and piece not in CELL_BLOCKS):
             continue                                         # (under its feet: the tile shows it, not what is laid)
-        if laid(obs, X, Y, piece) or (stand := plan.stand_for(dx, dy, open_)) is None:
-            continue
-        if piece != "roof" and _at(obs, "grid", X, Y) not in ground_ch:
+        if dz == 0 and piece not in CELL_BLOCKS and _at(obs, "grid", X, Y) not in ground_ch:
             continue                                         # (someone or something on it: the next piece)
-        item = _item(piece, inv)
-        if item is None:
+        if _item(piece, inv) is None:
             step = next((s for w in (WALLS if piece == "wall" else (piece,)) if (s := craft(obs, w, ground_ch, tool_for, dirs))), None)
             if step is not None:
                 return step
             continue
-        run = _run(obs, hx, hy, ground_ch, inv, plan, stand)
+        stand = plan.stand_for(cell, open_, up)
+        if stand is None:
+            continue
+        run = _run(obs, hx, hy, ground_ch, inv, plan, stand, is_laid, land)
         if not run:
             continue                                         # (a roof waiting on its ring: the next piece)
-        sx, sy = hx + stand[0], hy + stand[1]                # (walk to where it is laid from first: one pick walks
-        go = {} if (me["x"], me["y"]) == (sx, sy) else {"go": {"x": sx, "y": sy}}   # there and lays all in reach)
+        sx, sy, sz = hx + stand[0], hy + stand[1], land + stand[2]        # (walk to where it is laid from first: one
+        here = (me["x"], me["y"]) == (sx, sy) and (not stand[2] or me.get("z") == sz)    # pick walks there and lays
+        go = {} if here else {"go": {"x": sx, "y": sy, **({"z": sz} if stand[2] else {})}}   # all in reach)
         return "ring", {"pieces": run, **go}
     return None
+
+
+def level_at(obs, X, Y) -> int:
+    """The land's level at a tile, from the observation's heights (none sent: all the low ground, 0)."""
+    from .actions import LEVEL
+    return LEVEL.get(_at(obs, "heights", X, Y), 0) if obs.get("heights") else 0
+
+
+def laid_by(obs, social, plan):
+    """Is the cell laid: on the land, as the observation shows it; a block a storey over the land, as its roofs show;
+    higher up, or a flight of stairs, as the game said when it was laid (social.up_laid: the view is the land's)."""
+    hx, hy = social.home
+    land = level_at(obs, hx + plan.ground[0][0], hy + plan.ground[0][1])
+    up = getattr(social, "up_laid", set())
+
+    def is_laid(cell):
+        dx, dy, dz, p = cell
+        X, Y = hx + dx, hy + dy
+        if p == "stairs":
+            return (X, Y, "stairs") in up
+        if dz == 0:
+            return laid(obs, X, Y, p)
+        if p in CELL_BLOCKS and dz == STOREY and _at(obs, "roofs", X, Y) == "1":
+            return True
+        return (X, Y, land + dz) in up
+    return is_laid
 
 
 def _item(piece, inv):
@@ -254,25 +264,24 @@ def _item(piece, inv):
     return piece if inv.get(piece) else None
 
 
-def _run(obs, hx, hy, ground_ch, inv, plan=HUT, stand=None) -> list:
-    """The pieces it can lay now from `stand` (the plan's first, the hut's middle), in the plan's order, as far as the
-    pack goes: [(x, y, item)]. One pick of build lays them all (rl/verbs.py split, as ring does), so a pick pays for
-    what it builds."""
-    stand = stand or plan.stands[0]
-    left, out = dict(inv), []
-    ring = [(dx, dy, p) for dx, dy, p in plan.pieces if p in ("wall", "door", "fence")]
-    standing = sum(laid(obs, hx + dx, hy + dy, p) for dx, dy, p in ring)     # (the ring laid before, and now)
-    for dx, dy, piece in plan.pieces:
+def _run(obs, hx, hy, ground_ch, inv, plan, stand, is_laid, land=0) -> list:
+    """The pieces it can lay now from `stand`, in the plan's order, as far as the pack goes: [(x, y, item[, z])]. One
+    pick of build lays them all (rl/verbs.py split), so a pick pays for what it builds. A roof a storey over the land
+    goes as the game lays one by hand (no z: a storey over the ground one stands on); any other block, and a thing
+    up a storey, at its height."""
+    left, out, going = dict(inv), [], set()
+    now = lambda c: is_laid(c) or c in going                                  # noqa: E731
+    for cell in plan.cells:
+        dx, dy, dz, piece = cell
         X, Y = hx + dx, hy + dy
-        if max(abs(dx - stand[0]), abs(dy - stand[1])) > REACH:
+        if now(cell) or not plan.reaches(stand, cell) or not plan.held(cell, now):
             continue
-        if piece == "roof" and standing + sum(1 for _, _, it in out if it in (*WALLS, *DOORS, "fence")) < len(ring):
-            continue                                         # (no roof on an open ring: r61 roofed one with 7 gaps)
-        if laid(obs, X, Y, piece) or (piece != "roof" and _at(obs, "grid", X, Y) not in ground_ch):
+        if dz == 0 and piece not in CELL_BLOCKS and _at(obs, "grid", X, Y) not in ground_ch:
             continue
         item = _item(piece, left)
         if item is None:
             continue
         left[item] -= 1
-        out.append((X, Y, item))
+        going.add(cell)
+        out.append((X, Y, item) if dz == 0 or (piece == "roof" and dz == STOREY) else (X, Y, item, land + dz))
     return out

@@ -123,7 +123,7 @@ def told(obs: dict, home=None, r: dict | None = None) -> str:
 def inside(home, social=None) -> tuple:
     """A tile inside the home, where the judge reads it from: the plan's first stand (the hut's middle, a drawn
     home's first floor tile; a drawn home's origin is its grid's corner, a wall)."""
-    sx, sy = plan_of(social).stands[0]
+    sx, sy = plan_of(social).ground[0]
     return home[0] + sx, home[1] + sy
 
 

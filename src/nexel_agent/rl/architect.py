@@ -10,26 +10,43 @@ from . import blueprint
 ROUNDS = 4
 BUDGET = 82                 # walls and roof tiles, at the most: a home for one 3 by 5 inside (the hut, 3 by 3: 64)
 
-DRAW = """You design small homes for a top-down tile game. Choose the design; it is drawn for you: walls all
-round the inside, the door in the middle of the wall you name, a path out of it, a roof over it all.
+DRAW = """You design builds for a tile game seen from above, built in storeys. Choose the design; it is drawn
+for you: walls all round the inside, a door in the middle of the wall you name, a path out of it, a floor of
+planks over each storey that has one above it, a flight of stairs outside up to each upper storey's own door, a
+roof over the top (one tile past its walls) unless you leave it open.
 
 Answer with JSON only:
-{{"width": inside tiles west to east, "depth": inside tiles north to south, "door": "north"|"south"|"east"|"west",
-  "furniture": {{"bed": [x, y], ...}}, "path": 2 or 3}}
-x from 0 (west) to width-1, y from 0 (north) to depth-1; two of a piece: "bed": [[x, y], [x, y]].
-Furniture: {furniture}.
+{{"shape": "rect" or "round", "width": tiles west to east, "depth": tiles north to south (rect),
+  "radius": 2 to 6 (round), "storeys": 1 to 3, "roof": true or false, "door": "north"|"south"|"east"|"west",
+  "furniture": {{"bed": [x, y], "table": [x, y, storey], ...}}, "path": 2 or 3}}
+Places are from the inside's top-left (x west to east, y north to south; a round's inside is its box), storey 0
+the ground (the default); two of a piece: "bed": [[x, y], [x, y]]. Furniture: {furniture}; on an upper storey
+only {upstairs} (the game stands nothing else on a floor).
 
-A good home, as the game judges it: 6 to 40 tiles inside; a bed, a campfire within 3 tiles of the bed (light, and a
-station to make things at), a chest, a table or chair; every piece beside a free tile one walks to from the door;
-the tile just inside the door left free; the wall with the door an odd number of tiles long (so the door is at its
-middle and the home is mirror-symmetric). Every wall and roof tile is gathered and made by hand: at most {budget}
-walls and roof tiles in all (the roof covers the walls and one tile past them: a 3 by 3 inside takes 64, 3 by 5
-takes 82, 5 by 5 takes 104).
+A good home, as the game judges it: every storey closed with its door and covered; 6 to 40 tiles inside the ground
+storey of a one-storey home; a bed, a campfire within 3 tiles of the bed (light, a station), a chest, a table or
+chair; each piece reached on foot from its storey's door; the wall with the door an odd number of tiles long (the
+door at its middle, the build mirror-symmetric). A base is a round or a yard left open (no roof): closed, a door
+or gate, a campfire in it. Every wall, plank and roof tile is gathered and made by hand: at most {budget} in all
+(a 3 by 3 one-storey home takes 64; each storey more on it about 40).
 
 Brief: {brief}"""
 
 AGAIN = """Judged {grade} of {of}. What failed: {told}.
 Choose again, fixing that, keeping what passed. JSON only."""
+
+
+def spec_of(reply: str):
+    """The design's JSON in a reply, or None (a grid, or nothing)."""
+    import json
+    m = re.search(r"\{.*\}", reply or "", re.S)
+    if not m:
+        return None
+    try:
+        spec = json.loads(m.group(0))
+    except ValueError:
+        return None
+    return spec if isinstance(spec, dict) and ("width" in spec or "radius" in spec) else None
 
 
 def grid_of(reply: str) -> str:
@@ -59,13 +76,22 @@ def cost(rows) -> int:
 
 
 def judged(reply: str, budget: int) -> dict:
-    """The drawing in a reply judged (blueprint.judged), its cost a check of its own: over the budget fails it."""
-    j = blueprint.judged(grid_of(reply))
+    """The design in a reply judged, its cost a check of its own (over the budget fails it): a design's JSON as a
+    build of storeys (rl/judge3d.py), a grid as drawn (blueprint.judged)."""
+    from . import judge3d
+    spec = spec_of(reply)
+    if spec is not None:
+        j = judge3d.judged(spec)
+        c = sum(p in ("wall", "plank", "roof") for *_, p in j["structure"].cells()) if j["ok"] else 0
+        j = {**j, "spec": spec, "told": judge3d.told(j) if j["ok"] else j["told"]}
+    else:
+        j = blueprint.judged(grid_of(reply))
+        c = cost(j["rows"]) if j["ok"] and j.get("rows") else 0
     j["of"] += 1
-    if j["ok"] and j.get("rows") and (c := cost(j["rows"])) > budget:
+    if j["ok"] and c > budget:
         j["failed"] = j["failed"] + ["cost"]
         j["told"] = (j["told"] if j["told"] != "nothing failed" else "") + \
-            f"{'; ' if j['failed'][:-1] else ''}it takes {c} walls and roof tiles, at most {budget}: smaller"
+            f"{'; ' if j['failed'][:-1] else ''}it takes {c} walls, planks and roof tiles, at most {budget}: smaller"
     elif j["ok"]:
         j["grade"] += 1
     return j
@@ -74,7 +100,9 @@ def judged(reply: str, budget: int) -> dict:
 def design(brief: str, ask, rounds: int = ROUNDS, budget: int = BUDGET) -> dict:
     """The best drawing for `brief` in `rounds`: {"rows", "grade", "of", "failed", "told", "history": [grades]}.
     `ask(messages) -> reply text` is the model."""
-    msgs = [{"role": "user", "content": DRAW.format(brief=brief, furniture=", ".join(blueprint.FURNITURE), budget=budget)}]
+    from .structure import UPSTAIRS_FURNITURE
+    msgs = [{"role": "user", "content": DRAW.format(brief=brief, furniture=", ".join(blueprint.FURNITURE), budget=budget,
+                                                    upstairs=", ".join(UPSTAIRS_FURNITURE))}]
     best, history = None, []
     for _ in range(rounds):
         reply = ask(msgs)
@@ -101,6 +129,14 @@ def model(url: str, *, max_tokens: int = 600, temperature: float = 0.4):
     return ask
 
 
+def plan_from(kept: dict):
+    """The plan of a design kept: a build of storeys (its JSON), or a grid."""
+    from .build import drawn
+    from .plan import of_structure
+    from .structure import Structure
+    return of_structure(Structure(kept["spec"])) if kept.get("spec") else drawn(kept["rows"])
+
+
 class Drafting:
     """The live side: when the mind builds a home not begun, the architect draws it first, in a thread, and the body
     waits for the drawing (it would site the hut otherwise). A drawing at full marks is the plan (social.plan) and is
@@ -110,7 +146,7 @@ class Drafting:
     def __init__(self, ask, path, brief: str):
         import json
         self.ask, self.path, self.brief, self.task, self.done = ask, path, brief, None, False
-        self.rows = json.loads(path.read_text()).get("rows") if path and path.exists() else None
+        self.kept = json.loads(path.read_text()) if path and path.exists() else None      # ({"spec"} or {"rows"})
         self.last = None                       # the last design: {"grade", "of", "history"} (logged by live.py)
 
     def holds(self, social, building: bool, obs, stats=None) -> bool:
@@ -119,9 +155,9 @@ class Drafting:
         import concurrent.futures
         import json
 
-        from .build import drawn, laid, plan_of
-        if self.rows and getattr(social, "plan", None) is None:
-            social.plan = drawn(self.rows)
+        from .build import laid, plan_of
+        if self.kept and getattr(social, "plan", None) is None:
+            social.plan = plan_from(self.kept)
         if not building or self.done or getattr(social, "plan", None) is not None:
             return False
         if social.home and any(laid(obs, social.home[0] + dx, social.home[1] + dy, p) for dx, dy, p in plan_of(social).pieces):
@@ -140,12 +176,13 @@ class Drafting:
             if stats is not None:
                 stats["draft"] = self.last
             return False
-        self.last = {k: d.get(k) for k in ("grade", "of", "history", "rows")}
+        self.last = {k: d.get(k) for k in ("grade", "of", "history", "rows", "spec")}
         if stats is not None:
             stats["draft"] = self.last
         if d.get("ok") and d["grade"] == d["of"]:
-            self.rows, social.plan, social.home = d["rows"], drawn(d["rows"]), None     # (sited anew, for its shape)
+            self.kept = {"spec": d["spec"]} if d.get("spec") else {"rows": d["rows"]}
+            social.plan, social.home = plan_from(self.kept), None                      # (sited anew, for its shape)
             if self.path:
                 self.path.parent.mkdir(parents=True, exist_ok=True)
-                self.path.write_text(json.dumps({"rows": self.rows, "brief": self.brief, "grade": d["grade"]}))
+                self.path.write_text(json.dumps({**self.kept, "brief": self.brief, "grade": d["grade"]}))
         return False
