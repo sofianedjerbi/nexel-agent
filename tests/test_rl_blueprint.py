@@ -1,6 +1,8 @@
 """The architect's drawings (#66): a tile grid read, stamped and judged before a block is laid (rl/blueprint.py), and
 the draw -> judge -> redraw loop on a scripted model (rl/architect.py)."""
 
+import json
+
 import pytest
 
 from nexel_agent.rl import architect, blueprint, judge
@@ -70,21 +72,26 @@ def test_a_reply_without_a_fence_is_read_whole():
     assert architect.grid_of(GOOD) == GOOD and architect.grid_of(f"here:\n```text\n{GOOD.strip()}\n```") == GOOD.strip() + "\n"
 
 
-def test_a_drawn_home_is_laid_by_building_alone_and_judged_as_drawn():
-    """The build verb lays a drawing as it lays the hut: from the pack, standing on its floor, the roof last."""
+CROWDED = "#####\n#.b.#\n#c.t#\n#f.h#\n##D##\n  =\n  =\n"    # (bench run 7: laid from its corner, it walled itself in)
+
+
+@pytest.mark.parametrize("grid", ["#######\n#b.f.c#\n#.....#\n#h....#\n###D###\n   =\n   =\n", CROWDED])
+def test_a_drawn_home_is_laid_by_building_alone_and_judged_as_drawn(grid):
+    """The build verb lays a drawing as it lays the hut: from the pack, standing on the floor the door leads to (never
+    where the furniture closes round it) or round the walls outside, the roof last."""
+    from collections import Counter
+
     from rl_kit import idx
 
     from nexel_agent.rl.build import drawn
     from nexel_agent.rl.core import SimEnv
-    big = "#######\n#b.f.c#\n#.....#\n#h....#\n###D###\n   =\n   =\n"
-    rows = blueprint.parse(big)
+    rows = blueprint.parse(grid)
     env = SimEnv(ep_ticks=10 ** 6, roam=0, rivals=0)
     env.reset(5)
     env.folk = []
     env.social.plan = drawn(rows)
     env.a.inventory.clear()
-    env.a.inventory.update({"stone_wall": 30, "door": 1, "bed": 1, "campfire": 1, "chest": 1, "chair": 1, "path": 2,
-                            "roof": 63})
+    env.a.inventory.update(Counter("stone_wall" if p == "wall" else p for _, _, p in blueprint.pieces(rows)))
     env.obs = env.sim.observe(env.a)
     for _ in range(400):
         if not env.encoded()["mask"][idx("build")]:
@@ -132,3 +139,29 @@ def test_live_a_drawing_short_of_full_marks_leaves_the_hut(tmp_path):
     while d.holds(social, True, env.sim.observe(env.a)):
         time.sleep(0.01)
     assert social.plan is None and not (tmp_path / "plan.json").exists() and d.last["grade"] < d.last["of"]
+
+
+DESIGN = {"width": 3, "depth": 3, "door": "south", "path": 2,
+          "furniture": {"bed": [0, 0], "campfire": [2, 0], "chest": [0, 2], "chair": [2, 2]}}
+
+
+@pytest.mark.parametrize("door", blueprint.SIDES)
+def test_a_design_chosen_is_drawn_whole_whatever_its_doors_side(door):
+    j = blueprint.judged(blueprint.render({**DESIGN, "door": door}))
+    assert j["failed"] == [], (door, j["told"])
+
+
+def test_a_design_that_cannot_be_drawn_is_told_why_and_two_of_a_piece_go_down():
+    for bad, why in (({"width": 30}, "width and depth"), ({"door": "up"}, "door is one of"),
+                     ({"furniture": {"bed": [5, 0]}}, "outside"), ({"furniture": {"sofa": [0, 0]}}, "no such furniture"),
+                     ({"furniture": {"bed": [0, 0], "chest": [0, 0]}}, "another piece")):
+        reply = json.dumps({**DESIGN, **bad})
+        j = blueprint.judged(architect.grid_of(reply))
+        assert not j["ok"] and why in j["error"], (bad, j)
+    two = blueprint.render({**DESIGN, "width": 5, "furniture": {**DESIGN["furniture"], "bed": [[0, 0], [4, 0]]}})
+    assert two.count("b") == 2
+
+
+def test_what_is_out_of_reach_is_named():
+    j = blueprint.judged(blueprint.render({**DESIGN, "furniture": {**DESIGN["furniture"], "table": [1, 2]}}))
+    assert "v2.reachable" in j["failed"] and "not reached on foot from the door" in j["told"]

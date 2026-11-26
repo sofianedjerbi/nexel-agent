@@ -23,7 +23,9 @@ CANNOT = ("v3.windows",)
 
 def parse(text: str) -> list:
     """The grid's rows as strings, the blank lines and a code fence around them dropped; ValueError when it is no
-    drawing (an unknown character, too big, nothing built)."""
+    drawing (an unknown character, too big, nothing built; "? why": a design that could not be drawn, architect.py)."""
+    if text.startswith("? "):
+        raise ValueError(text[2:])
     rows = [r.rstrip() for r in text.strip("\n").splitlines() if r.strip() and not r.strip().startswith("```")]
     if not rows:
         raise ValueError("no grid")
@@ -123,5 +125,111 @@ WHY = {"closed": "the walls do not close a room (a gap, or a tile outside reache
 
 
 def told(out: dict) -> str:
-    fails = [WHY.get(c, c) for k, v in out.items() for c in v["failed"] if f"{k}.{c}" not in CANNOT]
+    """The failures in words, with the judge's facts where they say which: the pieces not reached, the floor's size."""
+    f = out.get("v2", {}).get("facts", {})
+    exact = {"reachable": f"not reached on foot from the door: {', '.join(f.get('unreached') or [])} (each needs a free "
+                          f"tile beside it, joined to the door by free tiles; furniture blocks the way)",
+             "fit": f"{f.get('area')} tiles inside: 6 to 40 for a home"}
+    fails = [exact.get(c) if k == "v2" and c in exact and f.get("closed") else WHY.get(c, c)
+             for k, v in out.items() for c in v["failed"] if f"{k}.{c}" not in CANNOT]
     return "; ".join(dict.fromkeys(fails)) or "nothing failed"
+
+
+# ---- a design as choices (the model's), drawn by code: the 30B draws no grid well (spaced tiles, gaps, no door; #66
+# bench run 1: 0 of 10), it chooses well. {"width", "depth": the inside, "door": "north"/"south"/"east"/"west",
+# "furniture": {piece: [x, y] from the inside's top-left}, "path": tiles}
+
+SIDES = ("north", "south", "east", "west")
+FURNITURE = {v: k for k, v in LEGEND.items() if v not in ("wall", "door", "fence", "path", "floor")}
+
+
+def render(spec: dict) -> str:
+    """The grid of a design; ValueError, told in words, when it cannot be drawn."""
+    try:
+        w, d, door = int(spec["width"]), int(spec["depth"]), str(spec.get("door", "south")).lower()
+        things, path = dict(spec.get("furniture") or {}), int(spec.get("path", 2))
+    except (KeyError, TypeError, ValueError) as e:
+        raise ValueError(f"a design needs width, depth, door and furniture ({e})") from None
+    if not (2 <= w <= MOST - 2 and 2 <= d <= MOST - 2):
+        raise ValueError(f"width and depth from 2 to {MOST - 2}")
+    if door not in SIDES:
+        raise ValueError(f"door is one of {', '.join(SIDES)}")
+    path = max(0, min(path, 3))
+    g = [["#"] * (w + 2) for _ in range(d + 2)]
+    for y in range(d):
+        for x in range(w):
+            g[y + 1][x + 1] = "."
+    placed = [(n, at) for n, ats in things.items()                # (two of a piece: a list of places)
+              for at in (ats if isinstance(ats, list) and ats and isinstance(ats[0], list) else [ats])]
+    for name, at in placed:
+        if name not in FURNITURE:
+            raise ValueError(f"no such furniture: {name} (one of {', '.join(FURNITURE)})")
+        try:
+            x, y = (int(v) for v in at)
+        except (TypeError, ValueError):
+            raise ValueError(f"{name}: a place is [x, y]") from None
+        if not (0 <= x < w and 0 <= y < d):
+            raise ValueError(f"{name} at [{x}, {y}] is outside the {w} by {d} inside (x 0 to {w - 1}, y 0 to {d - 1})")
+        if g[y + 1][x + 1] != ".":
+            raise ValueError(f"{name} at [{x}, {y}]: another piece is there")
+        g[y + 1][x + 1] = FURNITURE[name]
+    mx, my = (w + 1) // 2, (d + 1) // 2                       # (the wall's middle: exact when the side is odd)
+    at = {"north": (mx, 0), "south": (mx, d + 1), "west": (0, my), "east": (w + 1, my)}[door]
+    g[at[1]][at[0]] = "D"
+    step = {"north": (0, -1), "south": (0, 1), "west": (-1, 0), "east": (1, 0)}[door]
+    pad = {"north": (0, path), "south": (0, 0), "west": (path, 0), "east": (0, 0)}[door]   # (room for the path out)
+    rows = [[" "] * pad[0] + r for r in [[" "] * len(g[0]) for _ in range(pad[1])] + g]
+    x, y = at[0] + pad[0], at[1] + pad[1]
+    for _ in range(path):
+        x, y = x + step[0], y + step[1]
+        while y >= len(rows):
+            rows.append([" "] * len(rows[0]))
+        while x >= len(rows[y]):
+            rows[y].append(" ")
+        rows[y][x] = "="
+    return "\n".join("".join(r).rstrip() for r in rows)
+
+
+def _all_reached(w, d, front, taken) -> bool:
+    """From the tile inside the door, on foot over the free tiles: every piece beside one walked (judge.sense's rule)."""
+    if front in taken:
+        return False
+    walked, stack = set(), [front]
+    while stack:
+        p = stack.pop()
+        if p in walked:
+            continue
+        walked.add(p)
+        stack += [q for q in _nbrs(p) if 0 <= q[0] < w and 0 <= q[1] < d and q not in taken and q not in walked]
+    return all(any(q in walked for q in _nbrs(t)) for t in taken)
+
+
+def _nbrs(p):
+    return [(p[0] + 1, p[1]), (p[0] - 1, p[1]), (p[0], p[1] + 1), (p[0], p[1] - 1)]
+
+
+def tidied(spec: dict) -> dict:
+    """The design with its furniture where it all fits: each piece by a wall, as a player sets it, where it was chosen
+    or the nearest tile to it that keeps everything reached on foot from the door (the middle only when the walls are
+    full). The model
+    chooses what and roughly where; this, that one can walk to all of it. A piece with no such tile is left out."""
+    w, d, door = int(spec["width"]), int(spec["depth"]), str(spec.get("door", "south")).lower()
+    mx, my = (w + 1) // 2 - 1, (d + 1) // 2 - 1              # (where render puts the door, inside)
+    front = {"north": (mx, 0), "south": (mx, d - 1), "west": (0, my), "east": (w - 1, my)}.get(door, (mx, d - 1))
+    by_wall = lambda q: 0 if q[0] in (0, w - 1) or q[1] in (0, d - 1) else 1      # noqa: E731
+    tiles = [(x, y) for y in range(d) for x in range(w) if (x, y) != front]
+    taken, out = set(), {}
+    placed = [(n, at) for n, ats in (spec.get("furniture") or {}).items()
+              for at in (ats if isinstance(ats, list) and ats and isinstance(ats[0], list) else [ats])]
+    for name, at in placed:
+        try:
+            x, y = (int(v) for v in at)
+        except (TypeError, ValueError):
+            x, y = 0, 0
+        ok = [q for q in tiles if q not in taken and _all_reached(w, d, front, taken | {q})]
+        if not ok:
+            continue
+        q = min(ok, key=lambda q: (by_wall(q), abs(q[0] - x) + abs(q[1] - y)))      # (where chosen, if by a wall)
+        taken.add(q)
+        out.setdefault(name, []).append(list(q))
+    return {**spec, "furniture": out}

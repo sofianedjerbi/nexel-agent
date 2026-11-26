@@ -34,14 +34,17 @@ def main():
         d = architect.design(brief, ask, a.rounds)
         rows.append({"brief": brief, "s": round(time.monotonic() - t0), **{k: d.get(k) for k in
                      ("grade", "of", "failed", "history", "rows", "error")}})
-        print(f"{d['grade']:>2}/{d['of']} {d['history']} {brief}", flush=True)
+        cost = architect.cost(d["rows"]) if d.get("rows") else 0
+        rows[-1]["cost"] = cost
+        print(f"{d['grade']:>2}/{d['of']} {d['history']} {cost:>3} walls+roof  {brief}", flush=True)
     a.out.parent.mkdir(parents=True, exist_ok=True)
     a.out.with_suffix(".json").write_text(json.dumps(rows, indent=1))
     full = [r for r in rows if r["grade"] == r["of"]]
     first = [r for r in rows if r["history"] and r["history"][0] == r["of"]]
     fails = Counter(c for r in rows for c in r["failed"] or [])
     print(f"\nfull marks {len(full)}/{len(rows)}, first drawing {len(first)}/{len(rows)}, "
-          f"mean best {sum(r['grade'] for r in rows) / len(rows):.1f}/{rows[0]['of']}, still failing: {dict(fails)}")
+          f"mean best {sum(r['grade'] for r in rows) / len(rows):.1f}/{rows[0]['of']}, "
+          f"mean walls+roof {sum(r['cost'] for r in rows) / len(rows):.0f} (the hut 64, roofed past its walls), still failing: {dict(fails)}")
     for r in rows:
         print(f"\n{r['brief']} ({r['grade']}/{r['of']})\n" + "\n".join(r["rows"] or [r.get("error") or ""]))
 

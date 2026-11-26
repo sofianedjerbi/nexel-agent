@@ -50,7 +50,8 @@ REACH = TILE_REACH["use"]          # (a piece is laid from where it stands: the 
 
 
 class Plan(tuple):
-    """(pieces, stands): the pieces (dx, dy, piece) in the order laid, the tiles (dx, dy) it is laid from."""
+    """(pieces, stands[, spare]): the pieces (dx, dy, piece) in the order laid, the tiles (dx, dy) it is laid from, and
+    spare ones it may be laid from when they are open ground (round the walls outside: a roof's corner over a bed)."""
 
     @property
     def pieces(self):
@@ -65,10 +66,15 @@ class Plan(tuple):
         ps = [(dx, dy) for dx, dy, p in self.pieces if p != "roof"] + list(self.stands)
         return min(x for x, _ in ps), min(y for _, y in ps), max(x for x, _ in ps), max(y for _, y in ps)
 
-    def stand_for(self, dx, dy):
-        """The stand nearest (dx, dy) that reaches it (not on it), or None."""
+    @property
+    def spare(self):
+        return self[2] if len(self) > 2 else ()
+
+    def stand_for(self, dx, dy, open_=lambda s: True):
+        """The stand nearest (dx, dy) that reaches it (not on it; a spare one only when `open_`), or None."""
         d = lambda s: max(abs(s[0] - dx), abs(s[1] - dy))                     # noqa: E731
-        s = min((s for s in self.stands if s != (dx, dy)), key=d, default=None)
+        ok = [s for s in self.stands if s != (dx, dy)] + [s for s in self.spare if s != (dx, dy) and open_(s)]
+        s = min(ok, key=d, default=None)
         return s if s is not None and d(s) <= REACH else None
 
 
@@ -76,11 +82,27 @@ HUT = Plan((PLAN, ((W // 2, H // 2),)))
 
 
 def drawn(rows) -> Plan:
-    """The plan of a grid the architect drew (rl/blueprint.py): its pieces, laid from its floor."""
+    """The plan of a grid the architect drew (rl/blueprint.py): its pieces, laid from the floor the door leads to once
+    all is in (a tile the furniture closes round is never stood on: it would wall itself in) and from its path; spare,
+    the ring round the walls outside."""
     from . import blueprint as bp
-    floor = tuple((x, y) for y, r in enumerate(rows) for x, ch in enumerate(r) if ch in ".=")   # (a path is stood on
-    #                                                                                                too, to lay its far end)
-    return Plan((bp.pieces(rows), floor))
+    at = lambda x, y: rows[y][x] if 0 <= y < len(rows) and 0 <= x < len(rows[y]) else " "      # noqa: E731
+    near = lambda p: [(p[0] + 1, p[1]), (p[0] - 1, p[1]), (p[0], p[1] + 1), (p[0], p[1] - 1)]  # noqa: E731
+    doors = [(x, y) for y, r in enumerate(rows) for x, ch in enumerate(r) if ch == "D"]
+    walked, stack = [], [q for d in doors for q in near(d) if at(*q) == "."]
+    while stack:
+        p = stack.pop()
+        if p not in walked:
+            walked.append(p)
+            stack += [q for q in near(p) if at(*q) == "." and q not in walked]
+    path = [(x, y) for y, r in enumerate(rows) for x, ch in enumerate(r) if ch == "="]
+    ps = bp.pieces(rows)
+    shell = [(x, y) for x, y, p in ps if p in ("wall", "door", "fence")]
+    x0, y0 = min(x for x, _ in shell) - 1, min(y for _, y in shell) - 1
+    x1, y1 = max(x for x, _ in shell) + 1, max(y for _, y in shell) + 1
+    spare = tuple((x, y) for y in range(y0, y1 + 1) for x in range(x0, x1 + 1)
+                  if (x in (x0, x1) or y in (y0, y1)) and (x, y) not in path)
+    return Plan((ps, tuple(sorted(walked, key=lambda q: (q[1], q[0]))) + tuple(path), spare))
 
 
 def plan_of(social) -> Plan:
@@ -203,7 +225,10 @@ def next_step(obs, social, *, ground_ch, tool_for, dirs):
             return "dig", {"dir": d, **({"with": w} if w else {})}
     for dx, dy, piece in plan.pieces:
         X, Y = hx + dx, hy + dy
-        if laid(obs, X, Y, piece) or (stand := plan.stand_for(dx, dy)) is None:
+        open_ = lambda s: _at(obs, "grid", hx + s[0], hy + s[1]) in ground_ch | {YOU}     # noqa: E731
+        if (me["x"], me["y"]) == (X, Y) and piece != "roof":
+            continue                                         # (under its feet: the tile shows it, not what is laid)
+        if laid(obs, X, Y, piece) or (stand := plan.stand_for(dx, dy, open_)) is None:
             continue
         if piece != "roof" and _at(obs, "grid", X, Y) not in ground_ch:
             continue                                         # (someone or something on it: the next piece)
