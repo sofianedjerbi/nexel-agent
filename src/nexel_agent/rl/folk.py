@@ -28,7 +28,8 @@ GIFT_EASES = sec(120)                # faster when the player gives it something
 # live save's real players were, measured per active minute (#12): a line in nine minutes or so, no gift, no ask, not
 # near anyone (they move off past AWAY), a creature hunted about once a minute. Rough: as one of them was, hitting
 # people (half a blow a minute): a few in a hundred. A neighbour who follows you about (shadow) is always social.
-QUIET, ROUGH = 0.4, 0.03
+QUIET, ROUGH = 0.4, 0.0      # (rough off: r64, trained with 3% rough neighbours, killed the peaceful visitor 5 times
+#                             live, trial 8; back on only with a ship gate that measures it: #13)
 AWAY = 8                             # tiles a quiet one keeps from the player (the measured walk-away)
 QUIET_SAY, QUIET_HUNT, ROUGH_HIT = 0.005, 0.3, 0.03  # a chance at each thing it does (ACT: 5 s or so between two)
 HUNT_R = 12                          # tiles round it a quiet one looks for a creature to hunt
