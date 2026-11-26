@@ -97,7 +97,7 @@ def test_an_episode_rarely_starts_full():
 def test_death_ends_episode():
     env = SimEnv(ep_ticks=10 ** 6, roam=0)
     env.reset(5)
-    during_next_tick(env, lambda: env.sim.damage(env.a, 100, "test"))
+    during_next_tick(env, lambda: env.sim.damage(env.a, 100, "admin"))
     _, r, d, t, info = env.step(0)
     assert d and not t and info["died"] and r < 0
 
