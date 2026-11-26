@@ -122,3 +122,9 @@ recording (`?replay=demo_replay.jsonl`, made by `tools/brain/from_demo.py` from 
 pip install pytest pytest-asyncio pytest-xdist
 pytest -q          # runs the game's simulation in-process: no server, no model, no art needed
 ```
+
+## Git hooks
+
+Run `tools/install_hooks.sh` once per checkout: git then runs `.githooks/` as CI checks. commit-msg runs commitlint
+(Conventional Commits), pre-commit runs ruff check on staged files, and pre-push runs the unit tests at the pinned
+game and checks subject length (94 characters, so a squash's ' (#NN)' stays within 100).
