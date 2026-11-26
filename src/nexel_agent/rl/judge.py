@@ -85,12 +85,27 @@ def told(v: dict) -> str:
     return ", ".join(parts) + f" (grade {v['grade']} of {v['of']})"
 
 
+def laid(world, home) -> int:
+    """How many pieces of the hut's blueprint (rl/build.py PLAN) stand where it puts them, read from the world."""
+    from .build import PLAN, WALLS
+    hx, hy = home
+    n = 0
+    for dx, dy, piece in PLAN:
+        x, y = hx + dx, hy + dy
+        b = world.block(x, y)
+        n += bool(world.roof(x, y)) if piece == "roof" else b in WALLS if piece == "wall" else \
+            b in ENCLOSE and not _SOLID.get(b, True) if piece == "door" else b == piece
+    return n
+
+
 class Potential:
     """The build reward (#29): UNIT for each check the build passes, paid as the grade changes (a wall torn down pays
     back what it earned: potential-based, as rl/progress.py). Measured at one place - the home (rl/build.py), else the
     last closed build it stood in - so walking out of the room is no loss. Read after a place or a dig only."""
 
     UNIT = 0.25
+    PIECE = 0.05                # and for each piece of the home's blueprint laid (rl/build.py): a ring of walls pays
+    #                             as it rises, not only once it closes (r53 picked build 0.4% of the times it could)
 
     def __init__(self):
         self.at, self.phi = None, 0.0
@@ -104,6 +119,6 @@ class Potential:
             at, v = me, verdict(world, *me)
         if v["checks"]["closed"] and not home:
             self.at = at
-        phi = self.UNIT * v["grade"]
+        phi = self.UNIT * v["grade"] + (self.PIECE * laid(world, home) if home else 0.0)
         r, self.phi = phi - self.phi, phi
         return r

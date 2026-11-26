@@ -39,3 +39,17 @@ def test_the_build_potential_pays_as_it_grows_and_back_when_torn_down():
     assert p.step(sim.world, None, (a.x + 9, a.y), ok) == 0                              # (walked out: no loss)
     sim.world.set(x + 1, y - 1, block="none")
     assert p.step(sim.world, None, (a.x + 9, a.y), [("dig", {}, {"ok": True})]) == -2 * judge.Potential.UNIT
+
+
+def test_each_piece_of_the_home_laid_pays():
+    from nexel_agent.rl.build import PLAN
+    env = SimEnv(ep_ticks=10 ** 6, roam=0, rivals=0)
+    env.reset(5)
+    sim, a = env.sim, env.a
+    home = (a.x + 3, a.y + 3)
+    p, ok = judge.Potential(), [("place", {}, {"ok": True})]
+    assert p.step(sim.world, home, (a.x, a.y), ok) == 0
+    dx, dy, _ = PLAN[0]
+    sim.world.set(home[0] + dx, home[1] + dy, block="stone_wall")
+    assert abs(p.step(sim.world, home, (a.x, a.y), ok) - judge.Potential.PIECE) < 1e-9
+    assert judge.laid(sim.world, home) == 1
