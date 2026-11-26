@@ -218,3 +218,18 @@ def test_the_body_reads_the_game_with_the_vocabulary_it_learned():
     assert ACTIONS[:len(vocab.ACTIONS)] == vocab.ACTIONS
     assert ITEMS == vocab.ITEMS and KINDS == vocab.KINDS and len(vocab.CHARS) + 1 == N_CHARS
     assert CHAR_ID["@"] == vocab.CHARS.index("@") + 1
+
+
+def test_the_ores_and_tool_tiers_have_their_own_block_at_the_end():
+    """(#24) What r57 learned keeps its place: its 200 actions (the game at 31963d92) and its 669 inputs. The pack's
+    items that came after ITEMS (ores, ingots, tool tiers, the hob, the Eclipse Core) are a block after them; an action
+    the game adds later goes after that, so a checkpoint only ever grows at the end (rl/train.py init_from)."""
+    from nexel_agent.rl import vocab
+    from nexel_agent.rl.encode import ACTIONS_V4, ITEMS_V2, V4, encode
+    assert len(vocab.ACTIONS) == ACTIONS_V4 == 200 and V4 == 669 and V4 + len(ITEMS_V2) + N_ACTIONS - ACTIONS_V4 == VEC
+    assert vocab.ACTIONS[-1] == ("build", None, None) and not set(ITEMS_V2) & set(vocab.ITEMS)
+    o = SimEnv(ep_ticks=10 ** 6, roam=0, rivals=0, folk=0).reset(5)
+    obs = {"tick": 0, "grid": ["." * SIDE] * SIDE, "self": {"hp": 20, "hunger": 20, "inventory": {"iron_ore": 3, "wood": 1}}}
+    v = encode(obs, last_action=ACTIONS_V4 - 1)["vec"]
+    assert v[V4 + ITEMS_V2.index("iron_ore")] > 0 and np.count_nonzero(v[V4:V4 + len(ITEMS_V2)]) == 1
+    assert v[V4 - 1] == 1 and o["vec"].shape == (VEC,)                       # (build, the last action r57 knew: the last slot before the block)

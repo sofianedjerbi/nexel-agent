@@ -11,7 +11,7 @@ from itertools import groupby
 from .facts import (HOSTILE, Attack, Craft, Give, Say, compass, counted, dist, events, ground, named, pack,
                     people, plain, told)
 
-SIGHTS = ("water", "deep_water", "tree", "rock", "ore", "thicket", "berry_bush", "fruit_tree", "campfire", "workbench",
+SIGHTS = ("water", "deep_water", "tree", "rock", "thicket", "berry_bush", "fruit_tree", "campfire", "workbench",
           "bed", "door", "chest", "well", "cave_floor", "hole", "ladder", "stone_wall", "wood_wall", "fence")
 WINDOW_S = 30.0                       # "lately": what it saw in the last 30 s; an ask not met in that time was not met
 # Trust in a person, in [-1, 1], from what they did (never from what they said): a gift, standing by it in a fight,
@@ -32,6 +32,7 @@ def places(obs: dict, signs: dict) -> str:
     legend = obs.get("legend") or {}
     seen = {legend.get(ch, "") for row in obs.get("grid") or [] for ch in row}
     sights = [s.replace("_", " ") for s in SIGHTS if s in seen]
+    sights += dict.fromkeys(o["ore"].replace("_", " ") for o in obs.get("ores") or [])    # (the ore in the rock that shows, nearest first: observe's ores)
     if sights:
         out.append("in sight: " + ", ".join(sights[:6]))
     if me.get("in_cave"):
