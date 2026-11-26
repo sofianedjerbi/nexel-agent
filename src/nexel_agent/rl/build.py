@@ -159,8 +159,12 @@ def _run(obs, hx, hy, ground_ch, inv) -> list:
     """The pieces it can lay now from the middle, in the plan's order, as far as the pack goes: [(x, y, item)]. One
     pick of build lays them all (rl/verbs.py split, as ring does), so a pick pays for what it builds."""
     left, out = dict(inv), []
+    ring = [(dx, dy, p) for dx, dy, p in PLAN if p in ("wall", "door")]
+    standing = sum(laid(obs, hx + dx, hy + dy, p) for dx, dy, p in ring)     # (the ring laid before, and now)
     for dx, dy, piece in PLAN:
         X, Y = hx + dx, hy + dy
+        if piece == "roof" and standing + sum(1 for _, _, it in out if it in WALLS + DOORS) < len(ring):
+            continue                                         # (no roof on an open ring: r61 roofed one with 7 gaps)
         if laid(obs, X, Y, piece) or (piece != "roof" and _at(obs, "grid", X, Y) not in ground_ch):
             continue
         item = max((w for w in WALLS if left.get(w)), key=left.get, default=None) if piece == "wall" else piece if left.get(piece) else None

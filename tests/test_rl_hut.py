@@ -64,3 +64,15 @@ def test_a_home_at_the_edge_of_view_is_kept():
     env.a.x, env.a.y = home[0] + 1 - 9, home[1] + 1
     built(env.sim.observe(env.a), env.social)
     assert env.social.home == home
+
+
+def test_no_roof_goes_on_an_open_ring():
+    """Short of walls (spent elsewhere), it lays what walls it has and no roof: a roof on an open ring is lost."""
+    from nexel_agent.rl.actions import built
+    env = SimEnv(ep_ticks=10 ** 6, roam=0, rivals=0)
+    env.reset(5)
+    env.folk = []
+    env.a.inventory.clear()
+    env.a.inventory.update({"stone_wall": 8, "door": 1, "roof": 25})
+    cmd = built(env.sim.observe(env.a), env.social)
+    assert cmd[0] == "ring" and not any(it == "roof" for _, _, it in cmd[1]["pieces"])
