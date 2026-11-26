@@ -104,3 +104,56 @@ def test_a_door_onto_water_and_a_hall_do_not_make_sense():
     env.reset(5)
     v = judge.sense(env.sim.world, env.a.x, env.a.y)                               # open land: nothing to judge
     assert v["grade"] == 0 and v["failed"] == list(judge.SENSE) and not v["facts"]["closed"]
+
+
+# ---- v3 part 1 (#32): does it look good? A builder's good hut, then one change each
+
+def hut(change=None, overhang=True, path=True):
+    """3 by 3 inside, wood walls and corners, the door in the north wall's middle, a window (a fence) in the east and
+    west walls, a roof over it all and one tile past, a cobble path of three north of the door. `change`: {(dx, dy):
+    block} from the inside's corner."""
+    from nexel_worlds.sim.storeys import STOREY
+    env = SimEnv(ep_ticks=10 ** 6, roam=0, rivals=0)
+    env.reset(5)
+    sim, a = env.sim, env.a
+    x, y = a.x - 1, a.y - 1
+    for i in range(-6, 9):
+        for j in range(-7, 9):
+            sim.world.set(x + i, y + j, ground="grass", block="none")
+    lv = sim.world.level(x, y)
+    for i in range(-1, 4):
+        for j in range(-1, 4):
+            if i in (-1, 3) or j in (-1, 3):
+                sim.world.set(x + i, y + j, block="wood_wall")
+    pieces = {(1, -1): "door", (-1, 1): "fence", (3, 1): "fence", **(change or {})}
+    for (i, j), b in pieces.items():
+        sim.world.set(x + i, y + j, block=b)
+    r = 2 if overhang else 1
+    for i in range(-r, 3 + r):
+        for j in range(-r, 3 + r):
+            sim.set_block(x + i, y + j, lv + STOREY, "roof")
+    for j in range(-4, -1) if path else ():
+        for i in (0, 1, 2):
+            sim.world.set(x + i, y + j, ground="cobble")
+    return judge.looks(sim.world, x + 1, y + 2)                                  # (from the south middle: the middle may be a post)
+
+
+def test_a_builders_hut_looks_good():
+    v = hut()
+    assert v["failed"] == [] and v["grade"] == v["of"] == len(judge.LOOKS), v
+    assert v["facts"]["materials"] == {"wood_wall": 13} and v["facts"]["windows"] and v["facts"]["path"] == 9
+    v = hut({(-1, -1): "stone_wall", (3, -1): "stone_wall", (-1, 3): "stone_wall", (3, 3): "stone_wall"})
+    assert v["checks"]["material"], v["facts"]                                    # a second material, at the corners: on purpose
+
+
+def test_each_thing_that_spoils_a_hut_is_named():
+    for kw, failed in ((dict(change={(0, 3): "stone_wall", (2, 3): "stone_wall"}), ["material"]),   # two of another, here and there
+                       (dict(change={(1, 1): "wood_wall"}), ["rectangles"]),                           # a post in the middle
+                       (dict(change={(0, 0): "wood_wall", (2, 0): "wood_wall", (-1, -1): "none", (3, -1): "none"}), ["straight"]),   # one-tile jogs: the north corners notched
+                       (dict(overhang=False), ["roof"]),                                               # a roof that stops at the walls
+                       (dict(change={(1, -1): "wood_wall", (0, -1): "door"}), ["symmetric"]),          # the door off its middle
+                       (dict(change={(-1, 1): "wood_wall", (3, 1): "wood_wall"}), ["windows"]),        # no window
+                       (dict(path=False), ["path"]),                                                   # no path to the door
+                       (dict(change={(5, 4): "fence"}), ["no_stray"])):                                # a fence post left in the grass
+        v = hut(**kw)
+        assert v["failed"] == failed, (kw, v["failed"], v["facts"])

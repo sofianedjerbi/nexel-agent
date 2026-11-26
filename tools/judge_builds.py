@@ -1,5 +1,5 @@
 """The build judge (rl/judge.py) on the builds a save holds: every closed room a door or gate leads into, judged by
-v1 (verdict) and v2 (sense), as the reference the body's homes are read against (#31). Read from a COPY of a save, never the live
+v1 (verdict), v2 (sense) and v3's rules (looks), as the reference the body's homes are read against (#31). Read from a COPY of a save, never the live
 game's own file (it writes there): take one first, e.g.
 
     python3 -c "import sqlite3; s = sqlite3.connect('file:../nexel-worlds/saves/caves/world.sqlite?mode=ro', uri=True); \\
@@ -46,9 +46,10 @@ def main():
         sim = Simulation(a.db, seed=a.seed, event_log=Path(tmp) / "events.jsonl")
         rows = []
         for x, y in homes(sim, a.db):
-            v1, v2 = judge.verdict(sim.world, x, y), judge.sense(sim.world, x, y)
+            v1, v2, v3 = judge.verdict(sim.world, x, y), judge.sense(sim.world, x, y), judge.looks(sim.world, x, y)
             rows.append({"at": [x, y], "v1": f"{v1['grade']}/{v1['of']}", "v1_failed": v1["failed"],
-                         "v2": f"{v2['grade']}/{v2['of']}", "v2_failed": v2["failed"], "facts": v2["facts"]})
+                         "v2": f"{v2['grade']}/{v2['of']}", "v2_failed": v2["failed"], "facts": v2["facts"],
+                         "v3": f"{v3['grade']}/{v3['of']}", "v3_failed": v3["failed"], "looks": v3["facts"]})
     for r in rows:
         print(json.dumps(r, default=list))
     closed = [r for r in rows if r["facts"].get("closed")]
@@ -56,6 +57,8 @@ def main():
     print("v1 grades:", dict(sorted(Counter(r["v1"] for r in rows).items())))
     print("v2 grades:", dict(sorted(Counter(r["v2"] for r in rows).items())))
     print("v2 failed, of the closed:", dict(Counter(k for r in closed for k in r["v2_failed"]).most_common()))
+    print("v3 grades:", dict(sorted(Counter(r["v3"] for r in rows).items())))
+    print("v3 failed:", dict(Counter(k for r in rows for k in r["v3_failed"]).most_common()))
 
 
 if __name__ == "__main__":
