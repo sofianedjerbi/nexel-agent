@@ -444,3 +444,10 @@ verdict: keep the shipped body (targets: score; 21 min)
 ## r60
 
 - From: r59 last, `--init`. Changed: a home is kept out of view's edge, a pit in a home begun is filled.
+- **Result (r60):** build picked 25-80 times; runs of 21-27 pieces cut after a few by the next decision (the env's 5 s
+  wait, or a newcomer in view), the rest lost. Fixed: a run of places goes on to its end. Stopped at +480k.
+
+## r61
+
+- From: r60 last, `--init`, home-kit starts 20%. Changed: a laying run is one choice, done to its end (a hut from a
+  stocked pack is one pick).
