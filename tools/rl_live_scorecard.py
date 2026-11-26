@@ -6,7 +6,12 @@ blow; Brute, who sets upon her), then the table (tools/scorecard.py) beside the 
     python tools/rl_live_scorecard.py --minutes 10 --model-url ""        # the body alone, in silence
 
 Everything goes to rl_runs/score/<time>/: the world copy and its events.jsonl, the player's logs (rl.jsonl,
-mind.jsonl, latency.jsonl, brain.jsonl), the visitor's account (visitor.json), scorecard.md."""
+mind.jsonl, latency.jsonl, brain.jsonl), the visitor's account (visitor.json), scorecard.md.
+
+The model on :8080: `python -m mlx_lm.server --model <it> --port 8080`, or players.py. Its defaults (mlx-lm 0.32.2)
+decode the requests in hand together (--decode-concurrency 32), which a reply going beside a thought counts on
+(rl/voice.py, #11): it does so for a model whose cache can merge, with no draft model, no --kv-bits and no seed in
+the request. Without that, a reply waits for the thought at the server: latency.jsonl's llm_s says so."""
 
 import argparse
 import json
