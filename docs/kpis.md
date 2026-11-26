@@ -473,8 +473,10 @@ _Made by `tools/kpis.py show`, 2026-11-26. Arrows: which way is better._
 | 20261125-174442 | words | 31 | 0.81 | 3.21 | 0 | 82 | 2 | 23.9 | 4/6 |
 | 20261125-181950 | words | 31 | 0.81 | 2.56 | 0 | 85 | 6 | 23 | 6/6 |
 | 20261125-192528 | words | 30 | 0.57 | 13.08 | 0 | 88 | 5 | 22.8 | 6/6 |
+| 20261126-114752 | words | 31 | 0.65 | 5.48 | 0 | 86 | 15 | 21.6 | 4/6 |
 
 ## Live builds: its closed rooms, beside the real players' in the same copy
 
 | run | builds_judged ↑ | best_grade ↑ | best_sense ↑ | best_looks ↑ | players' builds_judged | players' best_grade | players' best_sense | players' best_looks |
 |---|---|---|---|---|---|---|---|---|
+| 20261126-114752 | 1 | 2 | 4 | 0 | 3 | 4 | 5 | 6 |
