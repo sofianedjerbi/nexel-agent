@@ -87,3 +87,9 @@ def test_the_deed_its_line_claims():
     assert acts.deed('{"say": "made you a sword", "deed": "made sword"}', ITEMS) == ("made", "sword")
     assert acts.deed('{"say": "hi", "deed": ""}', ITEMS) is None
     assert acts.deed("no json at all", ITEMS) is None
+
+
+def test_a_recipe_with_counts_is_no_pack_dump():
+    pack = {"wood": 14, "stone": 2}
+    assert not acts.pack_dump("6 wood and 3 stone", ITEMS, pack)          # (what a thing takes, not what it carries)
+    assert acts.pack_dump("got 14 wood and 2 stone", ITEMS, pack)

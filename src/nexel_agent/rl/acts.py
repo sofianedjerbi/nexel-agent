@@ -56,9 +56,15 @@ def read(out: str, n_heard: int, items) -> tuple:
     return str(d.get("say") or ""), heard, promise
 
 
-def pack_dump(line: str, items) -> bool:
-    """Does the line read out its pack: two or more items it names with a count ("stone_block 26, dirt 13")?"""
+def pack_dump(line: str, items, pack: dict | None = None) -> bool:
+    """Does the line read out its pack: two or more items it names with a count ("stone_block 26, dirt 13")? With
+    the pack, only counts it carries are its pack: "6 wood and 3 fiber" to "how is a bed made" is a recipe, not a dump
+    (the 30B's talk bench: the answer was dropped)."""
     words = re.findall(r"[a-z_]+|\d+", line.lower().replace(" block", "_block"))
-    counted = {item_of(w, items) for i, w in enumerate(words) if item_of(w, items)
-               and any(x.isdigit() for x in words[max(0, i - 1):i + 2])}
+    counted = set()
+    for i, w in enumerate(words):
+        it = item_of(w, items)
+        near = [int(x) for x in words[max(0, i - 1):i + 2] if x.isdigit()]
+        if it and near and (pack is None or pack.get(it) in near):
+            counted.add(it)
     return len(counted) >= 2

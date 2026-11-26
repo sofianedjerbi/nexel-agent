@@ -178,7 +178,7 @@ class Voice:
             return None
         if any(x.lower() == line.lower() for _, x in self.mine):
             return None
-        if acts.pack_dump(line, self.now.items) and not (reply and self.asked_pack):
+        if acts.pack_dump(line, self.now.items, (self.now.obs.get("self") or {}).get("inventory")) and not (reply and self.asked_pack):
             self.write({"kind": "dropped", "said": line, "why": "reads out the pack"})
             return None
         self.last_said = t
