@@ -24,6 +24,8 @@ Answer with JSON only:
 Places are from the inside's top-left (x west to east, y north to south; a round's inside is its box), storey 0
 the ground (the default); two of a piece: "bed": [[x, y], [x, y]]. Furniture: {furniture}; on an upper storey
 only {upstairs} (the game stands nothing else on a floor).
+Or dug into the land: "underground": true - a trench stepping down to its door and a room tunnelled behind it,
+the land its walls and its roof (no storeys, no roof to choose; nothing to gather: the land dug is the walls).
 A roof is made of blocks, as a builder makes one: "flat" is one layer; "gable" steps up a layer a row to a ridge
 along the long side; "hip" steps up on all four sides (on a round: a dome). Its material: {materials} ("roof" is
 shingles; stone or earth sits on a deck of planks); "eaves" (the lowest ring) and "ridge" (the top) in another
@@ -141,8 +143,8 @@ def plan_from(kept: dict):
     """The plan of a design kept: a build of storeys (its JSON), or a grid."""
     from .build import drawn
     from .plan import of_structure
-    from .structure import Structure
-    return of_structure(Structure(kept["spec"])) if kept.get("spec") else drawn(kept["rows"])
+    from .dug import design_of
+    return of_structure(design_of(kept["spec"])) if kept.get("spec") else drawn(kept["rows"])
 
 
 class Drafting:

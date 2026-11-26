@@ -130,6 +130,8 @@ class SocialMemory:
         return max(inv, key=inv.get) if inv else None
 
     def achieved(self, tool: str, args: dict, ok: bool, tick: int, near: float, to: str | None = None) -> list:
+        if tool == "dig" and ok and "z" in args and "x" in args:          # (a cell dug, by the build verb: rl/build.py)
+            self.up_laid.add((args["x"], args["y"], args["z"], "dug"))
         if tool == "place" and ok and "x" in args:          # (what it laid where the view does not show: rl/build.py)
             if args.get("item") == "stairs":
                 self.up_laid.add((args["x"], args["y"], "stairs"))

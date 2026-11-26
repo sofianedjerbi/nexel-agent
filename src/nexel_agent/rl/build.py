@@ -22,7 +22,7 @@ from nexel_worlds.tiles import BLOCKS
 
 from .judge import ENCLOSE
 from .plan import BLOCKS as CELL_BLOCKS
-from .plan import Plan, of_pieces
+from .plan import Plan, drawn, of_pieces  # noqa: F401  (drawn: the grid's plan, for its callers)
 from .structure import LAND_IN_CELL
 from .pursue import craft
 
@@ -35,6 +35,8 @@ CH = {b.name: b.char for b in BLOCKS}
 WALLS = tuple(k for k in ENCLOSE if _SOLID[k])
 DOORS = tuple(k for k in ENCLOSE if not _SOLID[k])
 WALL_CH, DOOR_CH = {CH[k] for k in WALLS}, {CH[k] for k in DOORS}
+DIRS4 = {"N": (0, -1), "E": (1, 0), "S": (0, 1), "W": (-1, 0)}
+TIER = {"wood_pickaxe": 1, "pickaxe": 2, "iron_pickaxe": 3, "titanium_pickaxe": 4}      # (the best digs fastest)
 LIQUID_CH = {g.char for g in GROUNDS if g.liquid}                                       # (no home on water, nor its path)
 PATH_CH = next(g.char for g in GROUNDS if g.name == "cobble")                           # (what the path item lays)
 BLOCK_CH = {b.char for b in BLOCKS if b.name != "none" and b.hardness > 0}   # (what stands in the way and can be dug: a
@@ -54,30 +56,6 @@ REACH = TILE_REACH["use"]          # (a piece is laid from where it stands: the 
 
 
 HUT = of_pieces(PLAN, ((W // 2, H // 2),))
-
-
-def drawn(rows) -> Plan:
-    """The plan of a grid the architect drew (rl/blueprint.py): its pieces, laid from the floor the door leads to once
-    all is in (a tile the furniture closes round is never stood on: it would wall itself in) and from its path; spare,
-    the ring round the walls outside."""
-    from . import blueprint as bp
-    at = lambda x, y: rows[y][x] if 0 <= y < len(rows) and 0 <= x < len(rows[y]) else " "      # noqa: E731
-    near = lambda p: [(p[0] + 1, p[1]), (p[0] - 1, p[1]), (p[0], p[1] + 1), (p[0], p[1] - 1)]  # noqa: E731
-    doors = [(x, y) for y, r in enumerate(rows) for x, ch in enumerate(r) if ch == "D"]
-    walked, stack = [], [q for d in doors for q in near(d) if at(*q) == "."]
-    while stack:
-        p = stack.pop()
-        if p not in walked:
-            walked.append(p)
-            stack += [q for q in near(p) if at(*q) == "." and q not in walked]
-    path = [(x, y) for y, r in enumerate(rows) for x, ch in enumerate(r) if ch == "="]
-    ps = bp.pieces(rows)
-    shell = [(x, y) for x, y, p in ps if p in ("wall", "door", "fence")]
-    x0, y0 = min(x for x, _ in shell) - 1, min(y for _, y in shell) - 1
-    x1, y1 = max(x for x, _ in shell) + 1, max(y for _, y in shell) + 1
-    spare = tuple((x, y) for y in range(y0, y1 + 1) for x in range(x0, x1 + 1)
-                  if (x in (x0, x1) or y in (y0, y1)) and (x, y) not in path)
-    return of_pieces(ps, tuple(sorted(walked, key=lambda q: (q[1], q[0]))) + tuple(path), spare)
 
 
 def plan_of(social) -> Plan:
@@ -106,7 +84,7 @@ def flat(obs, X, Y, plan=HUT) -> bool:
     for dx in range(x0 - 1, x1 + 2):
         for dy in range(y0 - 1, y1 + 2):
             h = LEVEL.get(_at(obs, "heights", X + dx, Y + dy))
-            if h is None:
+            if h is None or (dx, dy) in plan.dug_tiles:      # (its own trench and room dug: no pit to fill)
                 continue                                     # (out of view: unknown, not lower - r59 left home after
             if h < lv or (x0 <= dx <= x1 and y0 <= dy <= y1 and h != lv):   # home each time it walked 9 tiles off)
                 return False
@@ -122,6 +100,8 @@ def _pit(obs, X, Y, plan=HUT):
     for dx in range(x0 - 1, x1 + 2):
         for dy in range(y0 - 1, y1 + 2):
             h = LEVEL.get(_at(obs, "heights", X + dx, Y + dy))
+            if (dx, dy) in plan.dug_tiles:
+                continue
             s = next((s for s in plan.ground if max(abs(s[0] - dx), abs(s[1] - dy)) <= REACH), None)
             if h is not None and lv is not None and h < lv and s is not None:
                 return (X + dx, Y + dy), s
@@ -188,7 +168,7 @@ def next_step(obs, social, *, ground_ch, tool_for, dirs):
             if (me["x"], me["y"]) != (hx + sx, hy + sy):     # the pack; without earth it goes on with what still goes
                 return "move_to", {"x": hx + sx, "y": hy + sy}       # down - r63 left a closed room for a pit 4 tiles off)
             return "place", {"item": earth, "x": px, "y": py}
-    on_land = {(x, y): p for x, y, z, p in plan.cells if z == 0 and p not in CELL_BLOCKS}
+    on_land = {(x, y): p for x, y, z, p in plan.cells if z <= 0 and p not in (*CELL_BLOCKS, "dig")}   # (a dug floor's too)
     for dx, dy in sorted(plan.clear, key=lambda q: (q[1], q[0])):      # (the ground cleared first, as a player clears
         X, Y = hx + dx, hy + dy                                           # it: a tree, a stump, a flower grown since)
         ch, piece = _at(obs, "grid", X, Y), on_land.get((dx, dy))
@@ -206,20 +186,19 @@ def next_step(obs, social, *, ground_ch, tool_for, dirs):
             return "dig", {"dir": d, **({"with": w} if w else {})}
     land = level_at(obs, hx + plan.ground[0][0], hy + plan.ground[0][1])
     open_ = lambda s: _at(obs, "grid", hx + s[0], hy + s[1]) in ground_ch | {YOU}       # noqa: E731
-    up = lambda dz: (t := plan.ups.get(dz)) is None or is_laid((t[0], t[1], 0, "stairs"))  # noqa: E731
     for cell in plan.cells:
         dx, dy, dz, piece = cell
         X, Y = hx + dx, hy + dy
-        if is_laid(cell) or not plan.held(cell, is_laid) or (dz == 0 and (me["x"], me["y"]) == (X, Y) and piece not in CELL_BLOCKS):
+        if is_laid(cell) or not plan.held(cell, is_laid) or (dz <= 0 and (me["x"], me["y"]) == (X, Y) and piece not in CELL_BLOCKS):
             continue                                         # (under its feet: the tile shows it, not what is laid)
-        if dz == 0 and piece not in CELL_BLOCKS and _at(obs, "grid", X, Y) not in ground_ch:
+        if dz <= 0 and piece not in (*CELL_BLOCKS, "dig") and _at(obs, "grid", X, Y) not in ground_ch:
             continue                                         # (someone or something on it: the next piece)
-        if _item(piece, inv) is None:
+        if piece != "dig" and _item(piece, inv) is None:
             step = next((s for w in (WALLS if piece == "wall" else (piece,)) if (s := craft(obs, w, ground_ch, tool_for, dirs))), None)
             if step is not None:
                 return step
             continue
-        stand = plan.stand_for(cell, open_, up)
+        stand = plan.stand_for(cell, open_, is_laid)
         if stand is None:
             continue
         run = _run(obs, hx, hy, ground_ch, inv, plan, stand, is_laid, land)
@@ -250,7 +229,9 @@ def laid_by(obs, social, plan):
         X, Y = hx + dx, hy + dy
         if p == "stairs":
             return (X, Y, "stairs") in up
-        if dz == 0:
+        if p == "dig":                                       # (dug: as the game said, or the floor seen lower)
+            return (X, Y, land + dz, "dug") in up or (obs.get("heights") is not None and level_at(obs, X, Y) < land + dz)
+        if dz <= 0:
             return laid(obs, X, Y, p)
         if p in CELL_BLOCKS and dz == STOREY and _at(obs, "roofs", X, Y) == "1":
             return True
@@ -277,7 +258,14 @@ def _run(obs, hx, hy, ground_ch, inv, plan, stand, is_laid, land=0) -> list:
         X, Y = hx + dx, hy + dy
         if now(cell) or not plan.reaches(stand, cell) or not plan.held(cell, now):
             continue
-        if dz == 0 and piece not in CELL_BLOCKS and _at(obs, "grid", X, Y) not in ground_ch:
+        if piece == "dig":                                   # (a cell of the land, from the tile beside it)
+            sx, sy = hx + stand[0], hy + stand[1]
+            d = next((k for k, v in DIRS4.items() if v == (X - sx, Y - sy)), None)
+            pick = max((k for k in left if "pickaxe" in k and left[k]), key=lambda k: TIER.get(k, 0), default=None)
+            going.add(cell)
+            out.append((X, Y, "dig", land + dz, d, pick))
+            continue
+        if dz <= 0 and piece not in CELL_BLOCKS and _at(obs, "grid", X, Y) not in ground_ch:
             continue
         if piece in LAND_IN_CELL and _at(obs, "grid", X, Y) not in ground_ch | {YOU}:
             continue                                         # (earth over a thing grown on the land: the game refuses it)
@@ -286,5 +274,5 @@ def _run(obs, hx, hy, ground_ch, inv, plan, stand, is_laid, land=0) -> list:
             continue
         left[item] -= 1
         going.add(cell)
-        out.append((X, Y, item) if dz == 0 or (piece == "roof" and dz == STOREY) else (X, Y, item, land + dz))
+        out.append((X, Y, item) if dz <= 0 or (piece == "roof" and dz == STOREY) else (X, Y, item, land + dz))
     return out

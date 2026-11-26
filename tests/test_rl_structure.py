@@ -136,3 +136,27 @@ def test_the_mind_says_the_build_in_its_words_and_the_architect_draws_those(tmp_
         time.sleep(0.01)
     assert "a round house with a sod roof. It is for: a quiet builder" in seen[0]
     assert social.plan is not None and json.loads((tmp_path / "plan.json").read_text())["spec"]["shape"] == "round"
+
+
+DUG = {"underground": True, "width": 3, "depth": 3, "door": "south", "furniture": HOME}
+
+
+def test_a_home_dug_underground_is_closed_and_roofed_by_the_land():
+    """A trench stepping down a layer a tile to the door; the room behind it tunnelled two cells high, the land round
+    it its walls and over it its roof; the furniture on its floor."""
+    from nexel_agent.rl.dug import Dug
+    s = Dug(DUG)
+    digs = [c for c in s.cells() if c[3] == "dig"]
+    assert {c[2] for c in digs if c[:2] in s.inside} == {-1, -2}                     # (the land's top left: a roof)
+    assert [max(-c[2] for c in digs if c[:2] == t) for t in reversed(s.trench)] == [0, 1, 2]
+    assert not any(t == "wall" for t in s.storeys[0].values()) and s.cost() == 0
+    j = judge3d.judged(DUG)
+    assert j["kind"] == "dug" and j["failed"] == [], j["failed"]
+
+
+@pytest.mark.parametrize("spec, seed", [(DUG, 5), ({**DUG, "shape": "round", "radius": 3, "door": "east"}, 20)])
+def test_a_home_is_dug_whole_by_building_alone(spec, seed):
+    """Each cell from the tile dug beside it; the furniture once all is dug (a chair set early stands in the way); its
+    own trench never filled as a pit; what the view cannot show, known from the game's answers."""
+    b = judge3d.built(spec, seed=seed)
+    assert b["sited"] and b["failed"] == [], b
