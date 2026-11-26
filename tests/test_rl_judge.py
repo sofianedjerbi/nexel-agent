@@ -157,3 +157,18 @@ def test_each_thing_that_spoils_a_hut_is_named():
                        (dict(change={(5, 4): "fence"}), ["no_stray"])):                                # a fence post left in the grass
         v = hut(**kw)
         assert v["failed"] == failed, (kw, v["failed"], v["facts"])
+
+
+def test_a_home_begun_pays_only_for_what_it_adds():
+    import random
+    from nexel_agent.rl import starts
+    env = SimEnv(ep_ticks=10 ** 6, roam=0, rivals=0, home_pct=100)
+    for seed in range(8):
+        env.reset(seed)
+        if env.social.home:
+            break
+    assert env.social.home
+    phi0 = env.build_phi.phi
+    assert phi0 > 0
+    r = env.build_phi.step(env.sim.world, env.social.home, (env.a.x, env.a.y), [("dig", {}, {"ok": True})])
+    assert abs(r) < 1e-9                                  # (nothing changed: nothing paid for the walls it found)

@@ -76,3 +76,19 @@ def test_no_roof_goes_on_an_open_ring():
     env.a.inventory.update({"stone_wall": 8, "door": 1, "roof": 25})
     cmd = built(env.sim.observe(env.a), env.social)
     assert cmd[0] == "ring" and not any(it == "roof" for _, _, it in cmd[1]["pieces"])
+
+
+def test_a_home_begun_is_one_build_from_done():
+    from nexel_agent.rl import starts
+    import random
+    env = SimEnv(ep_ticks=10 ** 6, roam=0, rivals=0)
+    env.reset(5)
+    env.folk = []
+    env.a.inventory.clear()
+    home = starts.with_a_home_begun(env.sim, env.a, random.Random(1))
+    env.social.home = home
+    env.obs = env.sim.observe(env.a)
+    v = judge.verdict(env.sim.world, home[0] + 1, home[1] + 1)
+    assert v["checks"]["closed"] and v["checks"]["door"]
+    env.step(BUILD)
+    assert judge.verdict(env.sim.world, home[0] + 1, home[1] + 1)["grade"] == 6

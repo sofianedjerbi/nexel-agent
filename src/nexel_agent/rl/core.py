@@ -63,8 +63,9 @@ class SimEnv:
             starts.thin_land(self.sim, self.a, rng)
         if self.gear_pct and rng.random() * 100 < self.gear_pct:      # (no draw otherwise: the other starts stay as they were)
             starts.near_a_tool(self.sim, self.a, rng)
-        if self.home_pct and rng.random() * 100 < self.home_pct:
-            starts.with_a_home_kit(self.sim, self.a, rng)
+        home = None
+        if self.home_pct and rng.random() * 100 < self.home_pct:     # (half a kit, half a home begun)
+            home = starts.with_a_home_begun(self.sim, self.a, rng) if rng.random() < 0.5 else starts.with_a_home_kit(self.sim, self.a, rng)
         self.sim.tick = self.sim.tick // DAY_TICKS * DAY_TICKS + int(START * DAY_TICKS)
         self.rng = random.Random(seed * 13 + 1)
         self.rival = Rival(self.sim, self.a, seed, pick=self.pick_target) if self.rivals else None
@@ -77,7 +78,10 @@ class SimEnv:
         if self.folk and rng.random() * 100 < self.shadow_pct:
             self.folk[0].shadow()
         self.social = SocialMemory(self.a.name, PACK)
+        self.social.home = home
         self.build_phi = judge.Potential()
+        if home:
+            self.build_phi.prime(self.sim.world, home)
         self.piles, self.taken, self.struck = {}, {}, {}           # packs dropped by people who died here, what it picked up of them
         self.sim.listeners.append(self.on_event)
         self.t0 = self.sim.tick
