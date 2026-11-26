@@ -9,7 +9,7 @@ legend, its heights and roofs, VIEW_R round the player). Past it nothing is know
 
 import math
 
-from nexel_worlds.sim.constants import VIEW_R
+from nexel_worlds.sim.constants import DAY_TICKS, TICK_HZ, VIEW_R
 from nexel_worlds.tiles import BLOCKS, GROUNDS, RECIPES
 
 from . import judge
@@ -18,6 +18,7 @@ from .build import PLAN, WALLS
 from .facts import compass, counted
 
 _BLOCK, _GROUND = {b.name for b in BLOCKS}, {g.name for g in GROUNDS}
+NIGHT, SOON_S = .75, 300     # night: the day's last quarter (the game's is_night: glooms patrol); told from 5 min before
 PIECE_ITEM = {"wall": "wood_wall", "door": "door", "roof": "roof"}     # (the blueprint's pieces as items; furniture is its own)
 
 
@@ -97,3 +98,27 @@ def told(obs: dict, home) -> str:
             line += "; it does not look good: " + ", ".join(f"no {k.replace('_', ' ')}" for k in look["failed"])
     lack = lacks(obs, home)
     return line + (f"; it lacks {counted(lack)}." if lack else "; you have all it takes.")
+
+
+def day(obs: dict, home) -> str | None:
+    """A player's day (#15): from five minutes before night until dawn, one line: how long until night falls (or
+    until dawn), where its home is, and its bed there (sleeping in a bed is where you wake after dying), or what it
+    still needs for one. None in the day before that."""
+    phase = (obs.get("tick", 0) % DAY_TICKS) / DAY_TICKS
+    night = phase >= NIGHT
+    left_s = ((1 if night else NIGHT) - phase) * DAY_TICKS / TICK_HZ
+    if not night and left_s > SOON_S:
+        return None
+    mins = max(1, round(left_s / 60))
+    when = f"It is night: glooms are out, dawn in {mins} min" if night else f"Night falls in {mins} min: glooms come out"
+    if not home:
+        return f"{when}; you have no home to go to: a bed is where you wake after dying."
+    me = obs["self"]
+    where = compass(home[0] - me["x"], home[1] - me["y"])
+    world = Seen(obs)
+    has = any(stands(world, home[0] + dx, home[1] + dy, p) for dx, dy, p in PLAN if p == "bed") or \
+        judge.report(world, *home).get("contents", {}).get("bed", 0) > 0
+    bed = "a bed" if has else "no bed yet: aim for one, and sleep in it"
+    if max(abs(home[0] - me["x"]), abs(home[1] - me["y"])) > VIEW_R - 2:
+        return f"{when}; your home is {where}: sleep in a bed there, it is where you wake after dying."
+    return f"{when}; your home is {where}, with {bed} (a bed is where you wake after dying)."

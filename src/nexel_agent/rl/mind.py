@@ -163,6 +163,8 @@ class Mind:
             lines.append("What your aims lack, and who had it: " + "; ".join(lacks) + ".")
         if self.home:
             lines.append(home.told(obs, self.home))
+        if day := home.day(obs, self.home):
+            lines.append(day)
         if self.ended:
             lines.append(f"Your last goal: {self.ended}.")
         if self.tried:
