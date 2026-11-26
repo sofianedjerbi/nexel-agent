@@ -6,6 +6,7 @@ What closes a room, what gives light and how a room is shaped are the game's (Si
 LIGHT_R, and sheltered's own size and compactness): read, not changed."""
 
 from collections import Counter
+from itertools import groupby
 
 from nexel_worlds.sim.core import Simulation
 from nexel_worlds.sim.wild import LIGHT, LIGHT_R
@@ -21,8 +22,9 @@ AREA = 4                    # tiles inside, at least: room to stand, sleep and t
 CHECKS = ("closed", "door", "roofed", "lit", "bed", "room_enough")
 
 
-def inside(world, x, y) -> set | None:
-    """The tiles a flood fill from (x, y) reaches without crossing an ENCLOSE piece, or None past CAP."""
+def inside(world, x, y, closers=ENCLOSE) -> set | None:
+    """The tiles a flood fill from (x, y) reaches without crossing a `closers` piece (the game's ENCLOSE), or None
+    past CAP."""
     seen, stack = {(x, y)}, [(x, y)]
     while stack:
         cx, cy = stack.pop()
@@ -30,7 +32,7 @@ def inside(world, x, y) -> set | None:
             return None
         for dx, dy in DIRS.values():
             n = (cx + dx, cy + dy)
-            if n not in seen and world.block(*n) not in ENCLOSE:
+            if n not in seen and world.block(*n) not in closers:
                 seen.add(n)
                 stack.append(n)
     return seen
@@ -146,6 +148,95 @@ def sense(world, x, y) -> dict:
 
 def _beside(p):
     return [(p[0] + dx, p[1] + dy) for dx, dy in DIRS.values()]
+
+
+# ---- v3 part 1 (#32): does it look good? The rules a builder would name, on the room's own shape. (Part 2, a vision
+# model on renders, is not here.) A window is a fence in the wall: the game's shelter does not count it as one (it is
+# no ENCLOSE piece: a room with a window is open to it), so its look is read with fences closing it.
+WINDOWS = ("fence",)
+LOOK_CLOSERS = (*ENCLOSE, *WINDOWS)
+PATH = ("cobble",)                    # the ground a path is (the path item lays it)
+PIECES = (*ENCLOSE, *WINDOWS)         # what a build is made of: one standing near it, not in its wall, is stray
+LOOKS = ("material", "rectangles", "straight", "roof", "symmetric", "windows", "path", "no_stray")
+
+
+def looks(world, x, y) -> dict:
+    """The build around (x, y), v3's rules: {"grade", "of", "checks", "failed", "facts"}. facts: the walls'
+    materials, the footprint's box, the jogs in its walls, how much of the roof is there (over the inside, the
+    walls, past them), the door's axis, the windows, the path's length, the stray pieces."""
+    tiles = inside(world, x, y, LOOK_CLOSERS)
+    if tiles is None or len(tiles) < AREA:
+        return {"grade": 0, "of": len(LOOKS), "checks": dict.fromkeys(LOOKS, False), "failed": list(LOOKS),
+                "facts": {"closed": False}}
+    xs, ys = [p[0] for p in tiles], [p[1] for p in tiles]
+    x0, x1, y0, y1 = min(xs), max(xs), min(ys), max(ys)
+    edge = {n: world.block(*n) for cx, cy in tiles for n in _beside((cx, cy)) if n not in tiles}
+    doors = sorted(p for p, b in edge.items() if not _SOLID.get(b, True))
+    walls = {p: b for p, b in edge.items() if b in ENCLOSE and _SOLID.get(b, True)}
+    ring = _around(tiles) - tiles                                        # the wall's line, its corners with it
+    corners = ring - set(edge)                                           # (a corner touches the inside by a diagonal only)
+    walls.update({p: world.block(*p) for p in corners if world.block(*p) in ENCLOSE})
+    mats = Counter(walls.values())
+    # one material, or a second laid on purpose: at the corners only, or a whole side of it
+    second = [p for p, b in walls.items() if len(mats) == 2 and b == mats.most_common()[-1][0]]
+    sides = {s: {walls.get(p) for p in walls if s(p)} for s in (lambda p: p[1] == y0 - 1, lambda p: p[1] == y1 + 1,
+                                                                 lambda p: p[0] == x0 - 1, lambda p: p[0] == x1 + 1)}
+    deliberate = len(mats) == 2 and (all(p in corners for p in second) or all(len(v) == 1 for v in sides.values()))
+    rows = {yy: sorted(p[0] for p in tiles if p[1] == yy) for yy in range(y0, y1 + 1)}
+    cols = {xx: sorted(p[1] for p in tiles if p[0] == xx) for xx in range(x0, x1 + 1)}
+    runs_ok = all(v and v[-1] - v[0] + 1 == len(v) for v in (*rows.values(), *cols.values()))   # no hole, no notch across
+    jogs = sum(_jogs([v[end] for v in line.values()]) for line in (rows, cols) for end in (0, -1))
+    roof_in = sum(world.roof(*p) > 0 for p in tiles) / len(tiles)
+    roof_walls = sum(world.roof(*p) > 0 for p in edge) / len(edge)
+    past = _around(ring) - tiles - ring                                  # (the tiles just past the walls: the overhang's)
+    roof_past = sum(world.roof(*p) > 0 for p in past) / max(1, len(past))
+    door = doors[0] if doors else None
+    mirror = None
+    if door:                                    # about the line through the door, across the wall it is in
+        across = door[1] in (y0 - 1, y1 + 1)
+        mirror = (lambda p: (2 * door[0] - p[0], p[1])) if across else (lambda p: (p[0], 2 * door[1] - p[1]))
+    symmetric = bool(mirror) and all(mirror(p) in tiles for p in tiles) and all(walls.get(mirror(p), b) == b for p, b in walls.items())
+    windows = sorted(p for p, b in edge.items() if b in WINDOWS)
+    path = _path(world, door, tiles | set(edge)) if door else 0
+    near = _around(_around(ring)) - tiles - ring                         # (two tiles round the walls)
+    stray = sorted(p for p in near if world.block(*p) in PIECES)
+    checks = {"material": len(mats) == 1 or deliberate,
+              "rectangles": runs_ok,
+              "straight": not jogs,
+              "roof": roof_in == 1 and roof_walls == 1 and roof_past >= .5,
+              "symmetric": symmetric,
+              "windows": bool(windows),
+              "path": path >= 2,
+              "no_stray": not stray}
+    return {"grade": sum(checks.values()), "of": len(LOOKS), "checks": checks, "failed": [k for k in LOOKS if not checks[k]],
+            "facts": {"closed": True, "area": len(tiles), "box": (x1 - x0 + 1, y1 - y0 + 1), "materials": dict(mats),
+                      "jogs": jogs, "roof": {"inside": round(roof_in, 2), "walls": round(roof_walls, 2), "past": round(roof_past, 2)},
+                      "door": door, "windows": windows, "path": path, "stray": stray}}
+
+
+def _around(ps) -> set:
+    """The tiles and every tile touching one, diagonals too."""
+    return {(px + i, py + j) for px, py in ps for i in (-1, 0, 1) for j in (-1, 0, 1)}
+
+
+def _jogs(line) -> int:
+    """A wall's single-tile jogs, along one of its sides: where it steps out (or in) for one tile only and back."""
+    runs = [len(list(g)) for _, g in groupby(line)]
+    return sum(1 for n in runs if n == 1) if len(runs) > 1 else 0
+
+
+def _path(world, door, built) -> int:
+    """Tiles of path leading from the door: cobble, walkable, reached from the door's outside without crossing the
+    build."""
+    start = [n for n in _beside(door) if n not in built and world.ground(*n) in PATH and walkable(world, *n)]
+    seen, stack = set(start), list(start)
+    while stack and len(seen) < CAP:
+        p = stack.pop()
+        for n in _beside(p):
+            if n not in seen and n not in built and world.ground(*n) in PATH and walkable(world, *n):
+                seen.add(n)
+                stack.append(n)
+    return len(seen)
 
 
 def laid(world, home) -> int:
