@@ -100,7 +100,8 @@ def main():
                            "--logs", str(logs), "--humans", str(src / "events.jsonl")], capture_output=True, text=True)
     sys.path.insert(0, str(ROOT / "tools"))
     import judge_builds                                     # (every closed room of the copy: its own, the real players')
-    text = card.stdout + card.stderr + visited(out / "visitor.json") + judge_builds.table(judge_builds.builds(out, a.name), a.name)
+    text = card.stdout + card.stderr + visited(out / "visitor.json") + judge_builds.table(judge_builds.builds(out, a.name), a.name) + \
+        judge_builds.home_table(judge_builds.its_home(out, a.name), a.name)      # (its own home, beside every closed room)
     (out / "scorecard.md").write_text(text)
     subprocess.run([py, str(ROOT / "tools" / "kpis.py"), "live", str(out)], capture_output=True)    # (its row in docs/kpis.md)
     print(text + f"\n(all of it in {out}; its KPIs: docs/kpis.md)")

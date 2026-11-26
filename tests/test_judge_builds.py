@@ -53,3 +53,30 @@ def test_the_kpi_page_shows_its_builds_beside_the_players():
            "players_best_sense": 5, "players_best_looks": 6}
     page = kpis.show([row])
     assert "## Live builds" in page and "| r1 | 1 | 4 | 5 | - | 3 | 4 | 5 | 6 |" in page
+
+
+def test_its_own_home_is_judged_where_memory_json_has_it(tmp_path):
+    """A live scorecard's run (rl_runs/score/<run>): its QA save with a room, the mind's memory.json home in it, and
+    rl.jsonl's decisions, two of them steered builds: its home's row, v1/v2/v3 and the share; with no home, none."""
+    qa, logs = tmp_path / "saves" / "qa", tmp_path / "Rook"
+    qa.mkdir(parents=True)
+    logs.mkdir()
+    sim = Simulation(qa / "world.sqlite", seed=12, event_log=tmp_path / "sim.jsonl")
+    for i in range(-1, 4):                                  # 3 by 3 inside, a door in the north wall
+        for j in range(-1, 4):
+            sim.world.set(i, j, ground="grass", block="none")
+            if i in (-1, 3) or j in (-1, 3):
+                sim.world.set(i, j, block="door" if (i, j) == (1, -1) else "wood_wall")
+    sim.flush()
+    sim.close()
+    (logs / "rl.jsonl").write_text("\n".join(json.dumps(d) for d in [
+        {"act": "build", "steered": True}, {"act": "build", "steered": True}, {"act": "step_e"}, {"act": "build"},
+        {"t": 1, "decisions": 4}]) + "\n")                  # (a minute's report: no decision)
+    (logs / "memory.json").write_text(json.dumps({"aims": ["home"], "home": [1, 1]}))
+    h = J.its_home(tmp_path, "Rook")
+    assert h["at"] == [1, 1] and h["decisions"] == 4 and h["steered"] == 2
+    assert h["v1"] >= 3 and "roofed" in h["v1_failed"] and h["of"][0] == 6 and h["v2"] is not None and h["v3"] is not None
+    card = J.home_table(h, "Rook")
+    assert f"| Rook | 1, 1 | {h['v1']}/6 | {h['v2']}/{h['of'][1]} | {h['v3']}/{h['of'][2]} |" in card and "| 2 of 4 (50%) |" in card
+    (logs / "memory.json").write_text(json.dumps({"aims": []}))
+    assert "| none chosen | - | - | - | - | - | 2 of 4 (50%) |" in J.home_table(J.its_home(tmp_path, "Rook"), "Rook")
