@@ -27,7 +27,8 @@ PROMISE = sec(120)         # a promise to hand something over is kept within thi
 THINK_S = 20.0             # (the model it asks: rl/voice.py MODEL, the same server as the words)
 HOME = "home"               # an aim that is no item: its home, what it takes its lacks (rl/home.py)
 GOALS_DOC = ("Goals: gather (an item), craft (an item), give (an item, to a person), ask (a person, for an item), "
-             "stay (with a person), help (a person, in a fight), avoid (a person), free (no goal)")
+             "stay (with a person), help (a person, in a fight), avoid (a person), build (your home: the body lays "
+             "it, walls, door, fire, bed, roof, from what you carry, making what it lacks), free (no goal)")
 
 
 def item_name(s) -> str:
@@ -57,6 +58,7 @@ class Mind:
         self.last, self.salient, self.busy = 0.0, False, False
         self.to_say: str | None = None
         self.tried: dict = {}                # goal text: [set, done] this session
+        self.building = False                # its home being laid, the planner's call (steer)
         self.names: dict = {}
         self.asks = ""                   # an ask open now, with what it carries of that item
         self.log = self.path.with_name("mind.jsonl")   # each thought: the facts it got, what it answered
@@ -122,6 +124,20 @@ class Mind:
             g.asked += 1
             self.now.ask(self.name, g.person, g.item)
         return r
+
+    def steer(self, i: int, mask, hurt: float) -> int:
+        """The body's action, or build while the mind is building its home (the planner's call: goal 'build'): the
+        learned body has not learned to finish a hut (r51-r65), the build verb does it (rl/build.py). Hurt, the body
+        acts as it learned (a fight, a flight); build with nothing to lay ends the building, told in the next facts."""
+        from .actions import ACTIONS
+        b = next(k for k, a in enumerate(ACTIONS) if a[0] == "build")
+        if not self.building or hurt > 0:
+            return i
+        if mask is not None and not mask[b]:
+            self.building, self.ended = False, "build (your home): nothing more it can lay or make here now"
+            self.tried.setdefault("build (your home)", [0, 0])[0] += 1
+            return i
+        return b
 
     def end(self, g: Goal, how: str, kept: bool = False):
         if g.promise:
@@ -207,7 +223,7 @@ class Mind:
                 "Reply with JSON only: "
                 '{"why": "one sentence first: what you want most now, and the quickest way to it from these facts", '
                 '"aims": ["1 to 3 items you want to own or build, from your character (kept: repeat them, or change them)"], '
-                '"goal": "gather|craft|give|ask|stay|help|avoid|free", "with": "a name you see, or empty", "item": "a game item name, or empty", "say": "a short chat line or empty", '
+                '"goal": "gather|craft|give|ask|stay|help|avoid|build|free", "with": "a name you see, or empty", "item": "a game item name, or empty", "say": "a short chat line or empty", '
                 '"relation_update": {"PERSON": {"ally": true|false}}, '
                 '"learned": {"ITEM": {"by": "who told you", "what": "what they said it takes or where it is found, short"}}}. '
                 "The line you say, if any: " + CHAT_STYLE)
@@ -234,6 +250,7 @@ class Mind:
 
     def apply(self, d: dict):
         kind = str(d.get("goal", "free")).split()[0].lower() if d.get("goal") else "free"
+        self.building = kind == "build"                      # (the home: the body lays it to the end - steer)
         kind = kind if kind in KINDS else "free"
         who = str(d.get("with") or "").strip()
         who = self.names.get(who.lower(), who) or None               # (the name as the game spells it)

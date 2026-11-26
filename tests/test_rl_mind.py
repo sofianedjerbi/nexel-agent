@@ -288,3 +288,26 @@ def test_near_you_names_the_nearest_kinds_and_a_few_piles():
     s = now.text()
     assert "beast0" in s and f"beast{NEAR_KINDS - 1}" in s and f"beast{NEAR_KINDS}" not in s, s     # (the nearest kinds, #11)
     assert "2 more kinds of creature further" in s and s.count("on the ground") == PILES, s
+
+
+def test_a_build_goal_steers_the_body_to_build_till_nothing_is_left():
+    """The planner says build (its home): the body's action becomes build, but not when hurt, and the building ends
+    when build has nothing left to lay (told in the next facts)."""
+    import numpy as np
+    from nexel_agent.rl.actions import ACTIONS
+    b = next(k for k, a in enumerate(ACTIONS) if a[0] == "build")
+    m = Mind("Rook", "a quiet player", "http://x", FakeHTTP('{"goal": "build", "aims": ["bed"]}'), tmp_path_factory())
+    m.now.see(OBS)
+    m.see(OBS)
+    asyncio.run(m.think(OBS))
+    assert m.building and m.goal.kind == "free"
+    mask = np.ones(len(ACTIONS), bool)
+    assert m.steer(3, mask, 0.0) == b and m.steer(3, mask, 2.0) == 3       # (hurt: the body's own)
+    mask[b] = False
+    assert m.steer(3, mask, 0.0) == 3 and not m.building and "nothing more" in m.ended
+
+
+def tmp_path_factory():
+    import tempfile
+    from pathlib import Path
+    return Path(tempfile.mkdtemp()) / "memory.json"

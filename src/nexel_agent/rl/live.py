@@ -221,7 +221,7 @@ class LiveBody:
                 enc = encode(obs, self.facing, self.last, self.last_ok, self.hurt, self.social.flags(obs), goal,
                              self.social.people_flags(obs, N_NEAR), self.ledger.done)
                 mask = legal(obs, self.facing, self.social, goal) if self.a.mask else None
-                i = self.pol.act(enc, self.rng, mask)
+                i = self.pol.act(enc, self.rng, mask) if not self.mind else self.mind.steer(self.pol.act(enc, self.rng, mask), mask, self.hurt)
                 kind = ACTIONS[i][0]
                 if self.hurt > 0:
                     self.reactions[kind] = self.reactions.get(kind, 0) + 1
