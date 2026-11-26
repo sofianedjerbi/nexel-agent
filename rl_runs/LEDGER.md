@@ -457,3 +457,10 @@ verdict: keep the shipped body (targets: score; 21 min)
 ## r62
 
 - From: r61 last, `--init`, home-kit starts 20%. Changed: no roof on an open ring.
+- **Result (r62):** 13-31 build picks an episode, 8-17 homes, none ever closed (its ring action, digging, wandering
+  undid each before the pay). Stopped at +330k.
+
+## r63
+
+- From: r62 last, `--init`, home starts 20% (half a kit, half a home begun: walls and door standing, the potential
+  primed from what stands).
