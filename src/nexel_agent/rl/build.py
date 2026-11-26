@@ -12,6 +12,7 @@ import math
 
 from nexel_worlds.sim.constants import VIEW_R
 from nexel_worlds.sim.observe import YOU
+from nexel_worlds.sim.storeys import EARTH
 from nexel_worlds.tiles import BLOCKS
 
 from .judge import ENCLOSE
@@ -59,10 +60,24 @@ def flat(obs, X, Y) -> bool:
         return False
     for dx in range(-2, W + 2):
         for dy in range(-2, H + 2):
-            h = LEVEL.get(_at(obs, "heights", X + dx, Y + dy), -99)
-            if h < lv or (-1 <= dx <= W and -1 <= dy <= H and h != lv):
+            h = LEVEL.get(_at(obs, "heights", X + dx, Y + dy))
+            if h is None:
+                continue                                     # (out of view: unknown, not lower - r59 left home after
+            if h < lv or (-1 <= dx <= W and -1 <= dy <= H and h != lv):   # home each time it walked 9 tiles off)
                 return False
     return True
+
+
+def _pit(obs, X, Y):
+    """A tile in reach of the middle that is lower than the spot, on or beside it: (x, y), or None."""
+    from .actions import LEVEL
+    lv = LEVEL.get(_at(obs, "heights", X + 1, Y + 1))
+    for dx in range(-2, W + 2):
+        for dy in range(-2, H + 2):
+            h = LEVEL.get(_at(obs, "heights", X + dx, Y + dy))
+            if h is not None and lv is not None and h < lv and abs(dx - 1) <= 2 and abs(dy - 1) <= 2:
+                return X + dx, Y + dy
+    return None
 
 
 def site(obs, ground_ch) -> tuple | None:
@@ -105,8 +120,14 @@ def next_step(obs, social, *, ground_ch, tool_for, dirs):
             return next_step(obs, social, ground_ch=ground_ch, tool_for=tool_for, dirs=dirs)
         k = (VIEW_R - 1) / d
         return "move_to", {"x": me["x"] + round(dx * k), "y": me["y"] + round(dy * k)}
-    if not flat(obs, hx, hy):                                # (dug into since: the game would refuse it - another spot)
-        social.home = None
+    if not flat(obs, hx, hy):                                # (dug into since: the game refuses a wall by a pit)
+        pit = _pit(obs, hx, hy)
+        earth = next((k for k in EARTH if inv.get(k)), None)
+        if pit is not None and earth and any(laid(obs, hx + dx, hy + dy, p) for dx, dy, p in PLAN):
+            if (me["x"], me["y"]) != (cx, cy):               # (a home begun is mended: the pit filled, as a player
+                return "move_to", {"x": cx, "y": cy}         # fills one, from the middle, with earth from the pack)
+            return "place", {"item": earth, "x": pit[0], "y": pit[1]}
+        social.home = None                                   # (nothing laid yet, or nothing to fill it: another spot)
         return next_step(obs, social, ground_ch=ground_ch, tool_for=tool_for, dirs=dirs) if site(obs, ground_ch) else None
     for dx, dy, piece in PLAN:                               # (the ground cleared first, as a player clears it:
         X, Y = hx + dx, hy + dy                              # a tree, a stump or a bush grown on the spot since)

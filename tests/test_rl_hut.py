@@ -50,3 +50,17 @@ def test_a_pit_dug_in_the_spot_makes_it_choose_another():
     w.set(hx + 1, hy + 1, level=w.level(hx + 1, hy + 1) - 1)
     built(env.sim.observe(env.a), env.social)
     assert env.social.home != first
+
+
+def test_a_home_at_the_edge_of_view_is_kept():
+    """Ten tiles off, part of the ring round the spot is out of view: unknown is not lower, the home stays."""
+    from nexel_agent.rl.actions import built
+    env = SimEnv(ep_ticks=10 ** 6, roam=0, rivals=0)
+    env.reset(5)
+    env.folk = []
+    env.a.inventory.update({"stone_wall": 16})
+    built(env.sim.observe(env.a), env.social)
+    home = env.social.home
+    env.a.x, env.a.y = home[0] + 1 - 9, home[1] + 1
+    built(env.sim.observe(env.a), env.social)
+    assert env.social.home == home
