@@ -134,8 +134,8 @@ class Voice:
         except Exception as e:
             out, t = "", {"error": repr(e)[:80]}
         raw, (out, labels, promise) = out, acts.read(out, len(heard), self.now.items)
-        for (who, _, _), (kind, item) in zip(heard, labels):
-            self.on_heard(who, kind, item)
+        for (who, _, _), (act, item) in zip(heard, labels):
+            self.on_heard(who, act, item)
         self.asked_pack = any(k == "pack" for k, _ in labels)
         out = next((ln.strip() for ln in out.splitlines() if ln.strip()), "").strip('"')[:120]     # (one line)
         if out.lower() in ("", "nothing", "(nothing)", "...", "-"):
