@@ -24,6 +24,14 @@ ANGRY = sec(8)                       # (a blow is seen by whoever is in view of 
 STICKY = 0.4                         # the share of visits it sticks right beside the player (a person who follows you about)
 GRUDGE = sec(240)                    # a grudge fades in a few minutes,
 GIFT_EASES = sec(120)                # faster when the player gives it something; at once when the player helps it in a fight
+# WHO COMES BY (#12): each visit is one of three kinds of person, the shares knobs. Social: as above. Quiet: as the
+# live save's real players were, measured per active minute (#12): a line in nine minutes or so, no gift, no ask, not
+# near anyone (they move off past AWAY), a creature hunted about once a minute. Rough: as one of them was, hitting
+# people (half a blow a minute): a few in a hundred. A neighbour who follows you about (shadow) is always social.
+QUIET, ROUGH = 0.4, 0.03
+AWAY = 8                             # tiles a quiet one keeps from the player (the measured walk-away)
+QUIET_SAY, QUIET_HUNT, ROUGH_HIT = 0.005, 0.3, 0.03  # a chance at each thing it does (ACT: 5 s or so between two)
+HUNT_R = 12                          # tiles round it a quiet one looks for a creature to hunt
 
 
 class Folk:
@@ -31,6 +39,7 @@ class Folk:
         """town: the list of all the neighbours (who saw what)."""
         self.sim, self.p = sim, player
         self.rng = random.Random(seed * 17 + 3)
+        self.kinds = random.Random(seed * 31 + 7)   # (which kind each visit is: its own draws, the rest of its play as it was)
         self.a = sim.login(name, f"folk-{name}")
         self.a.online = False
         self.next = sim.tick + self.rng.randint(*EVERY)
@@ -42,6 +51,7 @@ class Folk:
         self.set_upon = False                   # the rival is going for it now (the env says)
         self.sticky = False                     # this visit, it sticks right beside the player
         self.shadowing = False                  # this episode, it is always beside the player (it comes back after leaving)
+        self.kind = "social"                    # this visit: "social", "quiet" or "rough" (QUIET, ROUGH)
         self.town = town if town is not None else [self]
 
     @property
@@ -82,7 +92,7 @@ class Folk:
                     if tgt == a.name:
                         self.angry, self.asked = sim.tick + ANGRY, None      # (hit by the player: it hits back, then goes)
                     self.grudge = True                                        # (hit, or saw it: within earshot of the blow)
-                case Say(src=src, shout=False) if src == self.p.name:      # asked for something?
+                case Say(src=src, shout=False) if src == self.p.name and self.kind == "social":   # asked for something? (the others: no word)
                     it = next(iter(named(ev.text, a.inventory)), None)
                     if it and not self.grudge and self.rng.random() < 0.6:
                         self.asked = it
@@ -103,6 +113,11 @@ class Folk:
             return
         self.act = sim.tick + self.rng.randint(*ACT)
         d, r = self.dist(), self.rng.random()
+        if self.kind == "quiet":
+            return self.quiet(d, r)
+        if self.kind == "rough" and r < ROUGH_HIT:      # (it picks a fight, unasked: goes for the player a few seconds, then off)
+            self.angry = sim.tick + ANGRY
+            return
         if self.sticky and not self.grudge and d > 1.5 and r < 0.7:     # (back to its place beside the player)
             self.act = sim.tick + sec(1)
             return sim.submit(a, "move_to", {"x": self.p.x + 1, "y": self.p.y})
@@ -131,6 +146,22 @@ class Folk:
             return sim.submit(a, "say", {"text": f"got any {self.rng.choice(ASKS)} to spare?"})
         if r < 0.55 and d <= 2:
             return self.give()
+        self.work()
+
+    def quiet(self, d, r):
+        """A quiet player's turn: off from the player past AWAY, now and then a word, a creature hunted, else work."""
+        sim, a = self.sim, self.a
+        if d < AWAY:
+            ang = math.atan2(a.y - self.p.y, a.x - self.p.x)
+            return sim.submit(a, "move_to", {"x": self.p.x + round((AWAY + 3) * math.cos(ang)), "y": self.p.y + round((AWAY + 3) * math.sin(ang))})
+        if r < QUIET_SAY:
+            return sim.submit(a, "say", {"text": self.rng.choice(("hey", "ok", "lol", "brb"))})
+        prey = min((c for c in sim.creatures.values() if max(abs(c.x - a.x), abs(c.y - a.y)) <= HUNT_R), default=None,
+                   key=lambda c: max(abs(c.x - a.x), abs(c.y - a.y)))
+        if prey is not None and r < QUIET_SAY + QUIET_HUNT:
+            if max(abs(prey.x - a.x), abs(prey.y - a.y)) <= 1:
+                return sim.submit(a, "attack", {"target": prey.id})
+            return sim.submit(a, "move_to", {"x": prey.x, "y": prey.y})
         self.work()
 
     def work(self):
@@ -166,7 +197,9 @@ class Folk:
         a.events = []
         self.until, self.act, self.owed = sim.tick + self.rng.randint(*STAY), sim.tick + sec(2), False
         self.asked, self.proposed = None, False
-        self.sticky = self.shadowing or self.rng.random() < STICKY
+        k = self.kinds.random()
+        self.kind = "social" if self.shadowing else "rough" if k < ROUGH else "quiet" if k < ROUGH + QUIET else "social"
+        self.sticky = self.kind == "social" and (self.shadowing or self.rng.random() < STICKY)
         if self.shadowing:
             self.until = sim.tick + sec(24 * 3600)
         self.angry = sim.tick + ANGRY if self.grudge and self.rng.random() < 0.3 else 0     # (back to settle it)

@@ -4,6 +4,7 @@ chain from the pack and the land, a walk to a person and the ask - with no rule 
 from nexel_agent.rl.core import SimEnv
 from nexel_agent.rl.goals import Goal
 from rl_kit import idx
+from nexel_agent.rl import folk
 
 PURSUE = idx("pursue")
 
@@ -74,8 +75,10 @@ def test_no_step_no_pursue():
     assert not env.encoded()["mask"][PURSUE]
 
 
-def test_ask_walks_up_to_the_person_and_asks():
+def test_ask_walks_up_to_the_person_and_asks(monkeypatch):
     """A neighbour 10 tiles off carries wood: pursue walks over, asks once in earshot; she says yes and brings it."""
+    monkeypatch.setattr(folk, "QUIET", 0)                       # (a neighbour who answers asks: a social one, #12)
+    monkeypatch.setattr(folk, "ROUGH", 0)
     env = SimEnv(ep_ticks=10 ** 6, roam=0, rivals=0)
     env.reset(5)
     sim, a, f = env.sim, env.a, env.folk[0]

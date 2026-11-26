@@ -8,6 +8,7 @@ from nexel_agent.rl.achieve import ACHIEVEMENTS, Ledger, crafter_score
 from nexel_agent.rl.core import HURT, SimEnv
 from rl_kit import during_next_tick, idx, neighbour_beside, to_command_for
 from nexel_agent.rl.encode import ACTIONS, N_ACTIONS, N_CHARS, SIDE, VEC, action_name, legal
+from nexel_agent.rl import folk
 
 
 def test_legal_mask_follows_the_rules():
@@ -153,7 +154,9 @@ def test_a_goal_about_a_person_it_struck_is_not_paid():
         assert env.goals.counts["avoid"][0] == paid
 
 
-def test_ask_goal_and_a_neighbour_who_says_yes():
+def test_ask_goal_and_a_neighbour_who_says_yes(monkeypatch):
+    monkeypatch.setattr(folk, "QUIET", 0)                       # (a neighbour who answers asks: a social one, #12)
+    monkeypatch.setattr(folk, "ROUGH", 0)
     from nexel_agent.rl.goals import Goal
     env = SimEnv(ep_ticks=10 ** 6, roam=0, rivals=0)
     env.reset(5)
