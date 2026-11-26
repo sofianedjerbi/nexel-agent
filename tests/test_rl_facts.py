@@ -125,8 +125,11 @@ def test_the_sims_own_blows_read_the_same_with_who_and_whom():
         {"kind": name[2:] if blow else name.split("#")[0], "id": int(name.split("#")[1]) if "#" in name else c.id, "name": None}
     pairs = {(F.read(e).by_kind, F.read(e).target_kind) for e in seen}
     assert ("agent", "agent") in pairs and ("agent", "tusker") in pairs, seen
-    for e in seen:
-        assert F.read({**e, "who": ref(e["attacker"], True), "whom": ref(e["target"], False)}) == F.read(e), e
+    for e in seen:                   # (a game since nexel-worlds#173 says who and whom only: read above, as the words were)
+        if "attacker" in e:
+            assert F.read({**e, "who": ref(e["attacker"], True), "whom": ref(e["target"], False)}) == F.read(e), e
+        else:
+            assert e["who"] and e["whom"] and "target" not in e, e
 
 
 def test_a_death_is_told_from_its_code_and_who_did_it():
