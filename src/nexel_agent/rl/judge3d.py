@@ -49,6 +49,8 @@ def stamp(sim, s: Structure, x0, y0) -> int:
             continue                                      # (the way up is the structure's: s.stairs)
         elif p in ("plank", "roof"):
             sim.set_block(X, Y, lv + dz, p, thing=(sim.floors.get(X, Y, lv + dz) or (None, "none"))[1])
+        elif p in ("stone_block", "dirt"):
+            sim.world.set_cell(X, Y, lv + dz, True)          # (land in a cell: put_land's)
         elif dz == 0:
             sim.world.set(X, Y, block=judge.ENCLOSE[1] if p == "wall" else p)
         else:

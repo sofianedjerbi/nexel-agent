@@ -18,7 +18,8 @@ BRIEFS = (("a home for one", 82), ("a small home for one by a river", 82), ("a c
           ("a home for two, a bed each", 104), ("a workshop home: a workbench by the door", 82),
           ("a round hut", 90), ("a round base for a camp: an open yard walled round, a campfire in it", 60),
           ("a two-storey house: a bedroom upstairs", 150), ("a watchtower, three storeys high", 170),
-          ("a stone cottage", 82))
+          ("a stone cottage", 82), ("a cottage under a gable roof of shingles with stone eaves", 140),
+          ("a sod-roofed hut: earth on the roof", 150), ("a round house with a domed roof", 200))
 
 
 def main():
@@ -39,7 +40,7 @@ def main():
                      ("grade", "of", "failed", "history", "rows", "spec", "error")}})
         if s is not None:
             rows[-1]["rows"] = [line for k in range(s.n) for line in (f"storey {k}:", *s.grid(k))]
-        cost = sum(p in ("wall", "plank", "roof") for *_, p in s.cells()) if s is not None else 0
+        cost = s.cost() if s is not None else 0
         rows[-1]["cost"] = cost
         if a.build and d.get("spec") and d["grade"] == d["of"]:
             rows[-1]["built"] = judge3d.built(d["spec"])

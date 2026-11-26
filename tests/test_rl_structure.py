@@ -79,3 +79,30 @@ def test_the_architect_chooses_a_build_of_storeys_and_hears_what_failed():
     d = architect.design("a two-storey house", ask, budget=200)
     assert d["failed"] == [] and d["spec"] == DESIGNS["two storeys"], d["failed"]
     assert "no light" in seen[1] or "no chest" in seen[1], seen[1]
+
+
+ROOFS = {"gable of shingles": {"style": "gable"}, "hip of planks, stone eaves": {"style": "hip", "material": "plank", "eaves": "stone_block"},
+         "gable of earth, a plank ridge": {"style": "gable", "material": "dirt", "ridge": "plank"}, "flat stone": {"material": "stone_block"}}
+
+
+@pytest.mark.parametrize("roof", ROOFS)
+def test_a_roof_of_any_style_and_material_is_laid_whole_by_building_alone(roof):
+    """A roof is blocks, as a builder makes one: stepped up to a ridge or a peak, shingles, planks, stone or earth
+    (stone and earth on a deck of planks: the game holds them by blocks only), eaves and ridge of another."""
+    spec = {**DESIGNS["house"], "width": 5, "roof": ROOFS[roof]}
+    s = Structure(spec)
+    roof_cells = [c for c in s.cells() if c[2] >= 3]
+    if ROOFS[roof].get("style", "flat") != "flat":
+        assert max(z for _, _, z, _ in roof_cells) > 3                          # (it rises: layers over layers)
+    for k in ("material", "eaves", "ridge"):
+        assert (ROOFS[roof].get(k) or ROOFS[roof].get("material", "roof")) in {m for *_, m in roof_cells}
+    b = judge3d.built(spec)
+    assert b["sited"] and b["failed"] == [], b
+
+
+def test_earth_goes_only_over_bare_land_and_a_wrong_roof_is_told():
+    s = Structure({**DESIGNS["house"], "roof": {"material": "dirt"}})
+    busy = set(s.storeys[0]) | set(s.path)
+    assert all(m != "dirt" for x, y, z, m in s.cells() if z >= 3 and (x, y) in busy)
+    for bad, why in (({"style": "spire"}, "style is one of"), ({"material": "glass"}, "a roof is of")):
+        assert why in judge3d.judged({**DESIGNS["house"], "roof": bad})["error"]

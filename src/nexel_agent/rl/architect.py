@@ -17,18 +17,24 @@ roof over the top (one tile past its walls) unless you leave it open.
 
 Answer with JSON only:
 {{"shape": "rect" or "round", "width": tiles west to east, "depth": tiles north to south (rect),
-  "radius": 2 to 6 (round), "storeys": 1 to 3, "roof": true or false, "door": "north"|"south"|"east"|"west",
+  "radius": 2 to 6 (round), "storeys": 1 to 3, "door": "north"|"south"|"east"|"west",
+  "roof": false (open) or {{"style": "flat"|"gable"|"hip", "material": ..., "eaves": ..., "ridge": ...}},
   "furniture": {{"bed": [x, y], "table": [x, y, storey], ...}}, "path": 2 or 3}}
 Places are from the inside's top-left (x west to east, y north to south; a round's inside is its box), storey 0
 the ground (the default); two of a piece: "bed": [[x, y], [x, y]]. Furniture: {furniture}; on an upper storey
 only {upstairs} (the game stands nothing else on a floor).
+A roof is made of blocks, as a builder makes one: "flat" is one layer; "gable" steps up a layer a row to a ridge
+along the long side; "hip" steps up on all four sides (on a round: a dome). Its material: {materials} ("roof" is
+shingles; stone or earth sits on a deck of planks); "eaves" (the lowest ring) and "ridge" (the top) in another
+material if you like: a craftsman's roof mixes them.
 
 A good home, as the game judges it: every storey closed with its door and covered; 6 to 40 tiles inside the ground
 storey of a one-storey home; a bed, a campfire within 3 tiles of the bed (light, a station), a chest, a table or
 chair; each piece reached on foot from its storey's door; the wall with the door an odd number of tiles long (the
 door at its middle, the build mirror-symmetric). A base is a round or a yard left open (no roof): closed, a door
 or gate, a campfire in it. Every wall, plank and roof tile is gathered and made by hand: at most {budget} in all
-(a 3 by 3 one-storey home takes 64; each storey more on it about 40).
+(a 3 by 3 one-storey home with a flat roof takes 64; each storey more about 40; a gable or hip about half again
+its flat roof; stone or earth a deck more).
 
 Brief: {brief}"""
 
@@ -82,7 +88,7 @@ def judged(reply: str, budget: int) -> dict:
     spec = spec_of(reply)
     if spec is not None:
         j = judge3d.judged(spec)
-        c = sum(p in ("wall", "plank", "roof") for *_, p in j["structure"].cells()) if j["ok"] else 0
+        c = j["structure"].cost() if j["ok"] else 0
         j = {**j, "spec": spec, "told": judge3d.told(j) if j["ok"] else j["told"]}
     else:
         j = blueprint.judged(grid_of(reply))
@@ -100,9 +106,10 @@ def judged(reply: str, budget: int) -> dict:
 def design(brief: str, ask, rounds: int = ROUNDS, budget: int = BUDGET) -> dict:
     """The best drawing for `brief` in `rounds`: {"rows", "grade", "of", "failed", "told", "history": [grades]}.
     `ask(messages) -> reply text` is the model."""
-    from .structure import UPSTAIRS_FURNITURE
+    from .structure import ROOF_MATERIALS, UPSTAIRS_FURNITURE
     msgs = [{"role": "user", "content": DRAW.format(brief=brief, furniture=", ".join(blueprint.FURNITURE), budget=budget,
-                                                    upstairs=", ".join(UPSTAIRS_FURNITURE))}]
+                                                    upstairs=", ".join(UPSTAIRS_FURNITURE),
+                                                    materials=", ".join(ROOF_MATERIALS))}]
     best, history = None, []
     for _ in range(rounds):
         reply = ask(msgs)

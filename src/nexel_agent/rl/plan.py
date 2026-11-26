@@ -8,7 +8,8 @@ from nexel_worlds.sim.bodies import in_reach, reach_of
 from nexel_worlds.sim.storeys import STOREY
 
 R = reach_of("use")                 # (the game's reach: its table's and a tile of lead, height counted)
-BLOCKS = ("plank", "roof")          # what goes in a cell; the rest stands on the land or on a block
+BLOCKS = ("plank", "roof", "stone_block", "dirt")      # what goes in a cell (stone and earth: land in a cell, up a
+#                                                       storey only); the rest stands on the land or on a block
 SHELL = ("wall", "door", "fence")
 
 
@@ -18,6 +19,7 @@ class Plan:
         self.from_, self.ups = dict(from_ or {}), dict(ups or {})
         ground = [(x, y) for x, y, z, p in self.cells if z == 0] + [(x, y) for x, y, z in self.stands if z == 0]
         self.clear = set(clear) if clear is not None else set(ground)
+        self.under = {(x, y, z) for x, y, z, p in self.cells if p in BLOCKS}   # (a block on one: laid after it)
         self.shells = {}                                      # (dz: the walls and doors standing at that height)
         for x, y, z, p in self.cells:
             if p in SHELL:
@@ -64,6 +66,9 @@ class Plan:
         dx, dy, dz, p = cell
         if p not in BLOCKS:                               # (a thing up a storey stands on the floor laid under it)
             return dz == 0 or p == "stairs" or laid((dx, dy, dz, "plank"))
+        if (dx, dy, dz - 1) in self.under:                # (a roof's layer on the one under it: that one first)
+            below = next(c for c in self.cells if c[:3] == (dx, dy, dz - 1))
+            return laid(below)
         return all(laid(c) for c in self.shells.get(dz - STOREY, ()))
 
 

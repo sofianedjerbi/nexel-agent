@@ -4,7 +4,9 @@ rectangle or a round, drawn by code and laid as the game builds up (nexel_worlds
     storey 0      walls, a door, furniture on the land
     storey k > 0  a floor of planks laid on the walls under it (STOREY layers up), walls, a door, furniture on that,
                   reached by a flight of stairs from the ground outside, to its door (2 to 7 layers up: three storeys)
-    roof          shingles over the top storey and one tile past its walls (none: an open yard, a base)
+    roof          over the top storey and one tile past its walls (none: an open yard, a base): flat, or a gable
+                  stepping up a layer a row to a ridge along its long side, or a hip stepping up on all four (a dome
+                  on a round); shingles, planks, stone or earth blocks, the eaves and the ridge in another if chosen
 
 A cell is (dx, dy, dz, piece): dz the layers over the home's land, a thing standing at that height (on the land, or
 on a floor block there) or a block in that cell. Blocks go down in the order the game holds them: over the walls
@@ -23,6 +25,10 @@ MOST_STOREYS = 3            # the top floor 6 layers up: a flight of stairs lead
 SIDE = {"north": (0, -1), "south": (0, 1), "west": (-1, 0), "east": (1, 0)}
 THINGS = ("wall", "door", "fence", *bp.FURNITURE)
 BLOCKS = ("plank", "roof")
+ROOF_STYLES = ("flat", "gable", "hip")
+ROOF_MATERIALS = ("roof", "plank", "stone_block", "dirt")     # (shingles, planks: blocks; stone, earth: land in a cell)
+LAND_IN_CELL = ("stone_block", "dirt")
+ROOF_RISE = 3               # layers a roof steps up at the most: its top in reach from the floor under it
 UPSTAIRS_FURNITURE = tuple(f for f in bp.FURNITURE if PLACEABLE.get(f, f) in UPSTAIRS)
 
 
@@ -68,7 +74,8 @@ class Structure:
         self.n = int(spec.get("storeys", 1))
         if not 1 <= self.n <= MOST_STOREYS:
             raise ValueError(f"storeys from 1 to {MOST_STOREYS}")
-        self.roofed = bool(spec.get("roof", True))
+        self.roof = roof_of(spec.get("roof", True))
+        self.roofed = self.roof is not None
         self.inside, self.ring = footprint(spec)
         door = str(spec.get("door", "south")).lower()
         if door not in SIDE:
@@ -117,8 +124,43 @@ class Structure:
             out += [(x, y, STOREY * k, p) for (x, y), p in _shell_first(self.storeys[k])]
         if self.roofed:
             under = {p for p, t in self.storeys[-1].items() if t in ("wall", "door")}
-            out += [(x, y, STOREY * self.n, "roof") for x, y in _held(_around(foot), under)]
+            busy = set(self.storeys[0]) | set(self.path)     # (what stands on the land, or is no bare land, under it)
+            out += [(x, y, STOREY * self.n + i, m) for i, layer in enumerate(self.layers(_held(_around(foot), under), busy))
+                    for x, y, m in layer]
         return out
+
+    def layers(self, base, busy=()) -> list:
+        """The roof's layers, the lowest first: [[(x, y, material)]]. Flat, one; a gable, each a row in from the long
+        sides; a hip, a ring in from every side; ROOF_RISE layers at the most (what is left at the top, flat)."""
+        style, mat, eaves, ridge = self.roof["style"], self.roof["material"], self.roof.get("eaves"), self.roof.get("ridge")
+        xs, ys = [x for x, _ in base], [y for _, y in base]
+        cx, cy = (min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2
+        along_x = max(xs) - min(xs) >= max(ys) - min(ys)           # (the ridge along the long side)
+        if style == "flat":
+            depth = lambda p: 0                                            # noqa: E731
+        elif style == "gable":
+            depth = lambda p: int((max(ys) - min(ys)) / 2 - abs(p[1] - cy)) if along_x else int((max(xs) - min(xs)) / 2 - abs(p[0] - cx))   # noqa: E731
+        else:
+            ring = _rings(set(base))
+            depth = ring.get                                               # noqa: E731
+        deck = mat in LAND_IN_CELL                                # (stone, earth: held by blocks only, not by a wall
+        top = min(ROOF_RISE - deck, max(depth(p) for p in base))  # standing under: laid on a deck of planks)
+        out = [[] for _ in range(top + 1 + deck)]
+        for p in base:
+            d = min(depth(p), top)
+            if deck:
+                out[0].append((p[0], p[1], eaves if eaves and d == 0 else "plank"))
+            for i in range(d + 1):
+                m = eaves if eaves and i == 0 and d == 0 else ridge if ridge and i == d == top and top else mat
+                if m in LAND_IN_CELL and p in busy:
+                    m = "plank"                   # (the game reads earth over a tile with a thing on its land as the
+                if not (deck and eaves and d == 0):           # land's next layer, the thing in its way: nexel-worlds)
+                    out[i + deck].append((p[0], p[1], m))
+        return [layer for layer in out if layer]
+
+    def cost(self) -> int:
+        """The walls and blocks it takes (floors, roof): what is gathered and made most."""
+        return sum(p == "wall" or p in ROOF_MATERIALS for *_, p in self.cells())
 
     def stands(self) -> tuple:
         """(stands, spare): the floor each storey's door leads to (dx, dy, dz: the height one stands at) and the path;
@@ -147,6 +189,34 @@ class Structure:
             rows.append("".join(ch.get(self.storeys[k].get((x, y)), "." if (x, y) in self.inside else "=" if
                                        k == 0 and (x, y) in self.path else " ") for x in range(x1 + 1)).rstrip())
         return rows
+
+
+def roof_of(v):
+    """The roof chosen: None (open), or {"style", "material", "eaves", "ridge"}; True is a flat roof of shingles."""
+    if v is False or v is None or v == "none":
+        return None
+    r = {"style": "flat", "material": "roof"} if v is True else {"style": v, "material": "roof"} if isinstance(v, str) else dict(v)
+    r.setdefault("style", "flat")
+    r.setdefault("material", "roof")
+    if r["style"] not in ROOF_STYLES:
+        raise ValueError(f"a roof's style is one of {', '.join(ROOF_STYLES)}")
+    for k in ("material", "eaves", "ridge"):
+        if r.get(k) is not None and r[k] not in ROOF_MATERIALS:
+            raise ValueError(f"a roof is of {', '.join(ROOF_MATERIALS)} (its {k}: {r[k]})")
+    return r
+
+
+def _rings(ts) -> dict:
+    """How far in each tile is from the edge of `ts`, in rings (the edge 0)."""
+    near = lambda p: [(p[0] + 1, p[1]), (p[0] - 1, p[1]), (p[0], p[1] + 1), (p[0], p[1] - 1)]   # noqa: E731
+    out, left, d = {}, set(ts), 0
+    while left:
+        edge = {p for p in left if any(q not in left for q in near(p))}
+        for p in edge:
+            out[p] = d
+        left -= edge
+        d += 1
+    return out
 
 
 def _shell_first(things) -> list:
