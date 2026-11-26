@@ -44,6 +44,7 @@ dev = [
 [tool.pytest.ini_options]
 asyncio_default_fixture_loop_scope = "function"
 addopts = "-n 4"
+markers = ["slow: minutes of servers and a player (a QA copy): skipped unless NEXEL_SLOW=1 (one heavy job on the Mac at a time)"]
 
 # ---------------------------------------------------------------- lint (CI: .github/workflows/ci.yml)
 # Blocking: these rule families, less the rules today's code breaks (the `ignore` list is the debt:
