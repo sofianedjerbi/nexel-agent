@@ -124,6 +124,29 @@ def test_a_claimed_deed_with_none_behind_it_goes_unsaid(tmp_path):
     asyncio.run(go())
 
 
+def test_thanks_for_a_gift_never_given_is_not_taken(tmp_path):
+    """(#20, the talk bench: 'no problem' to 'thanks for the wood' it never gave.) Thanked for wood with no give on
+    record, its answer says it gave none, whatever the model wrote, and promises nothing; once given, the model's line."""
+    reply = '{"heard": ["thanks wood"], "say": "np anytime", "promise": "wood 2", "deed": ""}'
+    v, said = speaker(tmp_path, reply=reply, near=(person("Mira", 2),))
+    promised = []
+    v.on_promise = lambda *a: promised.append(a)
+
+    async def go():
+        v.hear("Mira", "thanks for the wood rook")
+        await settle(v)
+        assert said == ["i haven't given you any wood"] and promised == []
+        v.now.remember("Mira", "you gave them wood")
+        V.GAP_S = 0.0
+        v.hear("Mira", "thanks again for the wood")
+        await settle(v)
+    try:
+        asyncio.run(go())
+    finally:
+        V.GAP_S = 2.0
+    assert said == ["i haven't given you any wood", "np anytime"]
+
+
 def test_a_reply_never_waits_behind_a_thought_in_flight(tmp_path):
     """(#11) A thought is with the model when a line comes to answer: the reply goes out at once, beside it (the server
     decodes the two together), not after it; and no new thought starts while a reply is on its way."""

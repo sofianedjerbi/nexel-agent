@@ -97,8 +97,11 @@ async def run_case(case, url, http) -> dict:
     said = await v.line([(w, t, time.monotonic()) for w, t in case["heard"]], case["doing"])
     rec = next(r for r in logs if "acts" in r)
     dropped = next((r for r in logs if r.get("kind") == "dropped"), None)
-    said = said or (dropped or {}).get("said", "")                # (a line the deed check held back is still the model's)
-    return {"id": case["id"], "said": said, "acts": rec.get("acts"), "promise": rec.get("promise"), "error": rec.get("error"),
+    corrected = next((r for r in logs if r.get("kind") == "corrected"), None)
+    sent = said
+    # (a line the deed check held back, or the thanks check put right, is still the model's: the bench scores the model)
+    said = (dropped or {}).get("said") or (corrected["said"] if corrected else said)
+    return {"id": case["id"], "said": said, "sent": sent, "acts": rec.get("acts"), "promise": rec.get("promise"), "error": rec.get("error"),
             "llm_s": rec.get("llm_s"), **score(case, said, labels, rec.get("promise"), dropped is not None)}
 
 

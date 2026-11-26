@@ -144,6 +144,12 @@ class Voice:
         if out and claim and not self.now.backs(*claim, heard[-1][0] if heard else None):
             self.write({"kind": "dropped", "said": out, "why": f"claims it {' '.join(claim)}: no such deed"})
             out = ""
+        thanked = next(((who, item) for (who, _, _), (act, item) in zip(heard, labels)
+                        if act == "thanks" and item and not self.now.backs("gave", item, who)), None)
+        if thanked:                      # (thanks for a gift never given: not taken, whatever the model wrote, #20)
+            fix = f"i haven't given you any {thanked[1].replace('_', ' ')}"
+            self.write({"kind": "corrected", "said": out, "sent": fix, "why": f"thanked for {thanked[1]}: never given"})
+            out, promise = fix, None
         if out and promise and heard:
             self.on_promise(heard[-1][0], *promise)
         t.update(kind=kind, to=heard[-1][0] if heard else "", heard=" | ".join(h[1] for h in heard)[:120], said=out,

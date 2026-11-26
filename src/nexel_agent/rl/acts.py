@@ -2,19 +2,19 @@
 bye, asks what it carries, or just talks - told by the words model itself in the same call that writes its reply,
 never by a list of keywords (a line that names an item is not an ask: "a sword is 2 ingot" is an answer, #9). And what
 its own line does: a promise to hand something over binds its body (rl/mind.py commit), a line that reads out its
-pack goes unsaid unless someone asked what it carries, and a line that says it gave or made a thing goes unsaid when
-the game shows no such deed (rl/now.py backs)."""
+pack goes unsaid unless someone asked what it carries, a line that says it gave or made a thing goes unsaid when
+the game shows no such deed (rl/now.py backs), and thanks for a gift it never gave is not taken: its answer says so."""
 
 import json
 import re
 
 # (the words' reply, as the model is told to write it: rl/voice.py)
 REPLY = ('Reply with JSON only: {"heard": [one label for each line said to you, in order: "ask ITEM" (they want an item '
-         'from you), "offer ITEM" (they offer you one), "how ITEM" (they ask what it takes or where it is found), "pack" '
-         '(they ask what you carry), "tell" (they tell you a fact), "greet", "bye", "chat"], "say": "your chat line, or empty to say nothing", '
+         'from you), "offer ITEM" (they offer you one), "how ITEM" (they ask what it takes or where it is found), "thanks ITEM" '
+         '(they thank you for an item they say you gave them), "pack" (they ask what you carry), "tell" (they tell you a fact), "greet", "bye", "chat"], "say": "your chat line, or empty to say nothing", '
          '"promise": "ITEM N" when your line says you will hand them something (and you carry it), else empty, '
          '"deed": "gave ITEM" or "made ITEM" when your line says you already gave them or made it, else empty}')
-KINDS = ("ask", "offer", "how", "pack", "tell", "greet", "bye", "chat")
+KINDS = ("ask", "offer", "how", "thanks", "pack", "tell", "greet", "bye", "chat")
 
 
 def item_of(word, items) -> str | None:
@@ -48,7 +48,7 @@ def read(out: str, n_heard: int, items) -> tuple:
     for lab in (d.get("heard") or [])[:n_heard]:
         kind, _, rest = str(lab).strip().lower().partition(" ")
         if kind in KINDS:
-            heard.append((kind, item_of(rest, items) if kind in ("ask", "offer", "how") else None))
+            heard.append((kind, item_of(rest, items) if kind in ("ask", "offer", "how", "thanks") else None))
     promise = None
     p = str(d.get("promise") or "").split()
     if p and (it := item_of(" ".join(w for w in p if not w.isdigit()), items)):

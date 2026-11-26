@@ -45,7 +45,7 @@ def test_the_cases_are_forty_or_so_and_each_names_what_the_game_has():
     assert 35 <= len(cases) <= 45 and len({c["id"] for c in cases}) == len(cases)
     for c in cases:
         kinds, item = B.wanted(c)
-        assert set(kinds) <= {"ask", "offer", "how", "pack", "tell", "greet", "bye", "chat"}, c["id"]
+        assert set(kinds) <= {"ask", "offer", "how", "thanks", "pack", "tell", "greet", "bye", "chat"}, c["id"]
         assert item is None or item in PACK, c["id"]
         assert c.get("promise") in (None, *c["pack"]), c["id"]                 # (a promise only of what it carries)
         assert kinds != ("how",) or item in RECIPES, c["id"]
@@ -62,7 +62,7 @@ def test_a_good_answer_keeps_every_rule():
         "hey, i'm mira": {"heard": ["greet"], "say": "hey mira"},
         "ok": {"heard": ["chat"], "say": ""},
         "what do you have on you?": {"heard": ["pack"], "say": "stone block 26, dirt 13, some wood"},
-        "thx for the stone earlier": {"heard": ["chat"], "say": "np", "deed": "gave stone"},
+        "thx for the stone earlier": {"heard": ["thanks stone"], "say": "np", "deed": "gave stone"},
     }
     ids = ("ask-wood", "ask-none-sword", "how-workbench", "dump-intro", "quiet-ok", "pack-asked", "deed-backed")
     rows = run([case(i) for i in ids], FakeModel(good))
@@ -76,7 +76,7 @@ def test_each_rule_catches_what_a_bad_answer_does():
         "got a sword i can have?": {"heard": ["chat"], "say": "nope", "promise": "sword 1"},         # wrong act, a promise of nothing carried
         "how do you make a workbench": {"heard": ["how workbench"], "say": "no idea"},               # no recipe in it
         "hey, i'm mira": {"heard": ["greet"], "say": "hey, stone block 26, dirt 13, still got fruit"},  # the dump
-        "thanks for the wood you gave me!": {"heard": ["chat"], "say": "np", "deed": "gave wood"},  # a gift never given
+        "thanks for the wood you gave me!": {"heard": ["thanks wood"], "say": "np", "deed": "gave wood"},  # a gift never given
         "nice hut btw": {"heard": ["chat"], "say": "THANKS!! I Built It Myself Over Many Long Days Of Work Out Here By The Lake"},
         "what does a sword take?": {"heard": ["how sword"], "say": ""},                              # owed an answer
     }
@@ -87,6 +87,7 @@ def test_each_rule_catches_what_a_bad_answer_does():
     assert rows["how-workbench"]["answer"] is False
     assert rows["dump-intro"]["dump"] is False
     assert rows["deed-thanks-wood"]["deed"] is False and rows["deed-thanks-wood"]["said"] == "np"   # (held back live, still the model's)
+    assert rows["deed-thanks-wood"]["sent"] == "i haven't given you any wood"                     # (what goes out: not taken)
     assert rows["banter-house"]["style"] is False
     assert rows["how-sword"]["reply"] is False
 
