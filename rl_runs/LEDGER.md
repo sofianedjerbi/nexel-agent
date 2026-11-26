@@ -417,3 +417,9 @@ verdict: keep the shipped body (targets: score; 21 min)
 ## r56
 
 - From: r55 last, `--init`, home-kit starts 20%. Changed: one build pick walks to the middle and lays all it can.
+- **Result (r56):** build picked 10-45 times an episode; one pick laid 41 pieces; but a kit short of a door sent it on
+  an errand 30 tiles off and it gave the home up (FAR 30), hut after hut. Stopped at +480k.
+
+## r57
+
+- From: r56 last, `--init`, home-kit starts 20%. Changed: a home is given up only past 64 tiles.
