@@ -311,3 +311,21 @@ def tmp_path_factory():
     import tempfile
     from pathlib import Path
     return Path(tempfile.mkdtemp()) / "memory.json"
+
+
+def test_a_goal_left_for_another_is_set_aside_and_told_and_kept():
+    """The owner: change goals whenever needed, but remember - after the fight it still wants the fiber. A goal left
+    before it is done goes on the agenda, told in the facts; set again, it comes off; it is kept across sessions."""
+    from nexel_agent.rl.goals import Goal
+    path = tmp_path_factory()
+    m = Mind("Rook", "a quiet player", "http://x", FakeHTTP("{}"), path)
+    m.now.items = ("fiber", "wood")
+    m.goal = Goal("ask", "fiber", "doben00", m.tick, 0)
+    m.apply({"goal": "stay", "with": "doben00"})
+    m.now.see(OBS)
+    facts = m.messages(OBS)[1]["content"]
+    assert "Goals you set aside" in facts and "ask fiber (with doben00)" in facts
+    again = Mind("Rook", "a quiet player", "http://x", FakeHTTP("{}"), path)
+    assert again.agenda.saved() and again.agenda.saved()[0]["item"] == "fiber"
+    again.apply({"goal": "ask", "with": "doben00", "item": "fiber"})
+    assert not any(x["item"] == "fiber" for x in again.agenda.saved())

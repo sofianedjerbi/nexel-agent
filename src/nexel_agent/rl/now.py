@@ -8,8 +8,8 @@ import time
 from collections import Counter, deque
 from itertools import groupby
 
-from .facts import (HOSTILE, PILE_KINDS, Attack, Craft, Give, Say, compass, counted, dist, events, ground, most, named, pack,
-                    people, plain, told)
+from .facts import (HOSTILE, PILE_KINDS, Attack, Craft, Drop, Give, Say, Took, compass, counted, dist, events, ground,
+                    handed, most, named, pack, people, plain, told)
 
 SIGHTS = ("water", "deep_water", "tree", "rock", "thicket", "berry_bush", "fruit_tree", "campfire", "workbench",
           "bed", "door", "chest", "well", "cave_floor", "hole", "ladder", "stone_wall", "wood_wall", "fence")
@@ -61,6 +61,7 @@ class Now:
         self.body: deque = deque()           # (t, hp, food, inventory): the oldest is the window's start
         self.acts: deque = deque(maxlen=6)
         self.words_tell = False              # live with a words model: it tells which lines are asks (rl/acts.py)
+        self.drops: dict = {}                # name: [(t, items)] they let fall lately (a hand-over: facts.handed)
 
     def see(self, obs: dict):
         t, me = time.monotonic(), obs.get("self") or {}
@@ -125,6 +126,11 @@ class Now:
                                   trust="gave" if to == me and not i else None)
                     if self.asks.get((to, src), ("",))[0] == k:
                         del self.asks[(to, src)]
+            case Drop(name=who) if who and who != me:
+                self.drops.setdefault(who, []).append((t, dict(ev.items)))
+            case Took(name=who) if who == me:                    # (what someone dropped by it, picked up: their gift)
+                for giver, k, n in handed(self.drops, ev.items, t):
+                    self.outcome(Give(giver, me, {k: n}, ev.tick), t)
             case Say(src=src) if src != me and not self.words_tell and (item := next(iter(named(ev.text, self.items)), None)):
                 self.ask(src, me, item, t)
 

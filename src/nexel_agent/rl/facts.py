@@ -181,6 +181,30 @@ class Death(NamedTuple):
     by: str | None = None              # who did it, as a blow names it ("Bob", "a tusker"): from the event's who
 
 
+class Drop(NamedTuple):                # (drop: what someone let fall by them - a hand-over, when another picks it up)
+    name: str | None
+    items: dict
+    tick: int | None = None
+
+
+HANDED_S = 30.0                        # s: a drop picked up this soon after is the dropper's gift
+
+
+def handed(drops: dict, took: dict, t: float, window: float = HANDED_S) -> list:
+    """What a pickup was given by: [(giver, item, n)], from the drops by others lately (drops: {name: [(t, items)]},
+    consumed as matched). Live: a player dropped 10 fiber by Rook, its magnet picked them up, and it asked again."""
+    out = []
+    for k, n in took.items():
+        for who, seen in drops.items():
+            for i, (t0, items) in enumerate(seen):
+                if t - t0 <= window and items.get(k) and n > 0:
+                    m = min(n, items[k])
+                    out.append((who, k, m))
+                    items[k] -= m
+                    n -= m
+    return out
+
+
 class Took(NamedTuple):                # (pick_up, the sim's own events: what was taken from the ground, where)
     name: str | None
     items: dict
@@ -232,6 +256,7 @@ PARSERS = {
     "attack": lambda e: _attack(e),
     "give": lambda e: Give(e.get("from"), e.get("to"), dict(e.get("items") or {}), e.get("tick")),
     "death": lambda e: Death(e.get("name"), e.get("cause"), e.get("tick"), _at(e), e.get("dropped"), e.get("code"), said(e.get("who"), True)),
+    "drop": lambda e: Drop(e.get("name"), dict(e.get("items") or {}), e.get("tick")),
     "pick_up": lambda e: Took(e.get("name"), dict(e.get("items") or {}), e.get("tick"), _at(e)),
     "creature_died": lambda e: Fell(e.get("kind"), e.get("by"), e.get("id"), e.get("tick")),
     "craft": lambda e: Craft(e.get("name"), dict(e.get("made") or {}), e.get("tick")),
