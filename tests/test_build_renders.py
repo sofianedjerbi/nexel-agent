@@ -41,6 +41,8 @@ def test_the_rubric_asks_with_the_pictures_and_reads_scores_and_reasons(tmp_path
     answer = '```json\n{"neat": {"score": 4, "reason": "straight"}, "cosy": {"score": 2, "reason": "empty"}, "purposeful": {"score": 3, "reason": "ok"}}\n```'
     assert V.parse(answer) == {"neat": {"score": 4, "reason": "straight"}, "cosy": {"score": 2, "reason": "empty"},
                                "purposeful": {"score": 3, "reason": "ok"}}
+    trailing = '{"neat": {"score": 3, "reason": "a",}, "cosy": {"score": 2, "reason": "b"}, "purposeful": {"score": 2, "reason": "c"},}'
+    assert V.parse(trailing)["neat"] == {"score": 3, "reason": "a"}             # (a 3B model's answer, 2 rooms in 5)
     with pytest.raises(ValueError):
         V.parse('{"neat": {"score": 7}, "cosy": {"score": 2}, "purposeful": {"score": 3}}')   # (out of 1-5)
     with pytest.raises(ValueError):

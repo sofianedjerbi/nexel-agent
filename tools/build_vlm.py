@@ -48,11 +48,11 @@ def request(pngs: list, model: str = "default") -> dict:
 
 def parse(text: str) -> dict:
     """The model's answer -> {criterion: {"score": 1..5, "reason": str}}; the first JSON object in it (some models wrap
-    it in a code fence). Raises ValueError when a criterion is missing or out of range."""
+    it in a code fence; a trailing comma before a brace is let pass). Raises ValueError when a criterion is missing or out of range."""
     m = re.search(r"\{.*\}", text, re.S)
     if not m:
         raise ValueError(f"no JSON in the answer: {text[:200]!r}")
-    got = json.loads(m.group(0))
+    got = json.loads(re.sub(r",\s*([}\]])", r"\1", m.group(0)))      # (a comma before a closing brace: small models write one now and then)
     out = {}
     for c in CRITERIA:
         v = got.get(c) or {}
