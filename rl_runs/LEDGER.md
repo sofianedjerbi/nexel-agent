@@ -399,3 +399,9 @@ verdict: keep the shipped body (targets: score; 21 min)
 
 - From: r52 last, `--init`. Home-kit starts (--home-pct 20: a hut's pieces in the pack, rl/starts.py), so the build
   reward comes early enough to learn from. Target: builds_5 up from 0.
+- **Result (r53):** stopped at +480k: with the kit in its pack, build picked in 0.4% of the decisions where it was
+  legal, no hut; the build reward only moved when a ring closed.
+
+## r54
+
+- From: r53 last, `--init`, home-kit starts 20%. Changed: each piece of the blueprint laid pays 0.05 (judge.laid).
