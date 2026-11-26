@@ -140,6 +140,8 @@ class Now:
         rec = [f"{w} x{n:g}" if n != 1 else w for w, n in (rel.get("record") or {}).items()]
         if rel.get("record") and not any(w.startswith("gave you") for w in rel["record"]):
             rec.append("they have given you nothing yet")       # (live: 'Mira already agreed to help', 28 asks, nothing given)
+        if not any(w.startswith("you gave them") for w in (rel.get("record") or {})):
+            rec.append("you have given them nothing yet")      # (talk bench: 'no problem' to thanks for wood never given)
         ally = {True: "your ally", False: "not your ally"}.get(rel.get("ally"))
         return "; ".join(([ally] if ally else []) + self.standing(name) + rec) or "nothing between you yet"
 

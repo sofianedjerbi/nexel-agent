@@ -47,4 +47,7 @@ def test_a_person_who_never_gave_says_so():
     n.remember("Mira", "you asked them for wood")
     assert "they have given you nothing yet" in n.person("Mira")
     n.remember("Mira", "gave you wood")
-    assert "nothing yet" not in n.person("Mira")
+    assert "they have given you nothing yet" not in n.person("Mira")
+    assert "you have given them nothing yet" in n.person("Mira")         # (thanked for a gift never made: the facts say so)
+    n.remember("Mira", "you gave them stone")
+    assert "you have given them nothing yet" not in n.person("Mira")
