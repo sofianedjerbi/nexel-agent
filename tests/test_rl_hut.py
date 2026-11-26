@@ -34,3 +34,19 @@ def test_a_start_with_a_home_kit_holds_the_hut_pieces():
     env.reset(7)
     inv = env.a.inventory
     assert inv.get("door", 0) + inv.get("roof", 0) + inv.get("stone_wall", 0) + inv.get("wood_wall", 0) > 10
+
+
+def test_a_pit_dug_in_the_spot_makes_it_choose_another():
+    """The body dug a pit where its hut was to stand: the game refuses walls beside lower ground, so the spot is left."""
+    from nexel_agent.rl.actions import built
+    env = SimEnv(ep_ticks=10 ** 6, roam=0, rivals=0)
+    env.reset(5)
+    env.folk = []
+    env.a.inventory.update({"stone_wall": 16})
+    o = env.sim.observe(env.a)
+    built(o, env.social)
+    hx, hy = first = env.social.home
+    w = env.sim.world
+    w.set(hx + 1, hy + 1, level=w.level(hx + 1, hy + 1) - 1)
+    built(env.sim.observe(env.a), env.social)
+    assert env.social.home != first
