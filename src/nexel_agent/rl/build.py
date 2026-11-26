@@ -19,7 +19,7 @@ from .pursue import craft
 W = H = 3                                                   # the inside
 DOOR = (1, H)                                               # in the south wall's middle
 FURNITURE = ((0, 0, "campfire"), (W - 1, 0, "bed"))         # a corner each
-FAR = 3 * VIEW_R                                             # a home further off than this is given up
+FAR = 64                    # a home further off is given up (fallen, back at spawn; an errand for wood goes 30+)
 _SOLID = {b.name: b.solid for b in BLOCKS}
 CH = {b.name: b.char for b in BLOCKS}
 WALLS = tuple(k for k in ENCLOSE if _SOLID[k])
