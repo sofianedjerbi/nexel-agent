@@ -72,3 +72,35 @@ def test_the_planner_can_aim_at_its_home_and_sees_what_it_lacks(tmp_path):
     facts = m.facts(obs)
     assert f"home (it lacks {', '.join(f'{n:g} {k}' for k, n in home.lacks(obs, at).items())})" in facts
     assert "Your home right here: closed" in facts
+
+
+def test_a_players_day_night_falls_and_its_home_and_bed(tmp_path):
+    """(#15) From five minutes before night: how long until night (or dawn), where its home is, its bed there."""
+    from nexel_worlds.sim.constants import DAY_TICKS, TICK_HZ
+    _, at, obs = hut({"wall", "door", "campfire"})
+    day = DAY_TICKS * 10
+    obs = {**obs, "tick": day + int(.3 * DAY_TICKS)}                       # morning: nothing to say
+    assert home.day(obs, at) is None
+    obs["tick"] = day + int(.75 * DAY_TICKS) - 2 * 60 * TICK_HZ           # two minutes before night
+    assert home.day(obs, at) == ("Night falls in 2 min: glooms come out; your home is right here, with no bed yet: aim for one, "
+                                 "and sleep in it (a bed is where you wake after dying).")
+    obs["tick"] = day + int(.9 * DAY_TICKS)
+    assert home.day(obs, at).startswith("It is night: glooms are out, dawn in 2 min")
+    assert home.day(obs, None).endswith("you have no home to go to: a bed is where you wake after dying.")
+    _, at, obs = hut({"wall", "door", "campfire", "bed"})
+    obs["tick"] = day + int(.9 * DAY_TICKS)
+    assert "with a bed (" in home.day(obs, at)
+    m = Mind("Rook", "", "http://x", FakeHTTP("{}"), tmp_path / "memory.json")
+    m.social = SimpleNamespace(home=at)
+    m.see(obs)
+    assert "It is night: glooms are out" in m.facts(obs)
+
+
+def test_the_reading_is_what_the_line_says():
+    """told() words reading(): the brain view shows the reading, the mind the line, one reading."""
+    _, at, obs = hut({"wall", "door", "campfire"})
+    r = home.reading(obs, at)
+    assert home.told(obs, r=r) == home.told(obs, at)
+    assert r["at"] == list(at) and not r["far"] and r["verdict"]["of"] == 6 and set(r["verdict"]["checks"]) >= {"closed", "bed"}
+    assert r["closed"] and "chest" in r["sense"]["failed"] and "roof" in r["looks"]["failed"] and r["lacks"] == home.lacks(obs, at)
+

@@ -16,6 +16,8 @@ dependencies = [
 [project.optional-dependencies]
 # the shared local model server players.py starts (Apple Silicon)
 mlx = ["mlx-lm>=0.32.2; sys_platform == 'darwin' and platform_machine == 'arm64'"]
+# a build's renders with the game's own renderer (tools/render_build.py: Chrome, the installed one)
+render = ["playwright>=1.64.1"]
 
 [project.scripts]
 nexel-agent = "nexel_agent.rl.live:main"              # the AI player: the shipped body models/rook.npz
@@ -44,6 +46,7 @@ dev = [
 [tool.pytest.ini_options]
 asyncio_default_fixture_loop_scope = "function"
 addopts = "-n 4"
+markers = ["slow: minutes of servers and a player (a QA copy): skipped unless NEXEL_SLOW=1 (one heavy job on the Mac at a time)"]
 
 # ---------------------------------------------------------------- lint (CI: .github/workflows/ci.yml)
 # Blocking: these rule families, less the rules today's code breaks (the `ignore` list is the debt:

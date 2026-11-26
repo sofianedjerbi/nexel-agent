@@ -9,6 +9,7 @@ import time
 
 from nexel_agent.rl.brain import Brain, chat_or_event, frame, top
 from nexel_agent.rl.goals import Goal
+from nexel_agent.rl.judge import CHECKS, LOOKS, SENSE
 
 ACTS = ["step_N", "step_E", "step_S", "step_W", "dig_W", "attack", "approach", "say", "eat_berries", "craft_plank", "place_dirt_N"]
 
@@ -37,6 +38,8 @@ class Fake:
         self.goal, self.goal_at = Goal("gather", "wood", "Mira"), time.monotonic()
         self.relations = {"Mira": {"ally": True, "notes": "shares seeds, said she'd help with the house"}}
         self.foes, self.hurt, self.pol, self.mind = {}, 0.0, None, None
+        self.tried = {"gather wood (with Mira)": [2, 1], "make a bed": [1, 0]}   # (as mind.tried: goal: [set, done])
+        self.home, self.home_read = None, None                 # (as the mind's: rl/home.py reading, made up here)
 
     def obs(self, events=()):
         x0, y0 = self.me
@@ -114,6 +117,25 @@ def main():
             if say:
                 b.emit({"k": "chat", "from": "Rook", "text": say, "said": True})
             f.inv["wood"] += 1
+        if n % 30 == 20:                                      # (a goal ends now and then: the tally moves)
+            g = rng.choice(list(f.tried) + ["ask Mira for stone"])
+            t = f.tried.setdefault(g, [0, 0])
+            t[0] += 1
+            t[1] += rng.random() < .6
+        b.tried(f)
+        if n == 15:                                           # (it chooses a spot: not closed yet, lacking the hut's wood)
+            f.home = (31, 26)
+            f.home_read = {"at": [31, 26], "where": "4 tiles N", "far": False, "closed": False, "told": "not closed",
+                           "verdict": {"grade": 0, "of": 6, "checks": dict.fromkeys(CHECKS, False), "failed": list(CHECKS)},
+                           "lacks": {"wood": 14, "fiber": 3}}
+        if n == 45:                                           # (walls up and a door: closed, the rest missing)
+            f.home_read = {**f.home_read, "closed": True, "told": "closed, a door, no roof (0% covered), no light, no bed, 9 tiles inside (grade 3 of 6)",
+                           "verdict": {"grade": 3, "of": 6, "checks": {**dict.fromkeys(CHECKS, False), "closed": True, "door": True, "room_enough": True},
+                                       "failed": ["roofed", "lit", "bed"]},
+                           "sense": {"grade": 3, "of": len(SENSE), "failed": ["chest", "station", "seat", "fit", "light_by_bed"]},
+                           "looks": {"grade": 4, "of": len(LOOKS), "failed": ["roof", "windows", "path", "no_stray"]},
+                           "lacks": {"roof": 9, "bed": 1}}
+        b.homed(f)
         time.sleep(1.0)
     b.close()
 

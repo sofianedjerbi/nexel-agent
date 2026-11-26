@@ -123,12 +123,13 @@ def next_step(obs, social, *, ground_ch, tool_for, dirs):
     if not flat(obs, hx, hy):                                # (dug into since: the game refuses a wall by a pit)
         pit = _pit(obs, hx, hy)
         earth = next((k for k in EARTH if inv.get(k)), None)
-        if pit is not None and earth and any(laid(obs, hx + dx, hy + dy, p) for dx, dy, p in PLAN):
-            if (me["x"], me["y"]) != (cx, cy):               # (a home begun is mended: the pit filled, as a player
-                return "move_to", {"x": cx, "y": cy}         # fills one, from the middle, with earth from the pack)
-            return "place", {"item": earth, "x": pit[0], "y": pit[1]}
-        social.home = None                                   # (nothing laid yet, or nothing to fill it: another spot)
-        return next_step(obs, social, ground_ch=ground_ch, tool_for=tool_for, dirs=dirs) if site(obs, ground_ch) else None
+        if not any(laid(obs, hx + dx, hy + dy, p) for dx, dy, p in PLAN):
+            social.home = None                               # (nothing laid on it yet: another spot)
+            return next_step(obs, social, ground_ch=ground_ch, tool_for=tool_for, dirs=dirs) if site(obs, ground_ch) else None
+        if pit is not None and earth:                        # (a home begun is kept and mended: the pit filled, as a
+            if (me["x"], me["y"]) != (cx, cy):               # player fills one, from the middle, with earth from the
+                return "move_to", {"x": cx, "y": cy}         # pack; without earth it goes on with what still goes down -
+            return "place", {"item": earth, "x": pit[0], "y": pit[1]}     # r63 left a closed room for a pit 4 tiles off)
     for dx, dy, piece in PLAN:                               # (the ground cleared first, as a player clears it:
         X, Y = hx + dx, hy + dy                              # a tree, a stump or a bush grown on the spot since)
         ch = _at(obs, "grid", X, Y)
@@ -159,8 +160,12 @@ def _run(obs, hx, hy, ground_ch, inv) -> list:
     """The pieces it can lay now from the middle, in the plan's order, as far as the pack goes: [(x, y, item)]. One
     pick of build lays them all (rl/verbs.py split, as ring does), so a pick pays for what it builds."""
     left, out = dict(inv), []
+    ring = [(dx, dy, p) for dx, dy, p in PLAN if p in ("wall", "door")]
+    standing = sum(laid(obs, hx + dx, hy + dy, p) for dx, dy, p in ring)     # (the ring laid before, and now)
     for dx, dy, piece in PLAN:
         X, Y = hx + dx, hy + dy
+        if piece == "roof" and standing + sum(1 for _, _, it in out if it in WALLS + DOORS) < len(ring):
+            continue                                         # (no roof on an open ring: r61 roofed one with 7 gaps)
         if laid(obs, X, Y, piece) or (piece != "roof" and _at(obs, "grid", X, Y) not in ground_ch):
             continue
         item = max((w for w in WALLS if left.get(w)), key=left.get, default=None) if piece == "wall" else piece if left.get(piece) else None

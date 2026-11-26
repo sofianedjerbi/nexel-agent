@@ -16,11 +16,13 @@ from collections import Counter
 from pathlib import Path
 
 from nexel_worlds.sim.core import Simulation
+from nexel_worlds.tiles import BLOCKS, GROUNDS
 from nexel_worlds.world import CHUNK
 
 from nexel_agent.rl import judge
 
 PLAYERS = "players"           # the rooms nobody named laid: the world's real people's
+BLOCK_CH, GROUND_CH = {b.name: b.char for b in BLOCKS}, {g.name: g.char for g in GROUNDS}
 
 
 def homes(sim, db: Path):
@@ -65,11 +67,24 @@ def judged(db: Path, events: Path | None = None, who: str | None = None) -> list
         for x, y in homes(sim, copy):
             v1, v2, v3 = judge.verdict(sim.world, x, y), judge.sense(sim.world, x, y), judge.looks(sim.world, x, y)
             walls = {n for p in judge.inside(sim.world, x, y) for n in judge._beside(p)}
-            rows.append({"at": [x, y], "by": who if walls & mine else PLAYERS,
+            rows.append({"at": [x, y], "by": who if walls & mine else PLAYERS, "map": tiles(sim.world, judge.inside(sim.world, x, y)),
                          "v1": v1["grade"], "v2": v2["grade"], "v3": v3["grade"], "of": [v1["of"], v2["of"], v3["of"]],
                          "v1_failed": v1["failed"], "v2_failed": v2["failed"], "v3_failed": v3["failed"],
                          "facts": v2["facts"], "looks": v3["facts"]})
     return rows
+
+
+def tiles(world, inside: set, pad: int = 2) -> dict:
+    """The room and PAD tiles round it, as rows from its NW corner: each tile's block and ground (their chars in the
+    game's tables) and 1 where something is over it (a roof), and which are inside (tools/build_review.py draws it)."""
+    xs, ys = [p[0] for p in inside], [p[1] for p in inside]
+    x0, y0, x1, y1 = min(xs) - pad, min(ys) - pad, max(xs) + pad, max(ys) + pad
+    rows = [[(x, y) for x in range(x0, x1 + 1)] for y in range(y0, y1 + 1)]
+    return {"x0": x0, "y0": y0,
+            "blocks": ["".join(BLOCK_CH.get(world.block(*p), "?") for p in r) for r in rows],
+            "grounds": ["".join(GROUND_CH.get(world.ground(*p), "?") for p in r) for r in rows],
+            "roofs": ["".join("1" if world.roof(*p) else "0" for p in r) for r in rows],
+            "inside": ["".join("1" if p in inside else "0" for p in r) for r in rows]}
 
 
 def builds(run_dir: Path, who: str) -> list:

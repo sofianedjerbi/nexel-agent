@@ -444,3 +444,70 @@ verdict: keep the shipped body (targets: score; 21 min)
 ## r60
 
 - From: r59 last, `--init`. Changed: a home is kept out of view's edge, a pit in a home begun is filled.
+- **Result (r60):** build picked 25-80 times; runs of 21-27 pieces cut after a few by the next decision (the env's 5 s
+  wait, or a newcomer in view), the rest lost. Fixed: a run of places goes on to its end. Stopped at +480k.
+
+## r61
+
+- From: r60 last, `--init`, home-kit starts 20%. Changed: a laying run is one choice, done to its end (a hut from a
+  stocked pack is one pick).
+- **Result (r61):** one pick laid 40 pieces; but the kit's walls were partly spent by its ring action, and the roof
+  went over 7 gaps; then it dug walls out. Fixed: no roof on an open ring. Stopped at +330k.
+
+## r62
+
+- From: r61 last, `--init`, home-kit starts 20%. Changed: no roof on an open ring.
+- **Result (r62):** 13-31 build picks an episode, 8-17 homes, none ever closed (its ring action, digging, wandering
+  undid each before the pay). Stopped at +330k.
+
+## r63
+
+- From: r62 last, `--init`, home starts 20% (half a kit, half a home begun: walls and door standing, the potential
+  primed from what stands).
+
+## gate 2026-11-26 11:46: rl_runs/r63/last.zip vs rl_runs/r50/best.zip
+
+| 4 passes | r50/best.zip | r63/last.zip | |
+|---|---|---|---|
+| lush score | 6.142 ± 0.120 | 6.066 ± 0.277 | same |
+| lush deaths | 0.000 ± 0.000 | 0.500 ± 1.590 | same |
+| lush fs_per_near_min | 0.003 ± 0.008 | 0.001 ± 0.002 | same |
+| lush crafts_distinct | 24.865 ± 0.280 | 23.800 ± 0.895 | worse |
+| lush repeat_crafts | 0.768 ± 0.008 | 0.760 ± 0.000 | same |
+| lush fail_pct | 20.600 ± 4.998 | 19.550 ± 1.629 | same |
+| lush tools_made | 1.040 ± 0.082 | 1.402 ± 0.138 | better |
+| lush rooms | 0.295 ± 0.088 | 0.432 ± 0.128 | same |
+| lush build_grade | 0.500 ± 0.145 | 0.802 ± 0.253 | better |
+| lush builds_5 | 0.000 ± 0.000 | 0.000 ± 0.000 | same |
+| lush goals_done | 0.630 ± 0.035 | 0.587 ± 0.055 | same |
+| lush goal_gather | 0.727 ± 0.101 | 0.664 ± 0.074 | same |
+| lush goal_craft | 0.786 ± 0.098 | 0.770 ± 0.066 | same |
+| lush goal_give | 0.972 ± 0.052 | 0.973 ± 0.050 | same |
+| lush goal_ask | 0.896 ± 0.074 | 0.876 ± 0.110 | same |
+| lush goal_stay | 0.705 ± 0.084 | 0.677 ± 0.174 | same |
+| lush goal_help | 0.438 ± 0.056 | 0.387 ± 0.080 | same |
+| lush goal_avoid | 0.306 ± 0.114 | 0.247 ± 0.089 | same |
+| live-like score | 6.072 ± 0.190 | 6.144 ± 0.207 | same |
+| live-like deaths | 0.250 ± 0.795 | 0.000 ± 0.000 | same |
+| live-like fs_per_near_min | 0.005 ± 0.006 | 0.004 ± 0.011 | same |
+| live-like crafts_distinct | 25.335 ± 0.560 | 24.938 ± 0.676 | same |
+| live-like repeat_crafts | 0.765 ± 0.009 | 0.745 ± 0.009 | better |
+| live-like fail_pct | 16.150 ± 0.904 | 18.525 ± 0.628 | worse |
+| live-like tools_made | 0.958 ± 0.145 | 1.327 ± 0.148 | better |
+| live-like rooms | 0.375 ± 0.083 | 0.415 ± 0.210 | same |
+| live-like build_grade | 0.635 ± 0.176 | 0.728 ± 0.405 | same |
+| live-like builds_5 | 0.000 ± 0.000 | 0.000 ± 0.000 | same |
+| live-like goals_done | 0.633 ± 0.075 | 0.563 ± 0.014 | same |
+| live-like goal_gather | 0.807 ± 0.103 | 0.689 ± 0.239 | same |
+| live-like goal_craft | 0.865 ± 0.106 | 0.855 ± 0.107 | same |
+| live-like goal_give | 1.000 ± 0.000 | 0.958 ± 0.133 | same |
+| live-like goal_ask | 0.887 ± 0.222 | 0.688 ± 0.226 | same |
+| live-like goal_stay | 0.804 ± 0.100 | 0.680 ± 0.199 | same |
+| live-like goal_help | 0.408 ± 0.056 | 0.364 ± 0.027 | same |
+| live-like goal_avoid | 0.255 ± 0.289 | 0.195 ± 0.127 | same |
+
+verdict: keep the shipped body (targets: rooms, build_grade; 22 min)
+- **Result (r63):** stopped on score patience at +1.5M (score is the stop rule, not builds). Gate against r50 (today's
+  game, targets rooms and build_grade): build grade better (lush 0.50 -> 0.80), tools better on both sets, rooms 30% ->
+  43% (same by the interval), repeat crafts better (live-like), failed actions worse (live-like 16.2 -> 18.5%). No house
+  of 5 checks yet. **Shipped** for its builds and tools.

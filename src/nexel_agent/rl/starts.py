@@ -48,6 +48,24 @@ def near_a_tool(sim, a, rng):
         sim.set_tile(*rng.choice(spots), block="workbench")
 
 
+def with_a_home_begun(sim, a, rng):
+    """A home begun (a player who came back to it): the hut's walls and door standing on flat ground near it, the
+    roof, the bed and the fire in the pack, so one build finishes it - and a wall dug out of it is a loss it feels
+    (the build potential starts from what stands). -> the home (rl/build.py's top-left), or None (no flat spot)."""
+    from .actions import GROUND_CH
+    from .build import PLAN, WALLS, site
+    home = site(sim.observe(a), GROUND_CH - {"~", "$"})
+    if home is None:
+        return None
+    hx, hy = home
+    for dx, dy, piece in PLAN:
+        if piece in ("wall", "door"):
+            sim.world.set(hx + dx, hy + dy, block=rng.choice(WALLS) if piece == "wall" else "door")
+    for item, n in (("roof", sum(p == "roof" for _, _, p in PLAN)), ("bed", 1), ("campfire", 1)):
+        a.add(item, n)
+    return home
+
+
 def with_a_home_kit(sim, a, rng):
     """The pieces of a home in the pack (a player who came back with them): the walls, a door, a bed, a fire, the
     roof (rl/build.py's hut), now and then short of the roof, the bed or the fire, so it makes or fetches the rest. Never
@@ -63,3 +81,4 @@ def with_a_home_kit(sim, a, rng):
     for k, n in kit.items():
         if n:
             a.add(k, n)
+    return None                                          # (no home yet: build chooses one)

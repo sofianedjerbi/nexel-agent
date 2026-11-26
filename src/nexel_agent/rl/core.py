@@ -27,6 +27,8 @@ from .verbs import FIGHT, split  # noqa: F401 (rl/live.py imports split from her
 DECIDE = 5                          # ticks: an idle noop waits this long
 MIN_TICKS = 2                       # the shortest a decision waits (0.2 s: a step), unless hurt
 WAIT_MAX = 50                       # and the longest (a chop by hand takes ~5 s)
+WAIT_LAY = 400                      # a run of pieces laid (ring, build) goes on to its end, as live: one choice (r60 lost
+#                                     27-piece runs to the next decision after 5 s)
 START = 0.3                         # the time of day an episode starts (morning)
 EP_TICKS = int(2.75 * DAY_TICKS)    # three days and nights: to the third dawn, and a little more
 HURT = 0.1                          # reward lost per half heart lost (healing does not pay it back)
@@ -61,8 +63,9 @@ class SimEnv:
             starts.thin_land(self.sim, self.a, rng)
         if self.gear_pct and rng.random() * 100 < self.gear_pct:      # (no draw otherwise: the other starts stay as they were)
             starts.near_a_tool(self.sim, self.a, rng)
-        if self.home_pct and rng.random() * 100 < self.home_pct:
-            starts.with_a_home_kit(self.sim, self.a, rng)
+        home = None
+        if self.home_pct and rng.random() * 100 < self.home_pct:     # (half a kit, half a home begun)
+            home = starts.with_a_home_begun(self.sim, self.a, rng) if rng.random() < 0.5 else starts.with_a_home_kit(self.sim, self.a, rng)
         self.sim.tick = self.sim.tick // DAY_TICKS * DAY_TICKS + int(START * DAY_TICKS)
         self.rng = random.Random(seed * 13 + 1)
         self.rival = Rival(self.sim, self.a, seed, pick=self.pick_target) if self.rivals else None
@@ -75,7 +78,10 @@ class SimEnv:
         if self.folk and rng.random() * 100 < self.shadow_pct:
             self.folk[0].shadow()
         self.social = SocialMemory(self.a.name, PACK)
+        self.social.home = home
         self.build_phi = judge.Potential()
+        if home:
+            self.build_phi.prime(self.sim.world, home)
         self.piles, self.taken, self.struck = {}, {}, {}           # packs dropped by people who died here, what it picked up of them
         self.sim.listeners.append(self.on_event)
         self.t0 = self.sim.tick
@@ -118,7 +124,7 @@ class SimEnv:
         # (When the next decision comes, only: being hurt or someone coming into view never chooses what to do; the
         # policy does, and it may well go on with the same action.)
         seen = self.in_view()
-        for t in range(WAIT_MAX):
+        for t in range(WAIT_LAY if cmd is not None and cmd[0] == "ring" else WAIT_MAX):
             sim.step()
             if self.rival:
                 self.rival.tick()
@@ -141,7 +147,7 @@ class SimEnv:
                 continue
             if t + 1 >= MIN_TICKS and (act.result is not None if act is not None else not busy and t + 1 >= self.decide):
                 break                                   # what it was doing is done (or, idle, 0.5 s went by)
-            if t % 5 == 4 and self.in_view() - seen:
+            if t % 5 == 4 and not self.then and self.in_view() - seen:
                 break                                   # someone came into view
         r, made = 0.0, {}
         self.last_ok = 0.0

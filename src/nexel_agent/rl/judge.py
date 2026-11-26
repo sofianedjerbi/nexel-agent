@@ -264,6 +264,10 @@ class Potential:
     def __init__(self):
         self.at, self.phi = None, 0.0
 
+    def prime(self, world, home):
+        """Start from what stands (a home begun at the start pays nothing for walls it did not lay)."""
+        self.phi = self.UNIT * verdict(world, home[0] + 1, home[1] + 1)["grade"] + self.PIECE * laid(world, home)
+
     def step(self, world, home, me: tuple, results) -> float:
         if not any(t in ("place", "dig") and r.get("ok") for t, _, r in results):
             return 0.0

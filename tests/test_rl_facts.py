@@ -127,3 +127,14 @@ def test_the_sims_own_blows_read_the_same_with_who_and_whom():
     assert ("agent", "agent") in pairs and ("agent", "tusker") in pairs, seen
     for e in seen:
         assert F.read({**e, "who": ref(e["attacker"], True), "whom": ref(e["target"], False)}) == F.read(e), e
+
+
+def test_a_death_is_told_from_its_code_and_who_did_it():
+    """(nexel-worlds#171: no cause words) A death in words from its code and who, as the game's death screen says it;
+    an older game's words when there is no code."""
+    you = Now("Rook").who
+    bob, tusker = {"kind": "agent", "id": 2, "name": "Bob"}, {"kind": "tusker", "id": 7, "name": None}
+    assert F.told(F.read({"type": "death", "name": "Rook", "code": "killed", "who": bob}), you) == "you died (killed by Bob)"
+    assert F.told(F.read({"type": "death", "name": "Mira", "code": "bitten", "who": tusker})) == "Mira died (bitten by a tusker)"
+    assert F.told(F.read({"type": "death", "name": "Mira", "code": "starvation"})) == "Mira died (starved)"
+    assert F.told(F.read({"type": "death", "name": "Mira", "cause": "killed by Bob"})) == "Mira died (killed by Bob)"

@@ -9,7 +9,7 @@ legend, its heights and roofs, VIEW_R round the player). Past it nothing is know
 
 import math
 
-from nexel_worlds.sim.constants import VIEW_R
+from nexel_worlds.sim.constants import DAY_TICKS, TICK_HZ, VIEW_R
 from nexel_worlds.tiles import BLOCKS, GROUNDS, RECIPES
 
 from . import judge
@@ -18,6 +18,7 @@ from .build import PLAN, WALLS
 from .facts import compass, counted
 
 _BLOCK, _GROUND = {b.name for b in BLOCKS}, {g.name for g in GROUNDS}
+NIGHT, SOON_S = .75, 300     # night: the day's last quarter (the game's is_night: glooms patrol); told from 5 min before
 PIECE_ITEM = {"wall": "wood_wall", "door": "door", "roof": "roof"}     # (the blueprint's pieces as items; furniture is its own)
 
 
@@ -79,21 +80,62 @@ def lacks(obs: dict, home) -> dict:
     return {k: n - have.get(k, 0) for k, n in out.items() if n > have.get(k, 0)}
 
 
-def told(obs: dict, home) -> str:
-    """The home in one line of facts: "Your home 12 tiles NW: closed, no roof (40%), no bed (grade 3 of 6); it makes
-    no sense yet: no chest, no seat; it does not look good: no roof, no windows; it lacks 6 wood, 3 fiber"."""
+def reading(obs: dict, home) -> dict:
+    """What the judge and the blueprint say of the home, as facts (what told() words, and the brain view shows):
+    {"at", "where", "far": out of sight, "verdict": v1 (rl/judge.py verdict, its report left out), "told": v1 in words,
+    "sense", "looks": v2 and v3 ({"grade", "of", "failed"}, a closed home only), "lacks": {item: n}}."""
     me, world = obs["self"], Seen(obs)
     x, y = home
-    where = compass(x - me["x"], y - me["y"])
-    if max(abs(x - me["x"]), abs(y - me["y"])) > VIEW_R - 2:
-        return f"Your home is {where}: too far to see how it stands."
+    r = {"at": [x, y], "where": compass(x - me["x"], y - me["y"]),
+         "far": max(abs(x - me["x"]), abs(y - me["y"])) > VIEW_R - 2}
+    if r["far"]:
+        return r
     v = judge.verdict(world, x, y)
-    line = f"Your home {where}: {judge.told(v)}"
-    if v["report"]["closed"]:
-        s, look = judge.sense(world, x, y), judge.looks(world, x, y)
-        if s["failed"]:
-            line += "; it makes no sense yet: " + ", ".join(f"no {k.replace('_', ' ')}" for k in s["failed"])
-        if look["failed"]:
-            line += "; it does not look good: " + ", ".join(f"no {k.replace('_', ' ')}" for k in look["failed"])
-    lack = lacks(obs, home)
-    return line + (f"; it lacks {counted(lack)}." if lack else "; you have all it takes.")
+    r.update(verdict={k: v[k] for k in ("grade", "of", "checks", "failed")}, told=judge.told(v), closed=v["report"]["closed"])
+    if r["closed"]:
+        for k, f in (("sense", judge.sense), ("looks", judge.looks)):
+            s = f(world, x, y)
+            r[k] = {"grade": s["grade"], "of": s["of"], "failed": s["failed"]}
+    r["lacks"] = lacks(obs, home)
+    return r
+
+
+def told(obs: dict, home=None, r: dict | None = None) -> str:
+    """The home in one line of facts: "Your home 12 tiles NW: closed, no roof (40%), no bed (grade 3 of 6); it makes
+    no sense yet: no chest, no seat; it does not look good: no roof, no windows; it lacks 6 wood, 3 fiber". From its
+    reading (r), or read now."""
+    r = r or reading(obs, home)
+    lacking = lambda k: f"some {k[3:].replace('_', ' ')}" if k.startswith("no_") else f"no {k.replace('_', ' ')}"   # (no_stray failed: "some stray", not "no no stray")
+    if r["far"]:
+        return f"Your home is {r['where']}: too far to see how it stands."
+    line = f"Your home {r['where']}: {r['told']}"
+    if r["closed"]:
+        if r["sense"]["failed"]:
+            line += "; it makes no sense yet: " + ", ".join(lacking(k) for k in r["sense"]["failed"])
+        if r["looks"]["failed"]:
+            line += "; it does not look good: " + ", ".join(lacking(k) for k in r["looks"]["failed"])
+    return line + (f"; it lacks {counted(r['lacks'])}." if r["lacks"] else "; you have all it takes.")
+
+
+def day(obs: dict, home) -> str | None:
+    """A player's day (#15): from five minutes before night until dawn, one line: how long until night falls (or
+    until dawn), where its home is, and its bed there (sleeping in a bed is where you wake after dying), or what it
+    still needs for one. None in the day before that."""
+    phase = (obs.get("tick", 0) % DAY_TICKS) / DAY_TICKS
+    night = phase >= NIGHT
+    left_s = ((1 if night else NIGHT) - phase) * DAY_TICKS / TICK_HZ
+    if not night and left_s > SOON_S:
+        return None
+    mins = max(1, round(left_s / 60))
+    when = f"It is night: glooms are out, dawn in {mins} min" if night else f"Night falls in {mins} min: glooms come out"
+    if not home:
+        return f"{when}; you have no home to go to: a bed is where you wake after dying."
+    me = obs["self"]
+    where = compass(home[0] - me["x"], home[1] - me["y"])
+    world = Seen(obs)
+    has = any(stands(world, home[0] + dx, home[1] + dy, p) for dx, dy, p in PLAN if p == "bed") or \
+        judge.report(world, *home).get("contents", {}).get("bed", 0) > 0
+    bed = "a bed" if has else "no bed yet: aim for one, and sleep in it"
+    if max(abs(home[0] - me["x"]), abs(home[1] - me["y"])) > VIEW_R - 2:
+        return f"{when}; your home is {where}: sleep in a bed there, it is where you wake after dying."
+    return f"{when}; your home is {where}, with {bed} (a bed is where you wake after dying)."

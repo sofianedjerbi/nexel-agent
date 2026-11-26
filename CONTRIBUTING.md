@@ -58,6 +58,9 @@ nexel-worlds; this package imports it as `nexel_worlds` and never the other way 
   3.12 env with torch, stable-baselines3, sb3-contrib and gymnasium (`rl/vec.py`, `rl/train.py`).
 - **Personas** (`personas.json`) and the launcher `players.py`: one command for a shared local model server plus N
   players.
+- **Building** (`rl/build.py`, `rl/judge.py`, `rl/starts.py`, `tools/judge_builds.py`, `tools/build_review.py`):
+  the `build` verb, the build judge (v1, v2, v3), its reward and KPIs, and the runs that trained it:
+  [docs/builder.md](docs/builder.md).
 
 ### Install
 

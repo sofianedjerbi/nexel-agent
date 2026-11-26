@@ -50,7 +50,7 @@ class Mind:
         self.relations = self.now.relations                  # name: {ally, record}
         self.relations.update(mem.get("people", {k: v for k, v in mem.items() if k not in ("aims", "told", "home")}))
         self.home = tuple(mem["home"]) if mem.get("home") else None   # where its home is (the body chose it: rl/home.py)
-        self.social, self.home_back = None, False   # (the body's memory, live.py hands it: its home handed back once)
+        self.social, self.home_back, self.home_read = None, False, None   # (the body's memory, live.py hands it: its home handed back once)
         self.goal, self.goal_at = Goal(), time.monotonic()
         self.tick, self.pack, self.ended = 0, {}, ""     # (the game's tick and the pack, last seen; how the last goal went)
         self.where: dict = {}             # each person: where last seen (rl/social.py SocialMemory.where, live.py hands it)
@@ -161,8 +161,11 @@ class Mind:
         lacks = self.lacks(have, {p.get("name") for p in people(obs)}, obs)
         if lacks:
             lines.append("What your aims lack, and who had it: " + "; ".join(lacks) + ".")
-        if self.home:
-            lines.append(home.told(obs, self.home))
+        self.home_read = home.reading(obs, self.home) if self.home else None    # (what it is told of its home: the brain view shows it)
+        if self.home_read:
+            lines.append(home.told(obs, r=self.home_read))
+        if day := home.day(obs, self.home):
+            lines.append(day)
         if self.ended:
             lines.append(f"Your last goal: {self.ended}.")
         if self.tried:

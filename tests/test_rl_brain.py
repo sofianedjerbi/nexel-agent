@@ -169,3 +169,69 @@ def test_late_page_gets_hello_and_memory_first(tmp_path, monkeypatch):
         assert [e["k"] for e in evs[:2]] == ["hello", "memory"] and evs[-1]["text"] == "19" and len(evs) == 7
     finally:
         b.close()
+
+
+def test_the_goals_tally_goes_out_when_it_changes(tmp_path):
+    """How each goal the mind set went (mind.tried), checked with the frame once a second: a line when it changed only."""
+    p = tmp_path / "brain.jsonl"
+    b = Brain(None, p, "Rook")
+    m = FakeMind()
+    m.tried = {"gather wood": [1, 1]}
+    bd = body(m)
+    b.see(obs(), bd)
+    b.t_frame = 0                                               # (a second on: the next frame)
+    b.see(obs(), bd)                                            # (the same tally: no new line)
+    m.tried["make a bed"] = [1, 0]
+    b.t_frame = 0
+    b.see(obs(), bd)
+    b.close()
+    tallies = [x for x in lines(p) if x["k"] == "tally"]
+    assert [x["goals"] for x in tallies] == [{"gather wood": [1, 1]}, {"gather wood": [1, 1], "make a bed": [1, 0]}]
+
+
+def test_a_late_page_gets_the_last_tally_first(monkeypatch):
+    """(kept for a page that connects after it went out of the backlog, as hello and memory are)"""
+    import nexel_agent.rl.brain as brain
+    monkeypatch.setattr(brain, "BACKLOG", 5)
+    b = Brain(0, None, "Rook")
+    try:
+        m = FakeMind()
+        m.tried = {"gather wood": [2, 1]}
+        b.see(obs(), body(m))
+        for i in range(20):
+            b.emit({"k": "event", "what": "x", "text": str(i)})
+        b.flush()
+        _, evs = read_events(b.port, 8)
+        assert [e["k"] for e in evs[:3]] == ["hello", "memory", "tally"] and evs[2]["goals"] == {"gather wood": [2, 1]}
+    finally:
+        b.close()
+
+
+def test_no_tally_before_a_goal_ended(tmp_path):
+    p = tmp_path / "brain.jsonl"
+    b = Brain(None, p, "Rook")
+    m = FakeMind()
+    m.tried = {}
+    b.see(obs(), body(m))
+    b.close()
+    assert "tally" not in [x["k"] for x in lines(p)]
+
+
+def test_the_home_the_mind_is_told_goes_out_when_it_changes(tmp_path):
+    """mind.home_read (rl/home.py reading), as it was given to the mind: none while no home is chosen, then each new
+    reading once; kept for a late page."""
+    p = tmp_path / "brain.jsonl"
+    b = Brain(None, p, "Rook")
+    m = FakeMind()
+    m.home, m.home_read = None, None
+    bd = body(m)
+    b.see(obs(), bd)
+    m.home, m.home_read = (3, 4), {"at": [3, 4], "where": "2 tiles N", "far": False, "closed": False, "told": "not closed",
+                                   "verdict": {"grade": 0, "of": 6, "checks": {}, "failed": []}, "lacks": {"wood": 9}}
+    for _ in range(2):
+        b.t_frame = 0
+        b.see(obs(), bd)
+    b.close()
+    homes = [x for x in lines(p) if x["k"] == "home"]
+    assert [h.get("none") for h in homes] == [True, None] and homes[1]["where"] == "2 tiles N" and homes[1]["lacks"] == {"wood": 9}
+
