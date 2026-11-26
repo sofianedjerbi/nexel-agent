@@ -563,3 +563,8 @@ verdict: SHIP (targets: score, rooms; 21 min)
 - **Result (r64):** gate against r63 (targets score, rooms): SHIP. Score better on both sets (lush 5.95 -> 6.37,
   live-like 6.08 -> 6.62), rooms better (36% -> 55%, 29% -> 57%), build grade better (0.61 -> 1.01, 0.49 -> 1.07), no
   guard worse. No house of 5 checks yet. **Shipped.**
+
+## r65
+
+- From: r64 best (shipped), `--init`. Changed: ring is retired (never legal): a room comes from build. Home starts 20%.
+- Target: builds_5 above 0; rooms may dip first (ring's 1-tile boxes go).
