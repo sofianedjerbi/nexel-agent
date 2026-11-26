@@ -168,7 +168,7 @@ def test_records_are_outcomes_only(monkeypatch):
                                                "did not give you the wood you asked for": 1}
 
 
-def test_what_lies_about_and_the_whole_pack_are_facts():
+def test_what_lies_about_and_the_pack_are_facts():
     from nexel_agent.rl.voice import Now
     now = Now("Rook")
     pack = {f"item{i}": 20 - i for i in range(12)} | {"wood": 1}
@@ -176,7 +176,9 @@ def test_what_lies_about_and_the_whole_pack_are_facts():
              "items": [{"dx": 0, "dy": 5, "items": {"wood": 3}}, {"dx": 2, "dy": 0, "items": {"meat": 2, "fiber": 1}}]})
     s = now.text()
     assert "2 meat, 1 fiber on the ground 2 tiles E; 3 wood on the ground 5 tiles S" in s       # (nearest first)
-    assert "You carry 20 item0, 19 item1" in s and ", 1 wood." in s                            # (never cut)
+    assert "You carry 20 item0, 19 item1" in s and "9 item11 and 1 more kind." in s             # (the PACK_KINDS biggest: #11)
+    now.see({"self": {"hp": 20, "hunger": 20, "inventory": {"stone": 3, "wood": 1}}})
+    assert "You carry 3 stone, 1 wood." in now.text()                                          # (a single wood counts)
     now.see({"self": {"hp": 20, "hunger": 20, "inventory": {}}})
     assert "You carry nothing." in now.text() and "nothing on the ground" in now.text()
 
@@ -274,3 +276,15 @@ def test_the_facts_tell_how_its_goals_went(tmp_path):
     m.end(Goal("gather", "wood"), "done")
     m.now.see(OBS)
     assert "ask wood (with Mira): 0 of 3; gather wood: 1 of 1" in m.messages(OBS)[1]["content"]
+
+
+def test_near_you_names_the_nearest_kinds_and_a_few_piles():
+    from nexel_agent.rl.now import NEAR_KINDS, PILES
+    from nexel_agent.rl.voice import Now
+    now = Now("Rook")
+    beings = [{"kind": f"beast{i}", "dx": i + 1, "dy": 0} for i in range(NEAR_KINDS + 2)]
+    piles = [{"dx": 0, "dy": i + 1, "items": {"wood": 1}} for i in range(PILES + 2)]
+    now.see({"self": {"hp": 20, "hunger": 20, "inventory": {}}, "entities": beings, "items": piles})
+    s = now.text()
+    assert "beast0" in s and f"beast{NEAR_KINDS - 1}" in s and f"beast{NEAR_KINDS}" not in s, s     # (the nearest kinds, #11)
+    assert "2 more kinds of creature further" in s and s.count("on the ground") == PILES, s

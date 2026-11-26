@@ -89,6 +89,25 @@ def test_one_pace_when_all_want_to_talk_at_once(tmp_path):
     assert said == ["hey", "yo"]
 
 
+def test_an_answer_to_what_was_said_since_goes_at_once(tmp_path):
+    """#11: spoken to since its last line, its answer does not wait GAP_S after that line; an answer to nothing new does."""
+    import time
+    v, said = speaker(tmp_path, near=(person("Mira", 2),))
+
+    async def go():
+        await v.speak("hey")
+        v.heard_at = time.monotonic()                      # (Mira spoke after its line)
+        t0 = time.monotonic()
+        a = await v.speak("sure", reply=True)
+        t1 = time.monotonic()
+        b = await v.speak("yo", reply=True)
+        quick, slow = t1 - t0, time.monotonic() - t1
+        return a, b, quick, slow
+    a, b, quick, slow = asyncio.run(go())
+    assert a is not None and quick < 0.5 and b is not None and slow >= V.GAP_S - 0.1, (quick, slow)
+    assert said == ["hey", "sure", "yo"]
+
+
 def test_a_claimed_deed_with_none_behind_it_goes_unsaid(tmp_path):
     """'I gave you the wood' with no give on record: the line is dropped; once the give is on record, it is said."""
     reply = '{"heard": ["chat"], "say": "I gave you the wood already", "promise": "", "deed": "gave wood"}'

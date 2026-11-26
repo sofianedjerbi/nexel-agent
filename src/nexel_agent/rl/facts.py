@@ -83,10 +83,21 @@ def counted(d: dict) -> str:
     return ", ".join(f"{n:g} {k.replace('_', ' ')}" for k, n in d.items())
 
 
+PACK_KINDS, PILE_KINDS = 12, 4      # the most kinds a pack, a pile on the ground, is told with: past them, how many more (#11: a prompt's
+#                                     length is the model's time, and a pack of forty kinds made every prompt twice as long)
+
+
 def pack(obs: dict) -> str:
-    """Everything it carries, most first (the observation's own inventory: never cut, a single wood counts)."""
+    """What it carries, most first (the observation's own inventory: a single wood counts), the PACK_KINDS biggest,
+    then how many kinds more."""
     inv = (obs.get("self") or {}).get("inventory") or {}
-    return counted(dict(sorted(inv.items(), key=lambda kv: -kv[1]))) or "nothing"
+    return most(inv, PACK_KINDS) or "nothing"
+
+
+def most(items: dict, n: int) -> str:
+    """The n biggest of a pile, counted, most first, and how many kinds more."""
+    top = sorted(items.items(), key=lambda kv: -kv[1])
+    return counted(dict(top[:n])) + (f" and {len(top) - n} more kind{'s' if len(top) - n > 1 else ''}" if len(top) > n else "")
 
 
 def ground(obs: dict) -> list:
