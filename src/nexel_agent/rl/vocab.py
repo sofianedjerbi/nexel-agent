@@ -104,4 +104,18 @@ ACTIONS = (
     'cauliflower'), ('eat', None, 'eggplant'), ('eat', None, 'pumpkin'), ('eat', None, 'cooked_meat'), ('eat', None,
     'bread'), ('say', None, None), ('give', None, None), ('ask', None, None), ('approach', None, None), ('attack',
     None, 1), ('attack', None, 2), ('attack', None, 'back'), ('ring', None, None), ('pursue', None, None),
+    # (ACTIONS_V4, encode.py: what r57 trained with, the game at 31963d92: its tool tiers and ores, the hob, build)
+    ('craft', None, 'wood_axe'), ('craft', None, 'wood_pickaxe'), ('craft', None, 'iron_axe'), ('craft', None,
+    'iron_pickaxe'), ('craft', None, 'titanium_axe'), ('craft', None, 'titanium_pickaxe'), ('craft', None,
+    'titanium_sword'), ('craft', None, 'iron_ingot'), ('craft', None, 'copper_ingot'), ('craft', None,
+    'titanium_ingot'), ('craft', None, 'gold_coin'), ('craft', None, 'wire'), ('craft', None, 'hob'), ('build', None,
+    None),
+)
+# Pack items that came after ITEMS was learned (nexel-worlds#41's ores, ingots and tool tiers; the hob, the Eclipse
+# Core): a block of their own at the vec's end (encode.py ITEMS_V2), not appended to ITEMS, whose block is in its middle.
+# ("ore" and "ingot" in ITEMS are the game's iron_ore and iron_ingot now: theirs are never set)
+ITEMS_V2 = (
+    'coal', 'copper_ore', 'iron_ore', 'gold_ore', 'titanium_ore', 'copper_ingot', 'iron_ingot', 'titanium_ingot',
+    'gold_coin', 'wire', 'wood_axe', 'wood_pickaxe', 'iron_axe', 'iron_pickaxe', 'titanium_axe', 'titanium_pickaxe',
+    'titanium_sword', 'hob', 'eclipse_core',
 )
