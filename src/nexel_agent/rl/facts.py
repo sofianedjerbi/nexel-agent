@@ -167,6 +167,7 @@ class Death(NamedTuple):
     at: tuple | None = None            # (the sim's own events only: where, and the pack that fell there)
     dropped: dict | None = None
     code: str | None = None            # why, as the game files it: killed, bitten, burnt, fell, starvation, fire, admin, dev
+    by: str | None = None              # who did it, as a blow names it ("Bob", "a tusker"): from the event's who
 
 
 class Took(NamedTuple):                # (pick_up, the sim's own events: what was taken from the ground, where)
@@ -219,7 +220,7 @@ PARSERS = {
     "say": _say, "shout": _say,
     "attack": lambda e: _attack(e),
     "give": lambda e: Give(e.get("from"), e.get("to"), dict(e.get("items") or {}), e.get("tick")),
-    "death": lambda e: Death(e.get("name"), e.get("cause"), e.get("tick"), _at(e), e.get("dropped"), e.get("code")),
+    "death": lambda e: Death(e.get("name"), e.get("cause"), e.get("tick"), _at(e), e.get("dropped"), e.get("code"), said(e.get("who"), True)),
     "pick_up": lambda e: Took(e.get("name"), dict(e.get("items") or {}), e.get("tick"), _at(e)),
     "creature_died": lambda e: Fell(e.get("kind"), e.get("by"), e.get("id"), e.get("tick")),
     "craft": lambda e: Craft(e.get("name"), dict(e.get("made") or {}), e.get("tick")),
@@ -240,6 +241,11 @@ def events(obs_or_list) -> list:
     return [ev for e in raw if (ev := read(e)) is not None]
 
 
+# A death in words, from its code (nexel-worlds#171 sends no words): as the game's death screen says it (web/js/death.js WHY_DIED)
+WHY = {"killed": "killed by {by}", "bitten": "bitten by {by}", "burnt": "burnt by a hob", "fell": "fell", "starvation": "starved",
+       "fire": "burnt in a fire", "admin": "struck down", "dev": "struck down"}
+
+
 def told(ev, who=plain) -> str:
     """An event in words. who: how a name is said (voice.py says "you" for the player itself)."""
     match ev:
@@ -250,7 +256,8 @@ def told(ev, who=plain) -> str:
         case Give():
             return f"{who(ev.src)} gave {who(ev.to)} {counted(ev.items)}"
         case Death():
-            return f"{who(ev.name)} died" + (f" ({ev.cause})" if ev.cause else "")
+            why = WHY[ev.code].format(by=who(ev.by) if ev.by else "someone") if ev.code in WHY else ev.cause    # (an older game's: its words)
+            return f"{who(ev.name)} died" + (f" ({why})" if why else "")
         case Fell():
             return f"a {ev.kind} fell" + (f" to {who(ev.by)}" if ev.by else "")
         case Craft():
