@@ -451,3 +451,9 @@ verdict: keep the shipped body (targets: score; 21 min)
 
 - From: r60 last, `--init`, home-kit starts 20%. Changed: a laying run is one choice, done to its end (a hut from a
   stocked pack is one pick).
+- **Result (r61):** one pick laid 40 pieces; but the kit's walls were partly spent by its ring action, and the roof
+  went over 7 gaps; then it dug walls out. Fixed: no roof on an open ring. Stopped at +330k.
+
+## r62
+
+- From: r61 last, `--init`, home-kit starts 20%. Changed: no roof on an open ring.
