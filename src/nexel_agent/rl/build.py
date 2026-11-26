@@ -11,6 +11,7 @@ on flat open ground near where it stands. None: no step to take now (nowhere fla
 import math
 
 from nexel_worlds.sim.constants import VIEW_R
+from nexel_worlds.sim.observe import YOU
 from nexel_worlds.tiles import BLOCKS
 
 from .judge import ENCLOSE
@@ -71,7 +72,7 @@ def site(obs, ground_ch) -> tuple | None:
     for oy in range(-VIEW_R + 2, VIEW_R - H - 1):
         for ox in range(-VIEW_R + 2, VIEW_R - W - 1):
             X, Y = me["x"] + ox, me["y"] + oy
-            if all(_at(obs, "grid", X + dx, Y + dy) in ground_ch | {"@"} for dx, dy, p in PLAN if p != "roof") and flat(obs, X, Y):
+            if all(_at(obs, "grid", X + dx, Y + dy) in ground_ch | {YOU} for dx, dy, p in PLAN if p != "roof") and flat(obs, X, Y):
                 d = math.hypot(ox + 1, oy + 1)
                 if best is None or d < best[0]:
                     best = (d, (X, Y))

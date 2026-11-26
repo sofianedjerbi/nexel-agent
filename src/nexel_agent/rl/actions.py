@@ -10,7 +10,7 @@ import numpy as np
 from nexel_worlds.sim.bodies import in_reach, reach_of
 from nexel_worlds.sim.constants import FOOD_MAX, VIEW_R
 from nexel_worlds.sim.entities import CREATURES
-from nexel_worlds.sim.observe import height_char
+from nexel_worlds.sim.observe import HIGH, ITEMS, LOW, WATER, YOU, height_char
 from . import ring, vocab
 from .facts import short
 from nexel_worlds.tiles import ARMOR, BLOCKS, FEED, FILLERS, FOOD, GROUNDS, PLACEABLE, RECIPES, REACH, WEAPONS, WEAR
@@ -23,7 +23,7 @@ CRAFT = tuple(RECIPES)
 EAT = tuple(FOOD)
 FARM = ("chicken", "cow", "chick", "calf")
 WEAR_ORDER = tuple(sorted(WEAR, key=lambda w: (-ARMOR.get(w, 0), w)))
-GROUND_CH = {g.char for g in GROUNDS} | {"~", "$", "@"}          # (a tile with nothing standing on it)
+GROUND_CH = {g.char for g in GROUNDS} | {WATER, ITEMS, YOU}       # (a tile with nothing standing on it)
 SOLID_CH = {b.char for b in BLOCKS if b.solid and b.name != "none"}
 BLOCK_NAME = {b.char: b.name for b in BLOCKS}
 
@@ -176,10 +176,10 @@ def pursued(obs, goal, social):
 def built(obs, social):
     """The home's next step as a tool call, or None (rl/build.py), on bare ground (no water, no pile)."""
     from .build import next_step
-    return next_step(obs, social, ground_ch=GROUND_CH - {"~", "$"}, tool_for=tool_for, dirs=STEP)
+    return next_step(obs, social, ground_ch=GROUND_CH - {WATER, ITEMS}, tool_for=tool_for, dirs=STEP)
 
 
-LEVEL = {height_char(lv): lv for lv in range(-26, 36)}     # (a height char of the grid: the game's height_char, read back)
+LEVEL = {height_char(lv): lv for lv in range(LOW, HIGH + 1)}     # (a height char of the grid: the game's height_char, read back)
 _STATION_CH = {b.name: b.char for b in BLOCKS}
 
 

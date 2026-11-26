@@ -3,6 +3,7 @@ if it carries one), one place after another, as the game's own place does it. As
 the policy chooses when. Not while anyone else is on or beside those tiles (it would wall them in)."""
 
 from nexel_worlds.sim.constants import VIEW_R
+from nexel_worlds.sim.observe import WATER
 from nexel_worlds.sim.core import Simulation
 from nexel_worlds.tiles import BLOCKS
 
@@ -18,7 +19,7 @@ def plan(obs: dict, ground_ch, least: int = 2) -> list | None:
     if len(grid) <= VIEW_R + 1 or any(e.get("kind") == "agent" and max(abs(e["dx"]), abs(e["dy"])) <= 2
                                       for e in obs.get("entities", [])):
         return None
-    tiles = [(dx, dy) for dx, dy in RING if grid[VIEW_R + dy][VIEW_R + dx] in ground_ch - {"~"}]
+    tiles = [(dx, dy) for dx, dy in RING if grid[VIEW_R + dy][VIEW_R + dx] in ground_ch - {WATER}]
     door = [next(d for d in DOORS if inv.get(d))] if any(inv.get(d) for d in DOORS) and tiles and 0 in tiles[0] else []
     pieces = door + [w for w in WALLS for _ in range(inv.get(w, 0))]
     out = list(zip(tiles, pieces))

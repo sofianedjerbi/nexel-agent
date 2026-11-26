@@ -17,6 +17,7 @@ import math
 
 from nexel_worlds.sim.bodies import in_reach, reach_of
 from nexel_worlds.sim.constants import VIEW_R
+from nexel_worlds.sim.observe import WATER
 from nexel_worlds.tiles import BLOCKS, PICKED, RECIPES
 
 ASK_R = 4                 # an ask is said this near the person (as a player walks up to someone to ask)
@@ -81,7 +82,7 @@ def craft(obs, item, ground_ch, tool_for, dirs, depth=0, blocked=()):
         at = next(iter(_cells(obs, {ch}, blocked)), None)
         if at is None:
             if inv.get(r.station):
-                d = next((k for k, (dx, dy) in dirs.items() if obs["grid"][VIEW_R + dy][VIEW_R + dx] in ground_ch - {"~"}), None)
+                d = next((k for k, (dx, dy) in dirs.items() if obs["grid"][VIEW_R + dy][VIEW_R + dx] in ground_ch - {WATER}), None)
                 return ("place", {"dir": d, "item": r.station}) if d else None
             return craft(obs, r.station, ground_ch, tool_for, dirs, depth + 1, blocked)
         return _walk(obs, *at, ground_ch)                   # (in view, not in reach: walk to it)
