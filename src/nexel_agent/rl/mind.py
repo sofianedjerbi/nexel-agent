@@ -17,6 +17,7 @@ from nexel_worlds.sim.constants import sec
 from nexel_worlds.tiles import RECIPES
 from .facts import Attack, Give, Say, counted, dist, events, named, needs, people, short
 from .actions import BLOCK_NAME
+from .agenda import Agenda
 from .goals import KINDS, Goal, account, judge
 from .pursue import DROPS
 from . import home
@@ -28,7 +29,8 @@ THINK_S = 20.0             # (the model it asks: rl/voice.py MODEL, the same ser
 HOME = "home"               # an aim that is no item: its home, what it takes its lacks (rl/home.py)
 GOALS_DOC = ("Goals: gather (an item), craft (an item), give (an item, to a person), ask (a person, for an item), "
              "stay (with a person), help (a person, in a fight), avoid (a person), build (your home: the body lays "
-             "it, walls, door, fire, bed, roof, from what you carry, making what it lacks), free (no goal)")
+             "it, walls, door, fire, bed, roof, from what you carry, making what it lacks), free (no goal). Change it "
+             "whenever you see fit: a goal you leave before it is done is kept, set aside, in your facts")
 BUILD = "build your home"     # (the build goal: no goal kind the body knows, the mind's own - steer)
 BUILT = 5                    # a home built: the judge's v1 at 5 of its 6 checks or more (rl/judge.py CHECKS)
 LACKING = {"closed": "walls all round", "door": "a door", "roofed": "a roof", "lit": "a light", "bed": "a bed",
@@ -50,6 +52,7 @@ class Mind:
         self.path.parent.mkdir(parents=True, exist_ok=True)      # (its notes, thoughts and timings go there)
         mem = json.loads(self.path.read_text()) if self.path.exists() else {}
         self.aims = list(mem.get("aims", []))                  # what it wants to own or build, its own choice
+        self.agenda = Agenda(mem.get("agenda", []))            # goals set aside, kept across sessions too
         self.told = dict(mem.get("told", {}))                  # item: what a person told it that takes, in their words
         self.now = now or Now(name)       # (what is happening to it: fed by the live body; it keeps the records)
         self.relations = self.now.relations                  # name: {ally, record}
@@ -175,6 +178,8 @@ class Mind:
             self.now.remember(g.person, "you kept a promise to them" if kept else "you broke a promise to them")
             how += "; it was a promise"
         self.ended = f"{goal_text(g)}: {how}"
+        if how.startswith("done"):
+            self.agenda.taken_up(g)
         if g.kind != "free":                                    # (how each goal it set went, this session)
             tally = self.tried.setdefault(goal_text(g), [0, 0])
             tally[0] += 1
@@ -217,6 +222,8 @@ class Mind:
             lines.append(day)
         if self.ended:
             lines.append(f"Your last goal: {self.ended}.")
+        if aside := self.agenda.line():
+            lines.append(aside)
         if self.tried:
             lines.append("Your goals so far, and how often done: " + "; ".join(
                 f"{t}: {d} of {n}" for t, (n, d) in sorted(self.tried.items(), key=lambda kv: -kv[1][0])[:5]) + ".")
@@ -295,6 +302,9 @@ class Mind:
         if (g.kind, g.item, g.person) != (self.goal.kind, self.goal.item, self.goal.person):
             if self.goal.promise:                               # (the planner's call: it may break its word)
                 self.end(self.goal, "broken: you set another goal")
+            else:                                                # (not forgotten: set aside, rl/agenda.py)
+                self.agenda.set_aside(self.goal, account(self.goal, self.tick))
+            self.agenda.taken_up(g)
             self.goal, self.goal_at = g, time.monotonic()
             self.stats["goals"][kind] = self.stats["goals"].get(kind, 0) + 1
             if item and self.now.items and item not in self.now.items:
@@ -315,5 +325,5 @@ class Mind:
             if by and by != self.name and item_name(item) and str(t.get("what") or "").strip():
                 self.told[item_name(item)] = f'{by}: "{str(t["what"]).strip()[:80]}"'
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(json.dumps({"aims": self.aims, "people": self.relations, "told": self.told,
+        self.path.write_text(json.dumps({"aims": self.aims, "agenda": self.agenda.saved(), "people": self.relations, "told": self.told,
                                          **({"home": list(self.home)} if self.home else {})}, indent=1))
