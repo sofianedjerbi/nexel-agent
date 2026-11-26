@@ -575,3 +575,6 @@ verdict: SHIP (targets: score, rooms; 21 min)
   on held-out worlds); the learned policy has not learned to finish one (best 3/6 at home, from a home begun). Each run
   found a real blocker in the macro or the env (all fixed, see above); what is left is the policy's credit for a long,
   rare payoff.
+- **r64 rolled back (live trial 8):** with the 30B on a QA copy, r64 killed Mira, the peaceful visitor, 5 times
+  (first strikes on people 1.94/h; r63 in trial 7: 0, 0). The sim gate called first strikes 'same': the rough
+  neighbours it trained among (#51) taught it to fight people, and the gate did not see it. models/rook.npz is r63 again.
