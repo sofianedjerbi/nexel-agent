@@ -437,3 +437,10 @@ verdict: keep the shipped body (targets: score; 21 min)
 ## r59
 
 - From: r58 last, `--init`, on the new pin (nexel-worlds 4f94113c). Changed: a kit is short only of roof, bed or fire.
+- **Result (r59):** build picked 62-175 times an episode, no hut: the home moved each time it walked 9 tiles off (the
+  flatness test read out-of-view tiles as lower ground). build alone from the same kit starts: 6/6 on 3 of 6 worlds,
+  5/6 on the other 3. Stopped at +480k.
+
+## r60
+
+- From: r59 last, `--init`. Changed: a home is kept out of view's edge, a pit in a home begun is filled.
