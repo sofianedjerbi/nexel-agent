@@ -101,9 +101,9 @@ class Brain:
         """port: serve /feed there (0: any free port, see .port; None: no server). path: append the lines there."""
         self.name, self.q, self.cond = name, queue.SimpleQueue(), threading.Condition()
         self.lines: deque = deque(maxlen=BACKLOG)      # (seq, line)
-        self.seq, self.sticky = 0, {}                    # hello, memory: always sent first to a page that connects
+        self.seq, self.sticky = 0, {}                    # hello, memory, tally: always sent first to a page that connects
         self.file = open(path, "a") if path else None
-        self.t_frame, self.mind, self.asked, self.deaths = 0.0, None, None, None
+        self.t_frame, self.mind, self.asked, self.deaths, self.tally = 0.0, None, None, None, None
         self.server, self.port = None, None
         threading.Thread(target=self._run, daemon=True, name="brain").start()
         if port is not None:
@@ -140,6 +140,7 @@ class Brain:
             self.t_frame = now
             from .encode import action_name
             mind = self.mind
+            self.tried(mind)
             rel = mind.relations if mind else {}
             f = frame(obs, getattr(body, "facing", "S"), action_name(i) if i is not None else None, mask,
                       mind.goal if mind else None, now - mind.goal_at if mind else None,
@@ -148,6 +149,18 @@ class Brain:
             self.emit(f, (pol, enc, mask, action_name) if pol is not None and enc is not None else None)
         except Exception:                                # (a view must never stop the player)
             pass
+
+    def tried(self, mind):
+        """How each goal the mind set went this session (mind.tried: {goal: [set, done]}), as a `tally` line when it
+        changed: a goal's end is judged in the mind's own step, not in a call the brain wraps, so it is looked at once a
+        frame."""
+        t = getattr(mind, "tried", None)
+        if not t:
+            return
+        s = json.dumps(t, sort_keys=True)
+        if s != self.tally:
+            self.tally = s
+            self.emit({"k": "tally", "goals": json.loads(s)})
 
     def attach(self, mind):
         """Watch the mind: what it is told (facts) and what it answers (apply), as `thought` and `memory` lines."""
@@ -200,7 +213,7 @@ class Brain:
                 self.file.flush()
             with self.cond:
                 self.seq += 1
-                if line["k"] in ("hello", "memory"):
+                if line["k"] in ("hello", "memory", "tally"):
                     self.sticky[line["k"]] = (self.seq, text)
                 self.lines.append((self.seq, text))
                 self.cond.notify_all()
