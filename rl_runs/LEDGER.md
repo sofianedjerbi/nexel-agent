@@ -405,3 +405,9 @@ verdict: keep the shipped body (targets: score; 21 min)
 ## r54
 
 - From: r53 last, `--init`, home-kit starts 20%. Changed: each piece of the blueprint laid pays 0.05 (judge.laid).
+- **Result (r54):** stopped at +480k: build still 0.5% of the decisions where legal, no hut (each pick laid one piece).
+
+## r55
+
+- From: r54 last, `--init`, home-kit starts 20%. Changed: one build pick lays every piece the pack holds (a hut from
+  a stocked pack is 4 picks, ~17 reward).
