@@ -3,7 +3,7 @@ live-like set) one episode each, in this process, and at each episode's end ever
 its home is judged (tools/judge_builds.py: v1, v2, v3, and its tiles). The best of each episode goes to a JSON file
 that tools/build_review.py --sim draws. It loads the Mac (torch, a sim): run it at nice 10, when no training runs.
 
-    nice -n 10 python tools/sim_builds.py <checkpoint.zip> [--seeds 8] [--live-like] [--out sim_builds.json]"""
+    nice -n 10 python tools/sim_builds.py <checkpoint.zip> [--seeds 8] [--live-like] [--out ~/nexel/local/builds/sim_builds.json]"""
 
 import argparse
 import json
@@ -63,7 +63,7 @@ def main():
     ap.add_argument("checkpoint")
     ap.add_argument("--seeds", type=int, default=8, help="how many held-out seeds (from the first)")
     ap.add_argument("--live-like", action="store_true", help="the live-like held-out set (thin_pct=100)")
-    ap.add_argument("--out", type=Path, default=Path("sim_builds.json"))
+    ap.add_argument("--out", type=Path, default=Path.home() / "nexel" / "local" / "builds" / "sim_builds.json")   # (drafts: beside the repos, not the checkout)
     a = ap.parse_args()
     from nexel_agent.rl.evaluate import EVAL_SEEDS, LIVE_LIKE_SEEDS
     from nexel_agent.rl.net import HybridMaskablePPO, load
@@ -74,6 +74,7 @@ def main():
         r = episode(pol, s, {"thin_pct": 100} if a.live_like else {})
         print(f"seed {s}: " + (f"v1 {r['v1']}, v2 {r['v2']}, v3 {r['v3']}" if r else "no closed room"), flush=True)
         rows += [r] if r else []
+    a.out.parent.mkdir(parents=True, exist_ok=True)
     a.out.write_text(json.dumps({"checkpoint": a.checkpoint, "seeds": list(seeds), "rooms": rows}, default=list))
     print(f"{len(rows)} of {len(seeds)} episodes closed a room: {a.out}")
 

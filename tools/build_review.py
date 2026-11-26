@@ -6,7 +6,7 @@ same in every QA copy) once, from the last run. Drafts go outside the repos: the
     python tools/build_review.py                       # every run in rl_runs/score
     python tools/build_review.py rl_runs/score/<run>   # some of them
     python tools/build_review.py --out <page.html>
-    python tools/build_review.py --sim sim_builds.json # and a checkpoint's best sim builds (tools/sim_builds.py)"""
+    python tools/build_review.py --sim ~/nexel/local/builds/sim_builds.json # and a checkpoint's best sim builds (tools/sim_builds.py)"""
 
 import argparse
 import html
