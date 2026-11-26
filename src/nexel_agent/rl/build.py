@@ -114,9 +114,8 @@ def next_step(obs, social, *, ground_ch, tool_for, dirs):
             if step is not None:
                 return step
             continue
-        if (me["x"], me["y"]) != (cx, cy):
-            return "move_to", {"x": cx, "y": cy}
-        return "ring", {"pieces": _run(obs, hx, hy, ground_ch, inv)}     # (all it can lay now, one after the other)
+        go = {} if (me["x"], me["y"]) == (cx, cy) else {"go": {"x": cx, "y": cy}}   # (walk to the middle first: one
+        return "ring", {"pieces": _run(obs, hx, hy, ground_ch, inv), **go}         # pick walks there and lays all)
     return None
 
 
