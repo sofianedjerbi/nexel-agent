@@ -94,3 +94,13 @@ def test_a_players_day_night_falls_and_its_home_and_bed(tmp_path):
     m.social = SimpleNamespace(home=at)
     m.see(obs)
     assert "It is night: glooms are out" in m.facts(obs)
+
+
+def test_the_reading_is_what_the_line_says():
+    """told() words reading(): the brain view shows the reading, the mind the line, one reading."""
+    _, at, obs = hut({"wall", "door", "campfire"})
+    r = home.reading(obs, at)
+    assert home.told(obs, r=r) == home.told(obs, at)
+    assert r["at"] == list(at) and not r["far"] and r["verdict"]["of"] == 6 and set(r["verdict"]["checks"]) >= {"closed", "bed"}
+    assert r["closed"] and "chest" in r["sense"]["failed"] and "roof" in r["looks"]["failed"] and r["lacks"] == home.lacks(obs, at)
+
