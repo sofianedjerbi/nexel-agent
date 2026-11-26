@@ -584,3 +584,46 @@ verdict: SHIP (targets: score, rooms; 21 min)
 - From: r64 best, `--init`, on the new pin (nexel-worlds cebd7b4). Changed: no fight to the end with a person it
   struck first (022ec7f), a fallen hitter forgotten, no rough neighbours (ba4db8c), ring retired (88c917d).
 - Gate: the sim gate against r63 (shipped), then tools/live_gate.py, then a live trial with the 30B before shipping.
+
+## gate 2026-11-26 22:25: rl_runs/r66/best.zip vs rl_runs/r63/last.zip
+
+| 4 passes | r63/last.zip | r66/best.zip | |
+|---|---|---|---|
+| lush score | 6.129 ± 0.235 | 6.386 ± 0.238 | same |
+| lush deaths | 0.250 ± 0.795 | 0.000 ± 0.000 | same |
+| lush fs_per_near_min | 0.007 ± 0.007 | 0.001 ± 0.004 | same |
+| lush crafts_distinct | 24.587 ± 0.799 | 25.157 ± 0.408 | same |
+| lush repeat_crafts | 0.755 ± 0.016 | 0.740 ± 0.000 | same |
+| lush fail_pct | 18.400 ± 2.105 | 35.300 ± 4.058 | worse |
+| lush tools_made | 1.420 ± 0.222 | 1.458 ± 0.121 | same |
+| lush rooms | 0.220 ± 0.109 | 0.290 ± 0.026 | same |
+| lush build_grade | 0.700 ± 0.329 | 1.002 ± 0.157 | same |
+| lush builds_5 | 0.000 ± 0.000 | 0.000 ± 0.000 | same |
+| lush goals_done | 0.599 ± 0.040 | 0.571 ± 0.046 | same |
+| lush goal_gather | 0.682 ± 0.132 | 0.605 ± 0.144 | same |
+| lush goal_craft | 0.757 ± 0.087 | 0.738 ± 0.088 | same |
+| lush goal_give | 0.953 ± 0.092 | 0.939 ± 0.070 | same |
+| lush goal_ask | 0.794 ± 0.072 | 0.698 ± 0.088 | same |
+| lush goal_stay | 0.556 ± 0.146 | 0.534 ± 0.038 | same |
+| lush goal_help | 0.444 ± 0.059 | 0.398 ± 0.023 | same |
+| lush goal_avoid | 0.285 ± 0.088 | 0.384 ± 0.054 | same |
+| live-like score | 6.106 ± 0.320 | 6.589 ± 0.411 | same |
+| live-like deaths | 0.000 ± 0.000 | 0.000 ± 0.000 | same |
+| live-like fs_per_near_min | 0.007 ± 0.014 | 0.005 ± 0.016 | same |
+| live-like crafts_distinct | 24.668 ± 1.048 | 26.113 ± 0.819 | better |
+| live-like repeat_crafts | 0.740 ± 0.013 | 0.720 ± 0.000 | better |
+| live-like fail_pct | 17.075 ± 2.123 | 26.825 ± 3.455 | worse |
+| live-like tools_made | 1.335 ± 0.172 | 1.370 ± 0.061 | same |
+| live-like rooms | 0.070 ± 0.080 | 0.302 ± 0.102 | better |
+| live-like build_grade | 0.230 ± 0.259 | 1.000 ± 0.360 | better |
+| live-like builds_5 | 0.000 ± 0.000 | 0.000 ± 0.000 | same |
+| live-like goals_done | 0.570 ± 0.050 | 0.547 ± 0.046 | same |
+| live-like goal_gather | 0.742 ± 0.140 | 0.743 ± 0.086 | same |
+| live-like goal_craft | 0.777 ± 0.130 | 0.748 ± 0.321 | same |
+| live-like goal_give | 0.977 ± 0.072 | 0.944 ± 0.105 | same |
+| live-like goal_ask | 0.792 ± 0.397 | 0.743 ± 0.485 | same |
+| live-like goal_stay | 0.583 ± 0.146 | 0.475 ± 0.216 | same |
+| live-like goal_help | 0.400 ± 0.095 | 0.367 ± 0.100 | same |
+| live-like goal_avoid | 0.354 ± 0.120 | 0.389 ± 0.232 | same |
+
+verdict: keep the shipped body (targets: score; 22 min)
