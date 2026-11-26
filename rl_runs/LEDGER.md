@@ -392,3 +392,10 @@ verdict: keep the shipped body (targets: score; 21 min)
 - From: r50 best (shipped), `--init`, `--copy-rows build=pursue` (the new action starts as the macro it already uses).
 - The workers run the pinned game (today's: roofs, ores and tool tiers; 200 actions, 13 more than r50 knew).
 - Target: builds_5 up from 0; score and deaths no worse.
+- **Result (r52):** build picked 2% of the times it is legal (r51: 0); a house of 5 checks in 4% of episodes at the
+  first check, then 0; rooms 29% -> 10% by +1.6M. Stopped there: its last checkpoint is on today's game and uses build.
+
+## r53
+
+- From: r52 last, `--init`. Home-kit starts (--home-pct 20: a hut's pieces in the pack, rl/starts.py), so the build
+  reward comes early enough to learn from. Target: builds_5 up from 0.
