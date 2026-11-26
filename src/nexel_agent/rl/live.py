@@ -170,7 +170,7 @@ class LiveBody:
                              Path(self.a.memory or f"agents/{self.a.name}/memory.json"), self.now)
             self.mind.where, self.mind.social = self.social.where, self.social   # (the body's own memory: where it saw each person, its home)
             self.draft = architect.Drafting(architect.model(self.a.model_url), self.mind.path.with_name("plan.json"),
-                                  f"a home for one ({self.a.persona})") if getattr(self.a, "architect", 1) else None
+                                  self.a.persona) if getattr(self.a, "architect", 1) else None
             self.voice = self.mind.voice = Voice(self.a.name, self.a.persona, self.a.model_url, self.http,
                                                  self.mind.path.with_name("latency.jsonl"), self.now)
             self.voice.out = self.say
@@ -225,7 +225,7 @@ class LiveBody:
                              self.social.people_flags(obs, N_NEAR), self.ledger.done)
                 mask = legal(obs, self.facing, self.social, goal) if self.a.mask else None
                 i = self.pol.act(enc, self.rng, mask)
-                if self.mind and not (self.draft and self.draft.holds(self.social, self.mind.building, obs, self.stats)):
+                if self.mind and not (self.draft and self.draft.holds(self.social, self.mind.building, obs, self.stats, self.mind.build_words)):
                     i = self.mind.steer(i, mask, self.hurt)        # (a home not begun is drawn first: rl/architect.py)
                 kind = ACTIONS[i][0]
                 steered = bool(self.mind and self.mind.building and kind == "build")    # (the mind's build: rl/mind.py steer)

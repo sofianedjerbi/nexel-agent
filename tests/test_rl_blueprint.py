@@ -117,7 +117,7 @@ def test_live_a_home_not_begun_waits_for_its_drawing_and_keeps_it(tmp_path):
     env.reset(5)
     obs = env.sim.observe(env.a)
     social, stats = SimpleNamespace(home=None, plan=None), {}
-    d = architect.Drafting(lambda msgs: f"```{GOOD}```", tmp_path / "plan.json", "a home for one")
+    d = architect.Drafting(lambda msgs: f"```{GOOD}```", tmp_path / "plan.json")
     assert not d.holds(social, False, obs)                                # (not building: no drawing)
     while d.holds(social, True, obs, stats):
         time.sleep(0.01)

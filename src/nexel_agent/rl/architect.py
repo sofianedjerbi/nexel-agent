@@ -8,6 +8,7 @@ import re
 from . import blueprint
 
 ROUNDS = 4
+NAMED = 200                 # ...and for a build the mind named in its own words (a tower, a round house): its choice
 BUDGET = 82                 # walls and roof tiles, at the most: a home for one 3 by 5 inside (the hut, 3 by 3: 64)
 
 DRAW = """You design builds for a tile game seen from above, built in storeys. Choose the design; it is drawn
@@ -150,13 +151,13 @@ class Drafting:
     kept in `path` (plan.json, by memory.json: a home drawn is laid as drawn the next session too); short of full
     marks, or no model, the hut. A home begun is never drawn again."""
 
-    def __init__(self, ask, path, brief: str):
+    def __init__(self, ask, path, who: str = "", brief: str = "a home for one"):
         import json
-        self.ask, self.path, self.brief, self.task, self.done = ask, path, brief, None, False
+        self.ask, self.path, self.who, self.brief, self.task, self.done = ask, path, who, brief, None, False
         self.kept = json.loads(path.read_text()) if path and path.exists() else None      # ({"spec"} or {"rows"})
         self.last = None                       # the last design: {"grade", "of", "history"} (logged by live.py)
 
-    def holds(self, social, building: bool, obs, stats=None) -> bool:
+    def holds(self, social, building: bool, obs, stats=None, words=None) -> bool:
         """True while the body is to wait for the drawing; the plan set on social once it is decided (and the design
         told in `stats`, the run's, as "draft")."""
         import concurrent.futures
@@ -170,8 +171,10 @@ class Drafting:
         if social.home and any(laid(obs, social.home[0] + dx, social.home[1] + dy, p) for dx, dy, p in plan_of(social).pieces):
             self.done = True                   # (the hut begun: laid as it is)
             return False
-        if self.task is None:
-            self.task = concurrent.futures.ThreadPoolExecutor(1).submit(design, self.brief, self.ask)
+        if self.task is None:                  # (the mind's own words for the build, when it said them: the brief)
+            self.brief = (words or self.brief) + (f". It is for: {self.who}" if self.who else "")
+            self.task = concurrent.futures.ThreadPoolExecutor(1).submit(design, self.brief, self.ask, ROUNDS,
+                                                                        NAMED if words else BUDGET)
             return True
         if not self.task.done():
             return True

@@ -106,3 +106,33 @@ def test_earth_goes_only_over_bare_land_and_a_wrong_roof_is_told():
     assert all(m != "dirt" for x, y, z, m in s.cells() if z >= 3 and (x, y) in busy)
     for bad, why in (({"style": "spire"}, "style is one of"), ({"material": "glass"}, "a roof is of")):
         assert why in judge3d.judged({**DESIGNS["house"], "roof": bad})["error"]
+
+
+def test_the_mind_says_the_build_in_its_words_and_the_architect_draws_those(tmp_path):
+    """The planner names the build in its own words (goal build, "build": ...); the architect gets them as its brief,
+    with whom it is for, and turns them into a design."""
+    import json
+    import time
+    from types import SimpleNamespace
+
+    from nexel_agent.rl.core import SimEnv
+    from nexel_agent.rl.mind import Mind
+    from nexel_agent.rl.now import Now
+    m = Mind("Rook", "a quiet builder", "", None, tmp_path / "memory.json", Now("Rook"))
+    m.apply({"goal": "build", "build": "a round house with a sod roof"})
+    assert m.building and m.build_words == "a round house with a sod roof"
+    m.apply({"goal": "gather", "item": "wood", "build": "a castle"})
+    assert m.build_words is None                                                    # (words for a build only)
+    seen = []
+
+    def ask(msgs):
+        seen.append(msgs[0]["content"])
+        return json.dumps(DESIGNS["round home"])
+    env = SimEnv(ep_ticks=10 ** 6, roam=0, rivals=0)
+    env.reset(5)
+    d = architect.Drafting(ask, tmp_path / "plan.json", "a quiet builder")
+    social = SimpleNamespace(home=None, plan=None)
+    while d.holds(social, True, env.sim.observe(env.a), None, "a round house with a sod roof"):
+        time.sleep(0.01)
+    assert "a round house with a sod roof. It is for: a quiet builder" in seen[0]
+    assert social.plan is not None and json.loads((tmp_path / "plan.json").read_text())["spec"]["shape"] == "round"
