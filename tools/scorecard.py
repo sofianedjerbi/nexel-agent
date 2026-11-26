@@ -15,6 +15,7 @@ import statistics
 from collections import defaultdict
 from pathlib import Path
 
+from nexel_agent.rl.facts import kind_of, said
 from nexel_worlds.sim.constants import SAY_R, sec
 from nexel_worlds.tiles import BLOCKS, TILL_TOOL, WEAPONS
 
@@ -34,8 +35,12 @@ def read(path) -> list:
     return out
 
 
-def is_person(name) -> bool:
-    return bool(name) and "#" not in str(name)          # (creatures are named kind#id in the game's events)
+def person(e: dict, ref: str, words: str):
+    """The person an event names at `ref` (who, whom: {kind, id, name}), else in its `words` (an older game's), by
+    kind: None for a creature ("a tusker" struck: it had no #, and was counted a person who struck first)."""
+    r = e.get(ref)
+    name = said(r, True) if r else e.get(words)
+    return name if kind_of(r, name) == "agent" else None
 
 
 def pct(xs, q):
@@ -52,8 +57,8 @@ def players(events) -> dict:
     end = max((e.get("tick", 0) for e in events), default=0)
     for e in events:
         t, k = e.get("tick", 0), e.get("type")
-        doer = e.get("attacker") or e.get("from") or (e.get("name") if k not in ("join", "leave", "death") else None)
-        if is_person(doer):
+        doer = (person(e, "who", "attacker") if k == "attack" else None) or e.get("from") or (e.get("name") if k not in ("join", "leave", "death") else None)
+        if doer:
             P[doer]["active"].add(t // (60 * TPS))       # (a minute it did something in: the rates' clock)
         if k == "join":
             P[e["name"]]["since"] = t
@@ -72,10 +77,9 @@ def players(events) -> dict:
             P[e["name"]]["crafts"] += [item for item, n in (e.get("made") or {}).items()]
         elif k == "death" and e.get("name"):
             P[e["name"]]["deaths"] += 1
-            if is_person(e.get("by")) and is_person(e["name"]) and e["by"] != e["name"]:
-                P[e["by"]]["people_killed"] += 1
-        elif k == "attack" and is_person(e.get("attacker")) and is_person(e.get("target")):
-            a, b = e["attacker"], e["target"]
+            if (by := person(e, "who", "by")) and by != e["name"]:
+                P[by]["people_killed"] += 1
+        elif k == "attack" and (a := person(e, "who", "attacker")) and (b := person(e, "whom", "target")):
             if t - max(hit.get((a, b), -10 ** 12), hit.get((b, a), -10 ** 12)) > PEACE_S * TPS:
                 P[a]["first_strikes"] += 1
             hit[(a, b)] = t

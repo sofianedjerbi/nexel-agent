@@ -9,7 +9,7 @@ from nexel_agent.rl.voice import Now
 
 def test_one_record_per_event_type():
     assert F.read({"type": "attack", "attacker": "a tusker", "target": "Rook", "damage": 2, "id": 7, "tick": 5}) == \
-        F.Attack("a tusker", "Rook", 2, None, 7, 5)
+        F.Attack("a tusker", "Rook", 2, None, 7, 5, "tusker", "agent")
     assert F.read({"type": "give", "from": "Mira", "to": "Rook", "items": {"stone": 2}}) == F.Give("Mira", "Rook", {"stone": 2})
     assert F.read({"type": "shout", "from": "Mira", "text": "hey"}) == F.Say("Mira", "hey", True)
     assert F.read({"type": "death", "name": "Rook", "cause": "killed by Bob", "by": "Bob"}) == F.Death("Rook", "killed by Bob")
@@ -55,7 +55,7 @@ def test_one_distance_the_servers():
     obs = {"entities": [{"kind": "tusker", "dx": 1, "dy": 0}, {"kind": "agent", "name": "Far", "dx": 4, "dy": 4},
                         {"kind": "agent", "name": "Near", "dx": 5, "dy": 0}]}
     assert [p["name"] for p in F.people(obs)] == ["Near", "Far"]
-    assert F.is_creature("a tusker") and F.is_creature("tusker#7") and not F.is_creature("Mira")
+    assert [F.kind_of(None, n) for n in ("a tusker", "tusker#7", "Mira", None)] == ["tusker", "tusker", "agent", None]   # (an older game's words)
 
 
 def test_a_pile_on_the_ground_is_seen_by_the_body_and_the_words():
@@ -85,3 +85,45 @@ def test_the_mask_reach_is_the_games():
     r = reach_of("melee")
     assert legal(obs(int(r), {}))[hit] and not legal(obs(int(r) + 1, {}))[hit]
     assert legal(obs(int(r) + 1, {"spear": 1}))[hit]
+
+
+def test_who_did_it_is_read_by_kind_not_by_name():
+    """(#35) An event names who did it as {kind, id, name} (nexel-worlds#119): a person is told from a creature by its
+    kind, a death by its code. The records keep the names the readers key on (rl/social.py, rl/folk.py), the same as
+    from an older game's words, which are still read when who and whom are not there (the agent's pin, 31963d92)."""
+    old = {"type": "attack", "attacker": "a tusker", "target": "Rook", "damage": 2, "id": 7, "tick": 5}
+    new = {**old, "who": {"kind": "tusker", "id": 7, "name": None}, "whom": {"kind": "agent", "id": 1, "name": "Rook"}}
+    assert F.read(new) == F.read(old) == F.Attack("a tusker", "Rook", 2, None, 7, 5, "tusker", "agent")
+    named = F.read({"type": "attack", "who": {"kind": "agent", "id": 3, "name": "a_tusker"}, "whom": {"kind": "tusker", "id": 9, "name": None}})
+    assert named.by == "a_tusker" and named.by_person and named.target == "tusker#9" and not named.on_person   # (a player named a_tusker is a person)
+    died = F.read({"type": "death", "name": "Rook", "cause": "tusker", "code": "bitten", "who": {"kind": "tusker", "id": 7, "name": None}})
+    assert died.code == "bitten" and died.cause == "tusker"
+
+
+def test_the_sims_own_blows_read_the_same_with_who_and_whom():
+    """(#35, t8) The training's sim (the pin's game: words only) and a game that names who did it give the same
+    records: a person's blow on a person (the rival's), a person's on a creature, a creature's on a person."""
+    from nexel_agent.rl.core import SimEnv
+    from nexel_worlds.sim.entities import CREATURES, Creature
+    env = SimEnv(ep_ticks=10 ** 6, roam=0)
+    env.reset(5)
+    sim, a, rv = env.sim, env.a, env.rival
+    rv.next = sim.tick + 1
+    env.step(0)
+    rv.a.x, rv.a.y, rv.a.z = a.x - 2, a.y, 99                     # (as test_rl_people's attack back)
+    c = Creature(sim.next_creature, "tusker", a.x + 1, a.y, CREATURES["tusker"]["hp"])
+    sim.next_creature += 1
+    sim.creatures[c.id] = c
+    sim.submit(rv.a, "attack", {"target": a.id})
+    sim.submit(a, "attack", {"target": c.id})
+    seen = []
+    for _ in range(6):
+        env.step(0)
+        seen += [e for e in env.obs.get("events", []) if e.get("type") == "attack"]
+    people = {p.name: p.id for p in sim.agents.values()}
+    ref = lambda name, blow: {"kind": "agent", "id": people[name], "name": name} if name in people else \
+        {"kind": name[2:] if blow else name.split("#")[0], "id": int(name.split("#")[1]) if "#" in name else c.id, "name": None}
+    pairs = {(F.read(e).by_kind, F.read(e).target_kind) for e in seen}
+    assert ("agent", "agent") in pairs and ("agent", "tusker") in pairs, seen
+    for e in seen:
+        assert F.read({**e, "who": ref(e["attacker"], True), "whom": ref(e["target"], False)}) == F.read(e), e

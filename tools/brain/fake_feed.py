@@ -81,7 +81,8 @@ def main():
         f.step(rng)
         events = []
         if rng.random() < .15:
-            events.append({"type": "attack", "attacker": "sporeling", "target": "Rook", "damage": 1})
+            events.append({"type": "attack", "attacker": "a sporeling", "target": "Rook", "damage": 1,
+                           "who": {"kind": "sporeling", "id": 9, "name": None}, "whom": {"kind": "agent", "id": 1, "name": "Rook"}})
             f.hp = max(4.0, f.hp - 1)
         if rng.random() < .08:
             events.append({"type": "say", "from": "Mira", "text": rng.choice(["got any stone?", "nice house", "brute's back", "ty rook"])})
