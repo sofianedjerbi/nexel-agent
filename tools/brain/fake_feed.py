@@ -37,6 +37,7 @@ class Fake:
         self.goal, self.goal_at = Goal("gather", "wood", "Mira"), time.monotonic()
         self.relations = {"Mira": {"ally": True, "notes": "shares seeds, said she'd help with the house"}}
         self.foes, self.hurt, self.pol, self.mind = {}, 0.0, None, None
+        self.tried = {"gather wood (with Mira)": [2, 1], "make a bed": [1, 0]}   # (as mind.tried: goal: [set, done])
 
     def obs(self, events=()):
         x0, y0 = self.me
@@ -114,6 +115,12 @@ def main():
             if say:
                 b.emit({"k": "chat", "from": "Rook", "text": say, "said": True})
             f.inv["wood"] += 1
+        if n % 30 == 20:                                      # (a goal ends now and then: the tally moves)
+            g = rng.choice(list(f.tried) + ["ask Mira for stone"])
+            t = f.tried.setdefault(g, [0, 0])
+            t[0] += 1
+            t[1] += rng.random() < .6
+        b.tried(f)
         time.sleep(1.0)
     b.close()
 

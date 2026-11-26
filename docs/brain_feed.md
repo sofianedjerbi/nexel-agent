@@ -84,7 +84,16 @@ did not parse, as `{"raw": "..."}`).
 {"k": "memory", "t": 1795460440.2, "people": {"doben00": {"ally": true, "notes": "gives path, takes berries"}}}
 ```
 
+### `tally`: how each goal the mind set went this session (`mind.tried`), whenever it changes
+
+```json
+{"k": "tally", "t": 1795460610.4, "goals": {"gather wood (with doben00)": [3, 2], "make a bed": [1, 0]}}
+```
+
+Each goal's text (as the mind words it) and `[times set, times done]`. Looked at with the frame, once a second: a goal
+ends in the mind's own step. None before the first goal ends.
+
 ## Size
 
 About 1 KB a frame (the tiles are 169 bytes), one frame a second: some 3.5 MB an hour, plain text, and it compresses
-ten to one. The SSE server keeps the last 400 lines (plus the last `hello` and `memory`) for a page that connects late.
+ten to one. The SSE server keeps the last 400 lines (plus the last `hello`, `memory` and `tally`) for a page that connects late.

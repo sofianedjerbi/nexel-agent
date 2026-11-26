@@ -94,6 +94,8 @@ mark{background:#fff1a8;color:inherit;box-shadow:0 0 0 1px #e0c060}
 .note{grid-column:1 / -1;text-align:center;color:#b8d49a;font-size:14px}
 @media (prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}
 }
+.tal { display:grid; grid-template-columns:1fr auto; gap:2px 8px; margin:3px 0; font-size:13px; }
+.tal i { grid-column:1 / -1; height:4px; border-radius:2px; background:linear-gradient(90deg, #6fae4f var(--p), #e8dcc4 var(--p)); }
 </style>
 </head>
 <body>
@@ -129,6 +131,7 @@ mark{background:#fff1a8;color:inherit;box-shadow:0 0 0 1px #e0c060}
 
   <div class="p">
     <div class="sec"><h2>Remembers <small>its notes on people</small></h2><div class="well" id="people"></div></div>
+    <div class="sec"><h2>Goals <small>done of set</small></h2><div class="well" id="tally"><span class="empty">none ended yet</span></div></div>
     <div class="sec"><h2>Lately</h2><div class="well log" id="log"></div></div>
   </div>
 
@@ -207,12 +210,12 @@ default: if (BOX[ch]) { P(2, 3, 8, 7, "#3a2a20"); P(3, 3, 6, 5, BOX[ch]); P(3, 3
 }
 
 // ---------- the data ----------
-const D = { F: [], T: [], M: [], G: [], H: null, t0: null, t1: 0 };
+const D = { F: [], T: [], M: [], G: [], Y: [], H: null, t0: null, t1: 0 };
 function add(o) {
 if (typeof o.t !== "number") return;
 if (D.t0 === null) D.t0 = o.t;
 D.t1 = mx(D.t1, o.t);
-({ frame: D.F, thought: D.T, memory: D.M, chat: D.G, event: D.G })[o.k]?.push(o);
+({ frame: D.F, thought: D.T, memory: D.M, tally: D.Y, chat: D.G, event: D.G })[o.k]?.push(o);
 if (o.k === "hello") D.H = o;
 }
 function at(a, T) { let lo = 0, hi = a.length - 1, r = -1; while (lo <= hi) { const m = (lo + hi) >> 1; if (a[m].t <= T) { r = m; lo = m + 1; } else hi = m - 1; } return r; }
@@ -327,14 +330,19 @@ tx("sub", [h.persona, f && f.time, D.t0 && (FEED ? `watched ${ago(T - D.t0)}` : 
 if (FEED) tx("clock", hm(T));
 else tx("clock", `${hm(T)} · ${ago(T - D.t0)} / ${ago(D.t1 - D.t0)}`);
 }
+function drawTally(i) {                                    // how each goal the mind set went: the most set first (mind.tried)
+const g = Object.entries((D.Y[i] || {}).goals || {}).sort((a, b) => b[1][0] - a[1][0]);
+ht("tally", g.length ? g.map(([k, [n, d]]) => `<div class="tal"><span>${esc(k)}</span><b>${d} of ${n}</b><i style="--p:${n ? rd(100 * d / n) : 0}%"></i></div>`).join("") : EMPTY("none ended yet"));
+}
 function render() {
-const iF = at(D.F, T), iT = at(D.T, T), iM = at(D.M, T), iG = at(D.G, T);
+const iF = at(D.F, T), iT = at(D.T, T), iM = at(D.M, T), iG = at(D.G, T), iY = at(D.Y, T);
 if (D.H && C.h !== D.H) { C.h = D.H; tx("name", D.H.name || "an AI player"); document.title = `Inside ${D.H.name || "an AI player"}'s head · Nexel Worlds`;
 const f = $("face").getContext("2d"); px(f, 0, 0, 16, 16, "#cfe6a8"); px(f, 0, 12, 16, 4, "#9fca73"); person(f, 2, 2, "#c7794f", "#7a4a2a"); }
 if (iG !== C.g) { C.g = iG; drawLog(iG); }
 if (iF !== C.f) { C.f = iF; drawFrame(iF); }
 if (iT !== C.t) { C.t = iT; drawThought(iT); }
 if (iM !== C.m) { C.m = iM; drawMemory(iM); }
+if (iY !== C.y) { C.y = iY; drawTally(iY); }
 const s = fl(T);
 if (s !== C.s) { C.s = s; clocks(); if (D.F[iF]) moods(D.F[iF]); }
 }
@@ -371,7 +379,7 @@ $("scrub").oninput = () => { T = D.t0 + (D.t1 - D.t0) * $("scrub").value / 1000;
 addEventListener("keydown", (e) => { if (e.code === "Space" && e.target.tagName !== "BUTTON") { e.preventDefault(); setPlay(!playing); } });
 fetch(REPLAY).then((r) => { if (!r.ok) throw r.status; return r.text(); }).then((txt) => {
 for (const ln of txt.split("\n")) if (ln.trim()) try { add(JSON.parse(ln)); } catch { }
-for (const a of [D.F, D.T, D.M, D.G]) a.sort((x, y) => x.t - y.t);
+for (const a of [D.F, D.T, D.M, D.G, D.Y]) a.sort((x, y) => x.t - y.t);
 const st = parseFloat(Q.get("t"));
 T = D.t0 + (isNaN(st) ? 0 : st);
 $("scrub").value = rd(1000 * (T - D.t0) / (D.t1 - D.t0 || 1));
