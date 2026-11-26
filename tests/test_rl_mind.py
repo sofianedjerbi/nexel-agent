@@ -72,6 +72,9 @@ def test_places_are_only_real_ones():
            "legend": {"~": "water", "T": "tree", ".": "grass", "@": "you"}}
     assert places(obs, {(5, -5): "mira's camp"}) == 'a sign "mira\'s camp" 7 tiles NE; your spawn point 20 tiles S; in sight: water, tree'
     assert places({"self": {"x": 0, "y": 0}, "grid": ["."], "legend": {".": "grass"}}, {}) == "none"
+    # (#24) the ore in the rock that shows, from observe's ores list, nearest first, each once (the ore block "*" is gone)
+    ores = [{"dx": 1, "dy": 0, "z": -2, "ore": "iron_ore"}, {"dx": 2, "dy": 0, "z": -2, "ore": "coal"}, {"dx": 3, "dy": 1, "z": -3, "ore": "iron_ore"}]
+    assert places({"self": {"x": 0, "y": 0}, "grid": ["M"], "legend": {"M": "rock"}, "ores": ores}, {}) == "in sight: rock, iron ore, coal"
 
 
 def test_chat_lines_go_before_thoughts(tmp_path):

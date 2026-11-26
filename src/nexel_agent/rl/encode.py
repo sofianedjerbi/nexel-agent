@@ -47,7 +47,10 @@ ACTIONS_V3 = 185                     # the actions an r28-r36 policy knew (their
 V3 = (BODY + len(ITEMS) + N_NEAR * (3 + len(KINDS)) + ACTIONS_V1 + SOCIAL_FLAGS + (ACTIONS_V2 - ACTIONS_V1) + GOAL + PEOPLE
       + (ACTIONS_V3 - ACTIONS_V2))
 DONE_ID = {a: i for i, a in enumerate(vocab.KNOWN)}        # done already, this life: what its own acts tell it (rl/achieve.py)
-VEC = V3 + len(vocab.KNOWN) + (N_ACTIONS - ACTIONS_V3)
+ACTIONS_V4 = 200                     # the actions an r57 policy knew (their slots before the pack's second block)
+V4 = V3 + len(vocab.KNOWN) + (ACTIONS_V4 - ACTIONS_V3)
+ITEMS_V2 = vocab.ITEMS_V2            # the pack's items that came after ITEMS (rl/vocab.py): their own block, at V4
+VEC = V4 + len(ITEMS_V2) + (N_ACTIONS - ACTIONS_V4)
 
 _GRID_LUT = np.zeros(128, np.uint8)
 for _ch, _i in CHAR_ID.items():
@@ -91,7 +94,10 @@ def encode(obs: dict, facing: str = "S", last_action: int = 0, last_ok: float = 
     o = BODY + len(ITEMS) + N_NEAR * (3 + len(KINDS))
     late = ACTIONS_V3 - ACTIONS_V2
     v[o + last_action if last_action < ACTIONS_V1 else o + SOCIAL_FLAGS + last_action if last_action < ACTIONS_V2
-      else V3 - late + last_action - ACTIONS_V2 if last_action < ACTIONS_V3 else VEC - N_ACTIONS + last_action] = 1
+      else V3 - late + last_action - ACTIONS_V2 if last_action < ACTIONS_V3
+      else V3 + len(vocab.KNOWN) + last_action - ACTIONS_V3 if last_action < ACTIONS_V4 else VEC - N_ACTIONS + last_action] = 1
+    for j, it in enumerate(ITEMS_V2):
+        v[V4 + j] = math.log1p(inv.get(it, 0)) / 3
     v[o + ACTIONS_V1:o + ACTIONS_V1 + SOCIAL_FLAGS] = social
     if people is not None:
         v[V3 - late - PEOPLE:V3 - late] = people
