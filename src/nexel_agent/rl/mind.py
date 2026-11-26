@@ -18,6 +18,7 @@ from nexel_worlds.tiles import RECIPES
 from .facts import Attack, Give, Say, counted, dist, events, named, needs, people, short
 from .actions import BLOCK_NAME
 from .agenda import Agenda
+from .building import BUILD, Building
 from .goals import KINDS, Goal, account, judge
 from .pursue import DROPS
 from . import home
@@ -31,12 +32,6 @@ GOALS_DOC = ("Goals: gather (an item), craft (an item), give (an item, to a pers
              "stay (with a person), help (a person, in a fight), avoid (a person), build (your home: the body lays "
              "it, walls, door, fire, bed, roof, from what you carry, making what it lacks), free (no goal). Change it "
              "whenever you see fit: a goal you leave before it is done is kept, set aside, in your facts")
-BUILD = "build your home"     # (the build goal: no goal kind the body knows, the mind's own - steer)
-BUILT = 5                    # a home built: the judge's v1 at 5 of its 6 checks or more (rl/judge.py CHECKS)
-LACKING = {"closed": "walls all round", "door": "a door", "roofed": "a roof", "lit": "a light", "bed": "a bed",
-           "room_enough": "room inside"}
-
-
 def item_name(s) -> str:
     """An item as the game spells it ("Stone Block" is stone_block)."""
     return str(s or "").strip().lower().replace(" ", "_")
@@ -46,7 +41,7 @@ def goal_text(g: Goal) -> str:
     return "" if g.kind == "free" else " ".join(str(p) for p in (g.kind, g.item, g.person and f"(with {g.person})") if p)
 
 
-class Mind:
+class Mind(Building):
     def __init__(self, name: str, persona: str, model_url: str, http, path: Path, now: Now | None = None):
         self.name, self.persona, self.url, self.http, self.path = name, persona, model_url, http, Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)      # (its notes, thoughts and timings go there)
@@ -72,18 +67,6 @@ class Mind:
         self.log = self.path.with_name("mind.jsonl")   # each thought: the facts it got, what it answered
         self.voice = None                                 # (rl/voice.py: the one model, chat lines first)
         self.stats = {"thoughts": 0, "said": 0, "errors": 0, "goals": {}}
-
-    def keep_home(self):
-        """The home the body chose (rl/build.py social.home), kept: at the start, the one it had last session is handed
-        back to a body that has none; after that it is the body's, kept as it is (dropped when the body gives it up)."""
-        s = self.social
-        if s is None:
-            return
-        if not self.home_back:
-            self.home_back = True
-            if s.home is None and self.home:
-                s.home = self.home
-        self.home = tuple(s.home) if s.home else None
 
     def see(self, obs: dict):
         """Something that happened to it (spoken to - unless the voice answers -, given, hit, an ally hit) thinks at once."""
@@ -133,46 +116,6 @@ class Mind:
             self.now.ask(self.name, g.person, g.item)
         return r
 
-    def steer(self, i: int, mask, hurt: float) -> int:
-        """The body's action, or build while the mind is building its home (the planner's call: goal 'build'): the
-        learned body has not learned to finish a hut (r51-r65), the build verb does it (rl/build.py). Hurt, the body
-        acts as it learned (a fight, a flight); build with nothing to lay ends the building, told in the next facts."""
-        from .actions import ACTIONS
-        b = next(k for k, a in enumerate(ACTIONS) if a[0] == "build")
-        if not self.building or hurt > 0:
-            return i
-        if mask is not None and not mask[b]:
-            self.stop_building("nothing more it can lay or make here now")
-            return i
-        return b
-
-    def stop_building(self, why: str):
-        """The building ends: told and tallied in the next facts, with how the home stands then (built)."""
-        self.building, self.build_end, self.ended = False, why, f"{BUILD}: {why}"
-
-    def stands(self) -> tuple:
-        """How its home stands, from the home's reading (rl/home.py reading: the judge's v1 on the observation, as the
-        home facts line says it): ("it stands at 4/6, lacking a roof", built: 5 of 6 or more)."""
-        r = self.home_read
-        if not self.home:
-            return "you have no home yet", False
-        if not r or r.get("far"):
-            return "your home is too far to see how it stands", False
-        v = r["verdict"]
-        lack = [LACKING.get(k, k.replace("_", " ")) for k in v["failed"]]
-        return f"it stands at {v['grade']}/{v['of']}" + (f", lacking {', '.join(lack)}" if lack else ", whole"), v["grade"] >= BUILT
-
-    def built(self):
-        """The building that ended since the last facts, graded: done when the home stands at 5 of 6 or more."""
-        if not self.build_end:
-            return
-        how, done = self.stands()
-        self.ended = f"{BUILD}: {how}; {self.build_end}"
-        tally = self.tried.setdefault(BUILD, [0, 0])
-        tally[0] += 1
-        tally[1] += done
-        self.build_end = ""
-
     def end(self, g: Goal, how: str, kept: bool = False):
         if g.promise:
             self.now.remember(g.person, "you kept a promise to them" if kept else "you broke a promise to them")
@@ -188,13 +131,6 @@ class Mind:
 
     def due(self) -> bool:
         return not self.busy and (self.salient or time.monotonic() - self.last >= THINK_S)
-
-    def home_needs(self, obs: dict) -> str:
-        """What its home still takes, for the aim "home": its lacks beyond the pack, or that it has not chosen one."""
-        if not self.home:
-            return "you have no home yet: find a flat spot and build"
-        lack = home.lacks(obs, self.home, self.social)
-        return f"it lacks {counted(lack)}" if lack else "you have all it takes"
 
     def facts(self, obs: dict) -> str:
         """What is happening now (rl/voice.py Now: the same text the words get, the pack in it), then the planner's own:
