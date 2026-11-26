@@ -126,6 +126,7 @@ def test_a_first_blow_is_one_swing_a_fight_back_goes_on():
     from nexel_agent.rl.core import split
     assert len(split(cmd)) == 1
     env.social.hit_me[f.a.name] = env.sim.tick                 # (it hit me just now)
+    env.social.began[f.a.name] = f.a.name                      # (and began it)
     cmd = to_command_for(env, "attack")
     assert cmd[1].get("fight") and len(split(cmd)) > 1
 
@@ -192,3 +193,18 @@ def test_attack_picks_a_slot():
            "entities": [{"id": 7, "kind": "agent", "dx": 1, "dy": 0}, {"id": 9, "kind": "agent", "dx": 2, "dy": 0}]}
     assert to_command(idx("attack"), obs, "S")[1]["target"] == 7
     assert to_command(idx("attack_1"), obs, "S")[1]["target"] == 9
+
+
+def test_no_fight_to_the_end_with_someone_it_struck_first():
+    """Live trial 8: it struck the visitor first, she hit back, and a fight to the end killed her, again and again.
+    A fight back goes on only at someone who began it; when it struck first, each blow is one choice."""
+    env = SimEnv(ep_ticks=10 ** 6, roam=0, rivals=0, shadow_pct=0)
+    env.reset(5)
+    f = neighbour_beside(env)
+    t = env.sim.tick
+    env.social.i_hit[f.a.name], env.social.began[f.a.name] = t - 5, env.a.name     # (it struck first)
+    env.social.hit_me[f.a.name] = t                                                # (she hit back)
+    cmd = to_command_for(env, "attack")
+    assert not cmd[1].get("fight")
+    env.social.began[f.a.name] = f.a.name                                          # (had she begun it: a fight back)
+    assert to_command_for(env, "attack")[1].get("fight")

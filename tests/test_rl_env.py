@@ -228,6 +228,7 @@ def test_one_attack_is_a_whole_fight():
     env.step(0)
     rv.a.x, rv.a.y, rv.a.z = a.x + 1, a.y, 99          # (right beside: in reach)
     env.social.hit_me[rv.a.name] = sim.tick            # (it has just hit the player)
+    env.social.began[rv.a.name] = rv.a.name            # (it began it: a fight back)
     env.obs = sim.observe(a)
     t0 = sim.tick
     env.step(idx("attack"))                            # one decision: swings till it falls (a fight back)

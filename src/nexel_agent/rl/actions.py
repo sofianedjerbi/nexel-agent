@@ -129,7 +129,9 @@ def to_command(i: int, obs: dict, facing: str, social=None, goal=None):
         else:
             e = ents[arg or 0] if len(ents) > (arg or 0) else None
         w = max((w for w in WEAPONS if inv.get(w)), key=lambda w: WEAPONS[w], default=None)
-        fight = arg == "back" or bool(e and social and e.get("kind") == "agent" and social.hit_me_lately(e.get("name"), obs["tick"]))
+        human = bool(e) and e.get("kind") == "agent"         # (a fight to the end: at a creature that hit it, or a
+        fight = bool(e) and ((arg == "back" and not human) or (human and social is not None     # person who struck
+                                                                and social.they_began(e.get("name"), obs["tick"])))    # first; it struck first: one blow - trial 8)
         return "attack", {"target": e["id"] if e else -1, **({"with": w} if w else {}), **({"fight": True} if fight else {})}
     if kind == "water":
         return "water", {"dir": facing, "with": "watering_can"}

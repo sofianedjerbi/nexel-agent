@@ -4,7 +4,7 @@ each per episode, a few in two hundred: never per message, nothing for talking m
 from it here."""
 
 from nexel_worlds.sim.constants import SAY_R, sec
-from .facts import Attack, Give, Say, events, named
+from .facts import Attack, Death, Give, Say, events, named
 
 ADDRESSED_S = sec(6)          # "answered someone": said something this soon after being spoken to
 TALK_GAP = sec(30)            # a chat cooldown, the same for every speaker: a line once spoken to, or 30 s after the last
@@ -28,6 +28,7 @@ class SocialMemory:
         self.my_last = -10 ** 9               # when I last said something
         self.last_hit = (None, None, -10 ** 9)   # who hit me last: (name, id, tick)
         self.home = None                      # (x, y) of the home's inside, once chosen (rl/build.py)
+        self.began: dict = {}                 # name: who struck the first blow of the incident with them
         self.where: dict = {}                 # each person: where I last saw them, (x, y, hp)
         self.words_tell = False               # live with a words model: it tells which lines are asks (rl/acts.py), not a name in them
 
@@ -47,10 +48,18 @@ class SocialMemory:
                     if not self.words_tell and (it := next(iter(named(ev.text, self.items)), None)):
                         self.asked, self.asked_by, self.asked_at = it, who, t     # (the sim's neighbours: their lines are asks)
                 case Attack(by=by, target=tgt) if tgt == self.me and by:
+                    if not self.lately(by, t):                       # (a new incident: they began it)
+                        self.began[by] = by
                     self.hit_me[by] = t
                     self.last_hit = (by, ev.id, t)                  # (a creature's blow says its id)
                 case Attack(by=by, target=tgt) if by == self.me and tgt:
+                    if not self.lately(tgt, t):                      # (a new incident: it began it)
+                        self.began[tgt] = self.me
                     self.i_hit[tgt] = t
+                case Death(name=who) if who and who != self.me:      # (a hitter who fell is dealt with: no blow back
+                    self.hit_me.pop(who, None)                       # at them when they come back - live trial 8: Rook
+                    if self.last_hit[0] == who:                      # killed Mira 5 times, each time she respawned)
+                        self.last_hit = (None, None, -10 ** 9)
                 case Give(src=who, to=to) if to == self.me and who:
                     self.got_from.add(who)
                     for k, n in ev.items.items():
@@ -74,6 +83,14 @@ class SocialMemory:
             out += [float(bool(name) and tick - self.hit_me.get(name, -10 ** 9) <= HIT_S),
                     float(bool(name) and tick - self.i_hit.get(name, -10 ** 9) <= HIT_S)]
         return out + [0.0] * (2 * n - len(out))
+
+    def lately(self, name, tick) -> bool:
+        """A blow between it and `name`, either way, HIT_S ago at most: an incident still on."""
+        return tick - max(self.hit_me.get(name, -10 ** 9), self.i_hit.get(name, -10 ** 9)) <= HIT_S
+
+    def they_began(self, name, tick) -> bool:
+        """`name` struck first in the incident still on (a fight back at them is defence, not a feud it began)."""
+        return self.lately(name, tick) and self.began.get(name) == name
 
     def hit_me_lately(self, name, tick) -> bool:
         return bool(name) and tick - self.hit_me.get(name, -10 ** 9) <= HIT_S
