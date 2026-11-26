@@ -8,7 +8,7 @@ import time
 from collections import Counter, deque
 from itertools import groupby
 
-from .facts import (HOSTILE, Attack, Craft, Give, Say, compass, counted, dist, events, ground, is_creature, named, pack,
+from .facts import (HOSTILE, Attack, Craft, Give, Say, compass, counted, dist, events, ground, named, pack,
                     people, plain, told)
 
 SIGHTS = ("water", "deep_water", "tree", "rock", "ore", "thicket", "berry_bush", "fruit_tree", "campfire", "workbench",
@@ -82,7 +82,7 @@ class Now:
             self.body.popleft()
 
     def remember(self, who, what: str, n=1, trust: str | None = None):
-        if who and who != self.name and not is_creature(who):     # (people only)
+        if who and who != self.name:                             # (people only: its callers name no creature)
             rel = self.relations.setdefault(who, {})
             rec = rel.setdefault("record", {})
             rec[what] = rec.get(what, 0) + n
@@ -109,11 +109,13 @@ class Now:
         me = self.name
         match ev:
             case Attack(by=a, target=tgt) if tgt == me:
-                self.remember(a, "hit you", trust="hit")
-                self.fought = t if is_creature(a) else self.fought
+                if ev.by_person:
+                    self.remember(a, "hit you", trust="hit")
+                self.fought = self.fought if ev.by_person else t
             case Attack(by=a, target=tgt) if a == me:
-                self.remember(tgt, "you hit them")
-            case Attack(by=a, target=tgt) if is_creature(tgt) and t - self.fought <= WINDOW_S:
+                if ev.on_person:
+                    self.remember(tgt, "you hit them")
+            case Attack(by=a) if ev.by_person and not ev.on_person and t - self.fought <= WINDOW_S:
                 self.remember(a, "fought a creature that was fighting you", trust="helped")
             case Give(src=src, to=to) if me in (src, to):
                 for i, (k, n) in enumerate(ev.items.items()):     # (a gift moves trust once, whatever it holds)

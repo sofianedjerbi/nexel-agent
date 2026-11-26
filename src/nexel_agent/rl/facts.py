@@ -42,9 +42,26 @@ def people(obs: dict) -> list:
 
 # ------------------------------------------------------------------ who, what
 
-def is_creature(name) -> bool:
-    """An event names a player by name, a creature as "a tusker" (its blow) or "tusker#12" (a blow on it)."""
-    return str(name).startswith("a ") or "#" in str(name)
+def kind_of(ref, name=None):
+    """What an event names, by its kind: "agent" for a person, else the creature's ("tusker"), from who it says did it
+    ({kind, id, name}, nexel-worlds#119). An event that names it only in words (the game before it: the agent's pin
+    31963d92) is read from them: a creature is "a tusker" (its blow) or "tusker#12" (a blow on it), a person by name."""
+    if ref:
+        return ref.get("kind")
+    if not name:
+        return None
+    name = str(name)
+    return name[2:] if name.startswith("a ") else name.split("#")[0] if "#" in name else "agent"
+
+
+def said(ref, blow: bool):
+    """Who an event names, in the words the game's events used: a person by name, a creature as "a tusker" when it
+    strikes, "tusker#12" when it is struck (the names every reader here keys on: rl/social.py, rl/folk.py)."""
+    if not ref:
+        return None
+    if ref.get("kind") == "agent":
+        return ref.get("name")
+    return f"a {ref.get('kind')}" if blow else f"{ref.get('kind')}#{ref.get('id')}"
 
 
 def plain(name) -> str:
@@ -124,6 +141,16 @@ class Attack(NamedTuple):
     weapon: str | None = None
     id: int | None = None              # a creature's blow says which creature
     tick: int | None = None
+    by_kind: str | None = None         # "agent" for a person, else the creature's kind (kind_of)
+    target_kind: str | None = None
+
+    @property
+    def by_person(self) -> bool:
+        return self.by_kind == "agent"
+
+    @property
+    def on_person(self) -> bool:
+        return self.target_kind == "agent"
 
 
 class Give(NamedTuple):
@@ -139,6 +166,7 @@ class Death(NamedTuple):
     tick: int | None = None
     at: tuple | None = None            # (the sim's own events only: where, and the pack that fell there)
     dropped: dict | None = None
+    code: str | None = None            # why, as the game files it: killed, bitten, burnt, fell, starvation, fire, admin, dev
 
 
 class Took(NamedTuple):                # (pick_up, the sim's own events: what was taken from the ground, where)
@@ -175,15 +203,23 @@ def _say(e):
     return Say(e.get("from"), str(e.get("text", "")), e.get("type") == "shout", e.get("tick"))
 
 
+def _attack(e):
+    """A blow: who struck whom by who/whom (nexel-worlds#119), else by the attacker/target words of an older game."""
+    who, whom = e.get("who"), e.get("whom")
+    by = said(who, True) if who else e.get("attacker")
+    target = said(whom, False) if whom else e.get("target")
+    return Attack(by, target, e.get("damage") or 0, e.get("weapon"), e.get("id"), e.get("tick"), kind_of(who, by), kind_of(whom, target))
+
+
 def _at(e):
     return (e["x"], e["y"]) if "x" in e and "y" in e else None
 
 
 PARSERS = {
     "say": _say, "shout": _say,
-    "attack": lambda e: Attack(e.get("attacker"), e.get("target"), e.get("damage") or 0, e.get("weapon"), e.get("id"), e.get("tick")),
+    "attack": lambda e: _attack(e),
     "give": lambda e: Give(e.get("from"), e.get("to"), dict(e.get("items") or {}), e.get("tick")),
-    "death": lambda e: Death(e.get("name"), e.get("cause"), e.get("tick"), _at(e), e.get("dropped")),
+    "death": lambda e: Death(e.get("name"), e.get("cause"), e.get("tick"), _at(e), e.get("dropped"), e.get("code")),
     "pick_up": lambda e: Took(e.get("name"), dict(e.get("items") or {}), e.get("tick"), _at(e)),
     "creature_died": lambda e: Fell(e.get("kind"), e.get("by"), e.get("id"), e.get("tick")),
     "craft": lambda e: Craft(e.get("name"), dict(e.get("made") or {}), e.get("tick")),

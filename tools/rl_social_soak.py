@@ -15,6 +15,7 @@ import time
 
 from websockets.asyncio.client import connect
 
+from nexel_agent.rl.facts import Attack, read
 from nexel_worlds.client import Client
 
 ASKS = {2: "wood", 7: "stone", 12: "berries", 17: "dirt", 22: "wood", 27: "stone"}
@@ -62,7 +63,7 @@ async def main():
                         if not log["refused_once"]:
                             log["refused_once"] = True
                             await mira.act("say", text="no, sorry, i need it")
-                elif e.get("type") == "attack" and e.get("attacker") == a.target and e.get("target") == "Mira":
+                elif (b := read(e)) and isinstance(b, Attack) and b.by == a.target and b.target == "Mira":
                     now = time.monotonic()
                     log["blows_on_mira"] += 1
                     if now - last_blow > 15 and now - mira_hit_it > 15:          # (a new incident, and she had not hit it)
