@@ -85,7 +85,7 @@ def test_refusals_the_obs_shows_are_masked():
 
 
 def test_it_sees_what_it_has_already_done():
-    from nexel_agent.rl.achieve import KNOWN
+    from nexel_agent.rl.vocab import KNOWN          # (the encoder's own, frozen numbering)
     from nexel_agent.rl.encode import DONE_ID, V3
     env = SimEnv(ep_ticks=10 ** 6, roam=0, rivals=0, folk=0)
     o = env.reset(5)
