@@ -108,3 +108,12 @@ def test_the_words_record_keeps_its_own_kind():
     v.write = logs.append
     asyncio.run(v.line([("Mira", "got wood?", time.monotonic())]))
     assert logs[-1]["kind"] == "reply" and logs[-1]["acts"] == ["ask wood"]
+
+
+def test_a_how_without_its_item_is_the_right_act_an_ask_without_it_is_not():
+    """(the body reads an ask's item, never a how's: the 30B labelled 'how workbench' as 'how')"""
+    rows = {r["id"]: r for r in run([case("how-workbench"), case("ask-wood")], FakeModel({
+        "how do you make a workbench": {"heard": ["how"], "say": "4 wood"},
+        "rook got any wood?": {"heard": ["ask"], "say": "sure", "promise": "wood 1"}}))}
+    assert rows["how-workbench"]["act"] is True and rows["ask-wood"]["act"] is False
+    assert B.score(case("how-workbench"), "4 wood", [("how", "plank")], None, False)["act"] is False     # (another item: wrong)

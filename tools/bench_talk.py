@@ -66,7 +66,10 @@ def score(case, said: str, labels: list, promise, false_deed: bool) -> dict:
     names = {NAME.lower()} | {w.lower() for w, _ in case["heard"]} | {n.lower() for n in case["near"]}
     words = said.split()
     caps = sum(ch.isupper() for w in words if w.strip(".,!?'").lower() not in names for ch in w)
-    out = {"act": label[0] in kinds and (item is None or label[1] == item),
+    # (an ask's or an offer's item is what the body acts on (rl/live.py on_heard); a how's is not read: "how" alone is
+    # right, a how naming another item is not. The 30B wrote "how" alone for 4 of the 6)
+    named = label[1] == item or (label[0] == "how" and label[1] is None)
+    out = {"act": label[0] in kinds and (item is None or named),
            "deed": not false_deed and not (said and case.get("must_not") and re.search(case["must_not"], said.lower())),
            "dump": kinds == ("pack",) or not pack_dump(said, PACK),
            "style": None if not said else len(words) <= MAX_WORDS and caps <= 1 and "!!" not in said,
