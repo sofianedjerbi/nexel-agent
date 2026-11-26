@@ -16,6 +16,8 @@ dependencies = [
 [project.optional-dependencies]
 # the shared local model server players.py starts (Apple Silicon)
 mlx = ["mlx-lm>=0.32.2; sys_platform == 'darwin' and platform_machine == 'arm64'"]
+# a build's renders with the game's own renderer (tools/render_build.py: Chrome, the installed one)
+render = ["playwright>=1.64.1"]
 
 [project.scripts]
 nexel-agent = "nexel_agent.rl.live:main"              # the AI player: the shipped body models/rook.npz
