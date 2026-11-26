@@ -47,20 +47,31 @@ def _at(obs, key, X, Y):
     return rows[gy][gx]
 
 
-def site(obs, ground_ch) -> tuple | None:
-    """The inside's top-left of the nearest spot in view where the whole hut stands on flat, open ground, clear of a
-    hill's rim (the game builds nothing next to lower ground, diagonals too: world.rim)."""
+def flat(obs, X, Y) -> bool:
+    """The hut whose inside's top-left is (X, Y) stands on one level, clear of a hill's rim: no lower tile beside it,
+    diagonals too (the game builds nothing there: world.rim). A pit dug in it since makes it no site."""
     from .actions import LEVEL
-    me, heights = obs["self"], obs.get("heights")
-    lv = LEVEL.get(_at(obs, "heights", me["x"], me["y"]), 0) if heights else None
+    if not obs.get("heights"):
+        return True                                          # (no relief in view at all)
+    lv = LEVEL.get(_at(obs, "heights", X + 1, Y + 1))
+    if lv is None:
+        return False
+    for dx in range(-2, W + 2):
+        for dy in range(-2, H + 2):
+            h = LEVEL.get(_at(obs, "heights", X + dx, Y + dy), -99)
+            if h < lv or (-1 <= dx <= W and -1 <= dy <= H and h != lv):
+                return False
+    return True
+
+
+def site(obs, ground_ch) -> tuple | None:
+    """The inside's top-left of the nearest spot in view where the whole hut stands on flat, open ground."""
+    me = obs["self"]
     best = None
     for oy in range(-VIEW_R + 2, VIEW_R - H - 1):
         for ox in range(-VIEW_R + 2, VIEW_R - W - 1):
             X, Y = me["x"] + ox, me["y"] + oy
-            if all(_at(obs, "grid", X + dx, Y + dy) in ground_ch | {"@"} for dx, dy, p in PLAN if p != "roof") and (
-                    lv is None or all(LEVEL.get(_at(obs, "heights", X + dx, Y + dy), -99) >= lv and
-                                      (abs(dx - 1) > 2 or abs(dy - 1) > 2 or LEVEL.get(_at(obs, "heights", X + dx, Y + dy)) == lv)
-                                      for dx in range(-2, W + 2) for dy in range(-2, H + 2))):
+            if all(_at(obs, "grid", X + dx, Y + dy) in ground_ch | {"@"} for dx, dy, p in PLAN if p != "roof") and flat(obs, X, Y):
                 d = math.hypot(ox + 1, oy + 1)
                 if best is None or d < best[0]:
                     best = (d, (X, Y))
@@ -93,6 +104,9 @@ def next_step(obs, social, *, ground_ch, tool_for, dirs):
             return next_step(obs, social, ground_ch=ground_ch, tool_for=tool_for, dirs=dirs)
         k = (VIEW_R - 1) / d
         return "move_to", {"x": me["x"] + round(dx * k), "y": me["y"] + round(dy * k)}
+    if not flat(obs, hx, hy):                                # (dug into since: the game would refuse it - another spot)
+        social.home = None
+        return next_step(obs, social, ground_ch=ground_ch, tool_for=tool_for, dirs=dirs) if site(obs, ground_ch) else None
     for dx, dy, piece in PLAN:                               # (the ground cleared first, as a player clears it:
         X, Y = hx + dx, hy + dy                              # a tree, a stump or a bush grown on the spot since)
         ch = _at(obs, "grid", X, Y)

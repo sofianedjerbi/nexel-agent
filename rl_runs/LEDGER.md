@@ -423,3 +423,5 @@ verdict: keep the shipped body (targets: score; 21 min)
 ## r57
 
 - From: r56 last, `--init`, home-kit starts 20%. Changed: a home is given up only past 64 tiles.
+- **Result (r57):** stopped at +930k: build picked 6-19 times an episode, huts started then refused: its own pits made
+  the spot a hill's rim (fixed in 333a161, a spot dug into is left). Rooms 23-31%, no house of 5 checks.

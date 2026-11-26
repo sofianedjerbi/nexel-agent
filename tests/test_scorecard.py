@@ -28,3 +28,17 @@ def test_rows_from_the_games_events():
     assert (r["distinct crafts"], r["repeat crafts %"], r["tools or weapons made"]) == (2, 33, 1)
     assert (r["first strikes on people / hour"], r["people killed"], r["gifts given"]) == (15.0, 1, 1)
     assert S.row(P["mira"])["first strikes on people / hour"] == 0
+
+
+def test_a_person_is_told_from_a_creature_by_kind():
+    """(#35) A creature's blow was named "a tusker", which has no #: it was counted a person who struck first. Who and
+    whom say the kind (nexel-worlds#119); a player named like a creature is a person."""
+    tusker, rook = {"kind": "tusker", "id": 7, "name": None}, {"kind": "agent", "id": 1, "name": "Rook"}
+    odd = {"kind": "agent", "id": 2, "name": "a_tusker"}
+    ev = [{"tick": 0, "type": "join", "name": "Rook"},
+          {"tick": 5, "type": "attack", "attacker": "a tusker", "target": "Rook", "damage": 1},                     # (an older game's words)
+          {"tick": 6, "type": "attack", "attacker": "a tusker", "target": "Rook", "who": tusker, "whom": rook},
+          {"tick": 7, "type": "attack", "attacker": "a_tusker", "target": "Rook", "who": odd, "whom": rook},
+          {"tick": 8, "type": "death", "name": "Rook", "by": "a_tusker", "code": "killed", "who": odd}]
+    P = S.players(ev)
+    assert "a tusker" not in P and P["a_tusker"]["first_strikes"] == 1 and P["a_tusker"]["people_killed"] == 1
