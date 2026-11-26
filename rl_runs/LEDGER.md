@@ -411,3 +411,9 @@ verdict: keep the shipped body (targets: score; 21 min)
 
 - From: r54 last, `--init`, home-kit starts 20%. Changed: one build pick lays every piece the pack holds (a hut from
   a stocked pack is 4 picks, ~17 reward).
+- **Result (r55):** stopped at +480k: build picked 4-5 times an episode, but a pick only walked to the middle, and the
+  next one came hundreds of decisions later.
+
+## r56
+
+- From: r55 last, `--init`, home-kit starts 20%. Changed: one build pick walks to the middle and lays all it can.
