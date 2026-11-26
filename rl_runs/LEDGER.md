@@ -431,3 +431,9 @@ verdict: keep the shipped body (targets: score; 21 min)
 - From: r57 last, `--init` (the input grows 669 -> 688 at its end: the ores, ingots and tool tiers, #36).
 - With: a spot dug into is left (333a161), one build pick walks and lays all, the pieces paid, home-kit starts 20%.
 - Target: a house of 5 checks or more (builds_5) above 0.
+- **Result (r58):** build picked 11-89 times an episode (new high); a pick laid 28 pieces, but its kit lacked the door:
+  a ring with a gap, an errand, a new spot past FAR. Stopped at +480k.
+
+## r59
+
+- From: r58 last, `--init`, on the new pin (nexel-worlds 4f94113c). Changed: a kit is short only of roof, bed or fire.
