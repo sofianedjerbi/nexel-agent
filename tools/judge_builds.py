@@ -9,6 +9,7 @@ It reads a COPY of a save, never the live game's own file (it writes there), and
     python tools/judge_builds.py /tmp/copy/world.sqlite [--events <its events.jsonl> --who Rook]"""
 
 import argparse
+import contextlib
 import json
 import sqlite3
 import tempfile
@@ -58,12 +59,8 @@ def judged(db: Path, events: Path | None = None, who: str | None = None) -> list
     """Every closed room of the save, judged: {"at", "by": who or PLAYERS, "v1", "v2", "v3" (grades), "of" (each's
     checks), the failed checks of each, the facts}. On a copy of `db` (opening a world may write to it)."""
     mine = placed_by(events, who) if events and who else set()
-    seed = dict(sqlite3.connect(f"file:{db}?mode=ro", uri=True).execute("select key, value from meta")).get("seed", 12)
-    with tempfile.TemporaryDirectory() as tmp:
-        copy = Path(tmp) / "world.sqlite"
-        with sqlite3.connect(f"file:{db}?mode=ro", uri=True) as a, sqlite3.connect(copy) as b:
-            a.backup(b)
-        sim, rows = Simulation(copy, seed=int(seed), event_log=Path(tmp) / "events.jsonl"), []
+    with opened(db) as (sim, copy):
+        rows = []
         for x, y in homes(sim, copy):
             v1, v2, v3 = judge.verdict(sim.world, x, y), judge.sense(sim.world, x, y), judge.looks(sim.world, x, y)
             walls = {n for p in judge.inside(sim.world, x, y) for n in judge._beside(p)}
@@ -72,6 +69,51 @@ def judged(db: Path, events: Path | None = None, who: str | None = None) -> list
                          "v1_failed": v1["failed"], "v2_failed": v2["failed"], "v3_failed": v3["failed"],
                          "facts": v2["facts"], "looks": v3["facts"]})
     return rows
+
+
+@contextlib.contextmanager
+def opened(db: Path):
+    """The save as a sim, on a copy of it (opening a world may write to it): -> (sim, the copy's path)."""
+    seed = dict(sqlite3.connect(f"file:{db}?mode=ro", uri=True).execute("select key, value from meta")).get("seed", 12)
+    with tempfile.TemporaryDirectory() as tmp:
+        copy = Path(tmp) / "world.sqlite"
+        with sqlite3.connect(f"file:{db}?mode=ro", uri=True) as a, sqlite3.connect(copy) as b:
+            a.backup(b)
+        yield Simulation(copy, seed=int(seed), event_log=Path(tmp) / "events.jsonl"), copy
+
+
+def its_home(run_dir: Path, who: str) -> dict:
+    """The player's own home (the mind's memory.json home, rl/mind.py) on a live scorecard's QA copy, judged where the
+    mind reads it (rl/home.py reading): {"at", "v1", "v2", "v3", "of", "v1_failed"}, {"at": None} with none chosen;
+    and the share of its decisions that were builds the mind steered (rl.jsonl's "steered", rl/live.py)."""
+    logs = run_dir / who
+    try:
+        at = json.loads((logs / "memory.json").read_text()).get("home")
+    except (OSError, ValueError):
+        at = None
+    acts = []
+    if (logs / "rl.jsonl").exists():
+        acts = [d for ln in (logs / "rl.jsonl").read_text().splitlines() if ln.strip() and "act" in (d := json.loads(ln))]
+    row = {"at": at, "decisions": len(acts), "steered": sum(bool(d.get("steered")) for d in acts)}
+    if at:
+        with opened(run_dir / "saves" / "qa" / "world.sqlite") as (sim, _):
+            v = [f(sim.world, *at) for f in (judge.verdict, judge.sense, judge.looks)]
+        row.update(v1=v[0]["grade"], v2=v[1]["grade"], v3=v[2]["grade"], of=[x["of"] for x in v], v1_failed=v[0]["failed"])
+    return row
+
+
+def home_table(h: dict, who: str) -> str:
+    """Its home as a scorecard row: where, v1/v2/v3, what v1 finds missing, and the share of steered builds."""
+    share = f"{h['steered']} of {h['decisions']} ({h['steered'] / h['decisions']:.0%})" if h["decisions"] else "-"
+    out = ["", f"| {who}'s home (memory.json) | at | v1 (works) | v2 (makes sense) | v3 (looks) | v1 lacks | steered builds |",
+           "|---|---|---|---|---|---|---|"]
+    if not h["at"]:
+        out.append(f"| none chosen | - | - | - | - | - | {share} |")
+    else:
+        lacks = ", ".join(h["v1_failed"]) or "-"
+        out.append(f"| {who} | {h['at'][0]}, {h['at'][1]} | {h['v1']}/{h['of'][0]} | {h['v2']}/{h['of'][1]} | "
+                   f"{h['v3']}/{h['of'][2]} | {lacks} | {share} |")
+    return "\n".join(out) + "\n"
 
 
 def tiles(world, inside: set, pad: int = 2) -> dict:

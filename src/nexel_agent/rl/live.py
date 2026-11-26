@@ -223,6 +223,7 @@ class LiveBody:
                 mask = legal(obs, self.facing, self.social, goal) if self.a.mask else None
                 i = self.pol.act(enc, self.rng, mask) if not self.mind else self.mind.steer(self.pol.act(enc, self.rng, mask), mask, self.hurt)
                 kind = ACTIONS[i][0]
+                steered = bool(self.mind and self.mind.building and kind == "build")    # (the mind's build: rl/mind.py steer)
                 if self.hurt > 0:
                     self.reactions[kind] = self.reactions.get(kind, 0) + 1
                 if kind in ("step", "jump", "dig", "dig_at", "climb") and ACTIONS[i][1]:
@@ -250,7 +251,8 @@ class LiveBody:
                 if self.log:                 # (each decision: where, what, how hurt; a full report each minute)
                     s = obs["self"]
                     self.log.write(json.dumps({"t": round(time.time(), 2), "pos": [s["x"], s["y"]], "hp": s["hp"],
-                                               "act": action_name(i), "hurt": self.hurt}) + "\n")
+                                               "act": action_name(i), "hurt": self.hurt,
+                                               **({"steered": True} if steered else {})}) + "\n")
                     if time.monotonic() - t_report > 60:
                         t_report = time.monotonic()
                         self.log.write(json.dumps(self.report(s, action_name(i))) + "\n")
