@@ -511,3 +511,9 @@ verdict: keep the shipped body (targets: rooms, build_grade; 22 min)
   game, targets rooms and build_grade): build grade better (lush 0.50 -> 0.80), tools better on both sets, rooms 30% ->
   43% (same by the interval), repeat crafts better (live-like), failed actions worse (live-like 16.2 -> 18.5%). No house
   of 5 checks yet. **Shipped** for its builds and tools.
+
+## r64
+
+- From: r63 last (shipped), `--init`. Changed: the sim's neighbours are a mixture (#51: 40% quiet like the save's
+  people, 3% rough, the rest social); a home with pieces standing is kept (c60b64a). Home starts 20%.
+- Watch: first strikes and help fights (the rough neighbours change the fight mix), builds_5.
