@@ -116,5 +116,21 @@ def next_step(obs, social, *, ground_ch, tool_for, dirs):
             continue
         if (me["x"], me["y"]) != (cx, cy):
             return "move_to", {"x": cx, "y": cy}
-        return "place", {"item": item, "x": X, "y": Y}
+        return "ring", {"pieces": _run(obs, hx, hy, ground_ch, inv)}     # (all it can lay now, one after the other)
     return None
+
+
+def _run(obs, hx, hy, ground_ch, inv) -> list:
+    """The pieces it can lay now from the middle, in the plan's order, as far as the pack goes: [(x, y, item)]. One
+    pick of build lays them all (rl/verbs.py split, as ring does), so a pick pays for what it builds."""
+    left, out = dict(inv), []
+    for dx, dy, piece in PLAN:
+        X, Y = hx + dx, hy + dy
+        if laid(obs, X, Y, piece) or (piece != "roof" and _at(obs, "grid", X, Y) not in ground_ch):
+            continue
+        item = max((w for w in WALLS if left.get(w)), key=left.get, default=None) if piece == "wall" else piece if left.get(piece) else None
+        if item is None:
+            continue
+        left[item] -= 1
+        out.append((X, Y, item))
+    return out
