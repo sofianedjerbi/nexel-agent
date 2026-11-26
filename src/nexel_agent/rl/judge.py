@@ -9,11 +9,12 @@ from collections import Counter
 
 from nexel_worlds.sim.core import Simulation
 from nexel_worlds.sim.wild import LIGHT, LIGHT_R
-from nexel_worlds.tiles import BLOCKS, DIRS
+from nexel_worlds.tiles import BLOCKS, DIRS, GROUNDS
 
 ENCLOSE = Simulation.ENCLOSE
 CAP, SIDE, COMPACT = 160, 14, 0.6           # (as the game's sheltered: past CAP tiles it is open land; a room's box)
 _SOLID = {b.name: b.solid for b in BLOCKS}
+_WALK = {g.name: g.walkable for g in GROUNDS}
 
 ROOFED = 0.9                # of the inside under a roof
 AREA = 4                    # tiles inside, at least: room to stand, sleep and turn round
@@ -83,6 +84,68 @@ def told(v: dict) -> str:
              "lit" if ch["lit"] else "no light", "a bed" if ch["bed"] else "no bed",
              f"{r['area']} tiles inside"]
     return ", ".join(parts) + f" (grade {v['grade']} of {v['of']})"
+
+
+# ---- v2 (#31): does it make sense? A home's core things, laid out to be used, of a size for one, kept for its purpose.
+# Its own checks beside v1's (verdict, which the reward reads: rl/core.py, Potential), on the same report.
+STATIONS = ("workbench", "campfire")       # to make things at: in the home or by its door
+SEATS = ("table", "chair")
+CORE = ("bed", "chest", *LIGHT, *STATIONS, *SEATS)
+FIT = (6, 40)               # tiles inside for one person: more than a box to stand in, less than a hall
+NEAR = 3                    # tiles: a station by the door, a light by the bed
+SENSE = ("chest", "station", "seat", "reachable", "door_out", "fit", "tidy", "light_by_bed")
+
+
+def walkable(world, x, y) -> bool:
+    """A tile you can stand on: ground you walk on (not water) and nothing solid on it."""
+    return _WALK.get(world.ground(x, y), False) and not _SOLID.get(world.block(x, y), True)
+
+
+def sense(world, x, y) -> dict:
+    """The build around (x, y), v2: {"grade", "of", "checks": {name: bool}, "failed": [names], "facts"}. facts: the
+    core things inside, counted ("core"), the doors, which core things no path from a door reaches ("unreached"),
+    the doors that open onto no walkable ground ("shut_doors"), the tiles where land stands in the room over its floor
+    ("stray": a block of earth or stone put down, landblocks.py: it raises the land)."""
+    tiles = inside(world, x, y)
+    r = report(world, x, y)
+    if not r["closed"]:
+        checks = dict.fromkeys(SENSE, False)
+        return {"grade": 0, "of": len(SENSE), "checks": checks, "failed": list(SENSE), "facts": {"closed": False}}
+    at = {p: world.block(*p) for p in tiles}
+    doors = sorted(n for cx, cy in tiles for dx, dy in DIRS.values()
+                   if (n := (cx + dx, cy + dy)) not in tiles and not _SOLID.get(world.block(*n), True))
+    things = {p: b for p, b in at.items() if b in CORE}
+    # on foot from a door: through the inside's walkable tiles; a thing is reached from a tile beside it
+    walked, stack = set(), [n for d in doors for n in _beside(d) if n in tiles and walkable(world, *n)]
+    while stack:
+        p = stack.pop()
+        if p not in walked:
+            walked.add(p)
+            stack += [n for n in _beside(p) if n in tiles and n not in walked and walkable(world, *n)]
+    unreached = sorted({b for p, b in things.items() if not any(n in walked for n in _beside(p))})
+    outside = lambda d: [n for n in _beside(d) if n not in tiles and n not in doors]           # noqa: E731
+    shut = [d for d in doors if not any(walkable(world, *n) for n in outside(d))]
+    near_door = {world.block(d[0] + i, d[1] + j) for d in doors for i in range(-NEAR, NEAR + 1) for j in range(-NEAR, NEAR + 1)}
+    beds = [p for p, b in at.items() if b == "bed"]
+    lit_bed = any(world.block(bx + i, by + j) in LIGHT for bx, by in beds for i in range(-NEAR, NEAR + 1) for j in range(-NEAR, NEAR + 1))
+    core = dict(Counter(b for b in things.values()))
+    floor = Counter(world.level(*p) for p in tiles).most_common(1)[0][0]
+    stray = sorted(p for p in tiles if world.level(*p) > floor)
+    checks = {"chest": core.get("chest", 0) > 0,
+              "station": any(core.get(k) for k in STATIONS) or bool(near_door & set(STATIONS)),
+              "seat": any(core.get(k) for k in SEATS),
+              "reachable": bool(doors) and not unreached,          # (nothing in it: nothing out of reach; the lack is chest's, seat's)
+              "door_out": bool(doors) and not shut,
+              "fit": FIT[0] <= r["area"] <= FIT[1],
+              "tidy": not stray,
+              "light_by_bed": lit_bed}
+    return {"grade": sum(checks.values()), "of": len(SENSE), "checks": checks, "failed": [k for k in SENSE if not checks[k]],
+            "facts": {"closed": True, "area": r["area"], "core": core, "doors": doors, "unreached": unreached,
+                      "shut_doors": shut, "stray": stray}}
+
+
+def _beside(p):
+    return [(p[0] + dx, p[1] + dy) for dx, dy in DIRS.values()]
 
 
 def laid(world, home) -> int:
