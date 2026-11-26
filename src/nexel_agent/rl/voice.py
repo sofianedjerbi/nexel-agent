@@ -169,10 +169,11 @@ class Voice:
         of its own and it was not spoken to since its last one and OPEN_S has not passed, or when it said it just now;
         else sent (the game's result)."""
         line, t = (line or "").strip(), time.monotonic()
-        if reply and t - self.last_said < GAP_S:             # (an answer waits its turn; a line of its own is dropped)
+        spoken_to = reply and self.heard_at > self.last_said       # (an answer to what was said since its last line goes at once, #11)
+        if reply and not spoken_to and t - self.last_said < GAP_S:      # (another answer waits its turn; a line of its own is dropped)
             await asyncio.sleep(GAP_S - (t - self.last_said))
             t = time.monotonic()
-        if not line or self.out is None or t - self.last_said < GAP_S:
+        if not line or self.out is None or (t - self.last_said < GAP_S and not spoken_to):
             return None
         if not reply and t - self.last_said < OPEN_S and self.heard_at <= self.last_said:
             return None

@@ -8,12 +8,13 @@ import time
 from collections import Counter, deque
 from itertools import groupby
 
-from .facts import (HOSTILE, Attack, Craft, Give, Say, compass, counted, dist, events, ground, named, pack,
+from .facts import (HOSTILE, PILE_KINDS, Attack, Craft, Give, Say, compass, counted, dist, events, ground, most, named, pack,
                     people, plain, told)
 
 SIGHTS = ("water", "deep_water", "tree", "rock", "thicket", "berry_bush", "fruit_tree", "campfire", "workbench",
           "bed", "door", "chest", "well", "cave_floor", "hole", "ladder", "stone_wall", "wood_wall", "fence")
 WINDOW_S = 30.0                       # "lately": what it saw in the last 30 s; an ask not met in that time was not met
+NEAR_KINDS, PILES = 4, 3              # the kinds of creature (the nearest first) and the piles on the ground "Near you" names (#11)
 # Trust in a person, in [-1, 1], from what they did (never from what they said): a gift, standing by it in a fight,
 # a blow, an ask of its they let pass. It fades toward nothing, by half every TRUST_HALF_S (real time: across sessions).
 TRUST = {"gave": 0.15, "helped": 0.3, "hit": -0.4, "let_pass": -0.1}
@@ -179,14 +180,17 @@ class Now:
                + (f". {obs['time']}." if obs.get("time") else "."), f"You carry {pack(obs)}."]
         beings = sorted(obs.get("entities", []), key=dist)
         near = []
-        for kind in dict.fromkeys(b["kind"] for b in beings if b.get("kind") != "agent"):
+        kinds = list(dict.fromkeys(b["kind"] for b in beings if b.get("kind") != "agent"))      # (nearest kind first)
+        for kind in kinds[:NEAR_KINDS]:
             d = [round(dist(b)) for b in beings if b["kind"] == kind]
             near.append(f"{len(d)} {kind}{' (foe)' if kind in HOSTILE else ''} {d[0]}" + (f"-{d[-1]}" if d[-1] != d[0] else "")
                         + " tiles away")
         for b in people(obs):
             near.append(f"{b.get('name')} {compass(b['dx'], b['dy'])}, health {b.get('hp')}, holding {b.get('holding') or 'nothing'}, "
                         f"doing: {b.get('doing') or 'idle'} (so far: {self.person(b.get('name'))})")
-        near += [f"{counted(items)} on the ground {compass(dx, dy)}" for dx, dy, items in ground(obs)[:5]]
+        if len(kinds) > NEAR_KINDS:
+            near.append(f"{len(kinds) - NEAR_KINDS} more kinds of creature further")
+        near += [f"{most(items, PILE_KINDS)} on the ground {compass(dx, dy)}" for dx, dy, items in ground(obs)[:PILES]]
         out.append("Near you: " + ("; ".join(near) if near else "nobody, no creature, nothing on the ground") + ".")
         seen = Counter(p for _, e in self.past if (p := self.event(e)))
         if seen:
