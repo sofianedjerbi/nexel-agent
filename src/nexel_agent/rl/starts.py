@@ -50,14 +50,15 @@ def near_a_tool(sim, a, rng):
 
 def with_a_home_kit(sim, a, rng):
     """The pieces of a home in the pack (a player who came back with them): the walls, a door, a bed, a fire, the
-    roof (rl/build.py's hut), now and then one kind short or lacking, so it makes or fetches the rest."""
+    roof (rl/build.py's hut), now and then short of the roof, the bed or the fire, so it makes or fetches the rest. Never
+    of a wall or the door: r58 laid 28 pieces round a gap and left to make the door, and the room never closed."""
     from .build import PLAN
     kit = {}
     for _, _, piece in PLAN:
         item = rng.choice(("stone_wall", "wood_wall")) if piece == "wall" else piece
         kit[item] = kit.get(item, 0) + 1
-    if rng.random() < 0.5:
-        short = rng.choice(sorted(kit))
+    if rng.random() < 0.5:                               # (short of what a room stands without: the walls and the
+        short = rng.choice(sorted(k for k in kit if k in ("roof", "bed", "campfire")))      # door close it)
         kit[short] = max(0, kit[short] - rng.randint(1, kit[short]))
     for k, n in kit.items():
         if n:
