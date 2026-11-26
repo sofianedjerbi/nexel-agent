@@ -27,6 +27,8 @@ from .verbs import FIGHT, split  # noqa: F401 (rl/live.py imports split from her
 DECIDE = 5                          # ticks: an idle noop waits this long
 MIN_TICKS = 2                       # the shortest a decision waits (0.2 s: a step), unless hurt
 WAIT_MAX = 50                       # and the longest (a chop by hand takes ~5 s)
+WAIT_LAY = 400                      # a run of pieces laid (ring, build) goes on to its end, as live: one choice (r60 lost
+#                                     27-piece runs to the next decision after 5 s)
 START = 0.3                         # the time of day an episode starts (morning)
 EP_TICKS = int(2.75 * DAY_TICKS)    # three days and nights: to the third dawn, and a little more
 HURT = 0.1                          # reward lost per half heart lost (healing does not pay it back)
@@ -118,7 +120,7 @@ class SimEnv:
         # (When the next decision comes, only: being hurt or someone coming into view never chooses what to do; the
         # policy does, and it may well go on with the same action.)
         seen = self.in_view()
-        for t in range(WAIT_MAX):
+        for t in range(WAIT_LAY if cmd is not None and cmd[0] == "ring" else WAIT_MAX):
             sim.step()
             if self.rival:
                 self.rival.tick()
@@ -141,7 +143,7 @@ class SimEnv:
                 continue
             if t + 1 >= MIN_TICKS and (act.result is not None if act is not None else not busy and t + 1 >= self.decide):
                 break                                   # what it was doing is done (or, idle, 0.5 s went by)
-            if t % 5 == 4 and self.in_view() - seen:
+            if t % 5 == 4 and not self.then and self.in_view() - seen:
                 break                                   # someone came into view
         r, made = 0.0, {}
         self.last_ok = 0.0
