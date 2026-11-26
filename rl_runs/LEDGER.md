@@ -517,3 +517,49 @@ verdict: keep the shipped body (targets: rooms, build_grade; 22 min)
 - From: r63 last (shipped), `--init`. Changed: the sim's neighbours are a mixture (#51: 40% quiet like the save's
   people, 3% rough, the rest social); a home with pieces standing is kept (c60b64a). Home starts 20%.
 - Watch: first strikes and help fights (the rough neighbours change the fight mix), builds_5.
+
+## gate 2026-11-26 16:21: rl_runs/r64/best.zip vs rl_runs/r63/last.zip
+
+| 4 passes | r63/last.zip | r64/best.zip | |
+|---|---|---|---|
+| lush score | 5.945 ± 0.189 | 6.369 ± 0.166 | better |
+| lush deaths | 0.750 ± 0.795 | 0.250 ± 0.795 | same |
+| lush fs_per_near_min | 0.003 ± 0.007 | 0.001 ± 0.004 | same |
+| lush crafts_distinct | 23.960 ± 0.334 | 25.610 ± 0.542 | better |
+| lush repeat_crafts | 0.755 ± 0.009 | 0.760 ± 0.000 | same |
+| lush fail_pct | 19.725 ± 1.791 | 18.175 ± 0.983 | same |
+| lush tools_made | 1.397 ± 0.142 | 1.557 ± 0.125 | same |
+| lush rooms | 0.363 ± 0.099 | 0.547 ± 0.132 | better |
+| lush build_grade | 0.610 ± 0.211 | 1.008 ± 0.303 | better |
+| lush builds_5 | 0.000 ± 0.000 | 0.000 ± 0.000 | same |
+| lush goals_done | 0.594 ± 0.020 | 0.570 ± 0.060 | same |
+| lush goal_gather | 0.668 ± 0.053 | 0.578 ± 0.133 | same |
+| lush goal_craft | 0.781 ± 0.059 | 0.740 ± 0.082 | same |
+| lush goal_give | 0.952 ± 0.096 | 0.947 ± 0.109 | same |
+| lush goal_ask | 0.682 ± 0.078 | 0.662 ± 0.229 | same |
+| lush goal_stay | 0.584 ± 0.074 | 0.549 ± 0.124 | same |
+| lush goal_help | 0.427 ± 0.049 | 0.449 ± 0.041 | same |
+| lush goal_avoid | 0.314 ± 0.160 | 0.267 ± 0.144 | same |
+| live-like score | 6.082 ± 0.348 | 6.615 ± 0.341 | better |
+| live-like deaths | 0.250 ± 0.795 | 0.000 ± 0.000 | same |
+| live-like fs_per_near_min | 0.002 ± 0.007 | 0.004 ± 0.014 | same |
+| live-like crafts_distinct | 24.240 ± 1.430 | 27.262 ± 0.414 | better |
+| live-like repeat_crafts | 0.738 ± 0.015 | 0.745 ± 0.016 | same |
+| live-like fail_pct | 18.425 ± 1.724 | 17.225 ± 1.629 | same |
+| live-like tools_made | 1.157 ± 0.432 | 1.492 ± 0.333 | same |
+| live-like rooms | 0.292 ± 0.194 | 0.570 ± 0.032 | better |
+| live-like build_grade | 0.490 ± 0.329 | 1.070 ± 0.032 | better |
+| live-like builds_5 | 0.000 ± 0.000 | 0.000 ± 0.000 | same |
+| live-like goals_done | 0.551 ± 0.054 | 0.579 ± 0.063 | same |
+| live-like goal_gather | 0.673 ± 0.202 | 0.832 ± 0.124 | same |
+| live-like goal_craft | 0.793 ± 0.113 | 0.793 ± 0.112 | same |
+| live-like goal_give | 0.975 ± 0.079 | 0.958 ± 0.133 | same |
+| live-like goal_ask | 0.707 ± 0.393 | 0.717 ± 0.400 | same |
+| live-like goal_stay | 0.619 ± 0.132 | 0.561 ± 0.256 | same |
+| live-like goal_help | 0.403 ± 0.102 | 0.393 ± 0.115 | same |
+| live-like goal_avoid | 0.146 ± 0.172 | 0.272 ± 0.242 | same |
+
+verdict: SHIP (targets: score, rooms; 21 min)
+- **Result (r64):** gate against r63 (targets score, rooms): SHIP. Score better on both sets (lush 5.95 -> 6.37,
+  live-like 6.08 -> 6.62), rooms better (36% -> 55%, 29% -> 57%), build grade better (0.61 -> 1.01, 0.49 -> 1.07), no
+  guard worse. No house of 5 checks yet. **Shipped.**
