@@ -18,7 +18,10 @@ Body, in the sim (held-out worlds; from train.py's checks):
 - builds_5: the share of episodes whose best build passes 5 of the 6 checks or more - higher (#25)
 Live (a QA copy, with the scripted visitors; tools/scorecard.py), beside the real people of the world:
 - lines_min, reply_p90_s, fs_hour (first strikes on people an hour), repeat_crafts_pct, tools_made, fail_pct,
-  asks_met (the visitor's asks it met)."""
+  asks_met (the visitor's asks it met).
+- builds_judged, best_grade, best_sense, best_looks: its closed rooms on the QA copy at the end, and the best of
+  each judge's grades (rl/judge.py: v1 verdict, v2 sense, v3 looks; tools/judge_builds.py) - higher (#27). The same
+  of the real players' rooms in the copy, the reference beside it."""
 
 import json
 import re
@@ -30,6 +33,7 @@ ROOT = Path(__file__).resolve().parents[1]
 ROWS, PAGE = ROOT / "docs" / "kpis.jsonl", ROOT / "docs" / "kpis.md"
 SIM = ("score", "deaths", "fs_near_min", "goals_done", "tools", "repeat_crafts", "rooms", "build_grade", "builds_5", "fail_pct")
 LIVE = ("lines_min", "reply_p90_s", "fs_hour", "repeat_crafts_pct", "tools_made", "fail_pct", "asks_met")
+BUILDS = ("builds_judged", "best_grade", "best_sense", "best_looks")
 LOWER = {"deaths", "fs_near_min", "repeat_crafts", "fail_pct", "fs_hour", "repeat_crafts_pct", "reply_p90_s"}
 
 
@@ -77,10 +81,15 @@ def live_row(run_dir: Path) -> dict:
         met = f"{sum(a.get('got') is not None for a in asks)}/{len(asks)}"
     except (OSError, ValueError):
         met = None
+    import judge_builds as J
+    rows = J.builds(run_dir, who)
+    mine, players = J.summary(rows, who), J.summary(rows, J.PLAYERS)
+    build = {**{k: mine[s] for k, s in zip(BUILDS, ("builds", "best_grade", "best_sense", "best_looks"))},
+             **{"players_" + k: players[s] for k, s in zip(BUILDS, ("builds", "best_grade", "best_sense", "best_looks"))}}
     return {"kind": "live", "run": run_dir.name, "who": who, "model": "words" if (run_dir / who / "latency.jsonl").exists() else "silent",
             "minutes": r.get("active min"), "lines_min": r.get("lines / min"), "reply_p90_s": own.get("heard to sent s (p90)"),
             "fs_hour": r.get("first strikes on people / hour"), "repeat_crafts_pct": r.get("repeat crafts %"),
-            "tools_made": r.get("tools or weapons made"), "fail_pct": own.get("failed actions %"), "asks_met": met}
+            "tools_made": r.get("tools or weapons made"), "fail_pct": own.get("failed actions %"), "asks_met": met, **build}
 
 
 def load() -> list:
@@ -108,6 +117,11 @@ def show(rows: list) -> str:
     out += ["## Live (QA copy, scripted visitors)", "", "| run | words | min | " + " | ".join(
         f"{k} {'↓' if k in LOWER else '↑'}" for k in LIVE) + " |", "|---|---|---|" + "---|" * len(LIVE)]
     out += [f"| {r['run']} | {r['model']} | {cell(r['minutes'])} | " + " | ".join(cell(r.get(k)) for k in LIVE) + " |" for r in live]
+    out += ["", "## Live builds: its closed rooms, beside the real players' in the same copy", "",
+            "| run | " + " | ".join(f"{k} ↑" for k in BUILDS) + " | " + " | ".join(f"players' {k}" for k in BUILDS) + " |",
+            "|---|" + "---|" * (2 * len(BUILDS))]
+    out += [f"| {r['run']} | " + " | ".join(cell(r.get(k)) for k in BUILDS) + " | " + " | ".join(cell(r.get("players_" + k)) for k in BUILDS) + " |"
+            for r in live if "builds_judged" in r]
     return "\n".join(out) + "\n"
 
 

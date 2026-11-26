@@ -98,7 +98,9 @@ def main():
                 p.kill()
     card = subprocess.run([py, str(ROOT / "tools" / "scorecard.py"), "--events", str(world / "events.jsonl"), "--who", a.name,
                            "--logs", str(logs), "--humans", str(src / "events.jsonl")], capture_output=True, text=True)
-    text = card.stdout + card.stderr + visited(out / "visitor.json")
+    sys.path.insert(0, str(ROOT / "tools"))
+    import judge_builds                                     # (every closed room of the copy: its own, the real players')
+    text = card.stdout + card.stderr + visited(out / "visitor.json") + judge_builds.table(judge_builds.builds(out, a.name), a.name)
     (out / "scorecard.md").write_text(text)
     subprocess.run([py, str(ROOT / "tools" / "kpis.py"), "live", str(out)], capture_output=True)    # (its row in docs/kpis.md)
     print(text + f"\n(all of it in {out}; its KPIs: docs/kpis.md)")
