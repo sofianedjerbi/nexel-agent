@@ -104,3 +104,31 @@ def test_the_reading_is_what_the_line_says():
     assert r["at"] == list(at) and not r["far"] and r["verdict"]["of"] == 6 and set(r["verdict"]["checks"]) >= {"closed", "bed"}
     assert r["closed"] and "chest" in r["sense"]["failed"] and "roof" in r["looks"]["failed"] and r["lacks"] == home.lacks(obs, at)
 
+
+
+def test_the_build_goal_ends_graded_by_how_the_home_stands(tmp_path):
+    """The planner's build: while it lasts, the goal says how the home stands; when it ends (nothing left to lay, or
+    another goal set), the next facts tell it graded by the judge's v1, and it is tallied done at 5 of 6 or more."""
+    import numpy as np
+    from nexel_agent.rl.actions import ACTIONS
+    _, at, obs = hut({"wall", "door", "campfire"})
+    m = Mind("Rook", "", "http://x", FakeHTTP('{"goal": "build"}'), tmp_path / "memory.json")
+    m.social = SimpleNamespace(home=at)
+    m.see(obs)
+    asyncio.run(m.think(obs))
+    assert m.building
+    assert "Your goal now: build your home: it stands at 4/6, lacking a roof, a bed." in m.facts(obs)
+    mask = np.ones(len(ACTIONS), bool)
+    mask[next(k for k, a in enumerate(ACTIONS) if a[0] == "build")] = False
+    m.steer(3, mask, 0.0)
+    facts = m.facts(obs)
+    assert "Your last goal: build your home: it stands at 4/6, lacking a roof, a bed; nothing more it can lay" in facts
+    assert "build your home: 0 of 1" in facts and "You have no goal now." in facts
+    _, at, obs = hut({"wall", "door", "campfire", "bed"})
+    m.social.home = at
+    m.see(obs)
+    m.apply({"goal": "build"})
+    m.apply({"goal": "gather", "item": "wood"})                   # (another goal: the building ends there)
+    facts = m.facts(obs)
+    assert "Your last goal: build your home: it stands at 5/6, lacking a roof; you set another goal." in facts, facts
+    assert "build your home: 1 of 2" in facts
