@@ -15,15 +15,17 @@ from pathlib import Path
 
 from nexel_worlds.sim.constants import sec
 from nexel_worlds.tiles import RECIPES
-from .facts import Attack, Give, Say, dist, events, named, needs, people, short
+from .facts import Attack, Give, Say, counted, dist, events, named, needs, people, short
 from .actions import BLOCK_NAME
 from .goals import KINDS, Goal, account, judge
 from .pursue import DROPS
+from . import home
 from .now import Now
 from .voice import CHAT_STYLE, THOUGHT_TOKENS
 
 PROMISE = sec(120)         # a promise to hand something over is kept within this, or broken
 THINK_S = 20.0             # (the model it asks: rl/voice.py MODEL, the same server as the words)
+HOME = "home"               # an aim that is no item: its home, what it takes its lacks (rl/home.py)
 GOALS_DOC = ("Goals: gather (an item), craft (an item), give (an item, to a person), ask (a person, for an item), "
              "stay (with a person), help (a person, in a fight), avoid (a person), free (no goal)")
 
@@ -46,7 +48,9 @@ class Mind:
         self.told = dict(mem.get("told", {}))                  # item: what a person told it that takes, in their words
         self.now = now or Now(name)       # (what is happening to it: fed by the live body; it keeps the records)
         self.relations = self.now.relations                  # name: {ally, record}
-        self.relations.update(mem.get("people", {k: v for k, v in mem.items() if k not in ("aims", "told")}))
+        self.relations.update(mem.get("people", {k: v for k, v in mem.items() if k not in ("aims", "told", "home")}))
+        self.home = tuple(mem["home"]) if mem.get("home") else None   # where its home is (the body chose it: rl/home.py)
+        self.social, self.home_back = None, False   # (the body's memory, live.py hands it: its home handed back once)
         self.goal, self.goal_at = Goal(), time.monotonic()
         self.tick, self.pack, self.ended = 0, {}, ""     # (the game's tick and the pack, last seen; how the last goal went)
         self.where: dict = {}             # each person: where last seen (rl/social.py SocialMemory.where, live.py hands it)
@@ -59,8 +63,21 @@ class Mind:
         self.voice = None                                 # (rl/voice.py: the one model, chat lines first)
         self.stats = {"thoughts": 0, "said": 0, "errors": 0, "goals": {}}
 
+    def keep_home(self):
+        """The home the body chose (rl/build.py social.home), kept: at the start, the one it had last session is handed
+        back to a body that has none; after that it is the body's, kept as it is (dropped when the body gives it up)."""
+        s = self.social
+        if s is None:
+            return
+        if not self.home_back:
+            self.home_back = True
+            if s.home is None and self.home:
+                s.home = self.home
+        self.home = tuple(s.home) if s.home else None
+
     def see(self, obs: dict):
         """Something that happened to it (spoken to - unless the voice answers -, given, hit, an ally hit) thinks at once."""
+        self.keep_home()
         me, self.tick, self.pack = self.name, obs.get("tick", self.tick), dict((obs.get("self") or {}).get("inventory") or {})
         for ev in events(obs):
             match ev:
@@ -120,6 +137,13 @@ class Mind:
     def due(self) -> bool:
         return not self.busy and (self.salient or time.monotonic() - self.last >= THINK_S)
 
+    def home_needs(self, obs: dict) -> str:
+        """What its home still takes, for the aim "home": its lacks beyond the pack, or that it has not chosen one."""
+        if not self.home:
+            return "you have no home yet: find a flat spot and build"
+        lack = home.lacks(obs, self.home)
+        return f"it lacks {counted(lack)}" if lack else "you have all it takes"
+
     def facts(self, obs: dict) -> str:
         """What is happening now (rl/voice.py Now: the same text the words get, the pack in it), then the planner's own:
         its aims and what each takes (the game's recipes: facts.needs), the goal, what it could make, what people told
@@ -129,13 +153,16 @@ class Mind:
         close = sorted((sum(short(r, have).values()), name) for name, r in RECIPES.items() if name not in have)
         close = [f"{name} ({needs(name, obs)})" for miss, name in close if 0 < miss <= 2][:5]
         lines = [self.now.text(),
-                 ("Your aims: " + "; ".join(f"{a} ({needs(a, obs, known)})" for a in self.aims) + "." if self.aims
+                 ("Your aims: " + "; ".join(f"{a} ({self.home_needs(obs) if a == HOME else needs(a, obs, known)})" for a in self.aims) + "."
+                  if self.aims
                   else "You have set yourself no aims yet."),
                  (f"Your goal now: {goal_text(self.goal)}: {account(self.goal, self.tick)}."
                   if self.goal.kind != "free" else "You have no goal now.")]
         lacks = self.lacks(have, {p.get("name") for p in people(obs)}, obs)
         if lacks:
             lines.append("What your aims lack, and who had it: " + "; ".join(lacks) + ".")
+        if self.home:
+            lines.append(home.told(obs, self.home))
         if self.ended:
             lines.append(f"Your last goal: {self.ended}.")
         if self.tried:
@@ -221,7 +248,8 @@ class Mind:
         self.to_say = say[:120] or None
         if isinstance(d.get("aims"), list) and d["aims"]:
             said = [str(a) for a in d["aims"][:3]]               # ("a house with a door and bed": door, bed - the
-            aims = [k for a in said for k in named(a, self.now.items)] if self.now.items else [item_name(a) for a in said]
+            aims = [k for a in said for k in named(a, [*self.now.items, HOME])] if self.now.items else \
+                [HOME if a.strip().lower() == HOME else item_name(a) for a in said]
             self.aims = list(dict.fromkeys(a for a in aims if a))[:3]   # game's items it names; a phrase is no item)
         for who, upd in (d.get("relation_update") or {}).items():
             who = self.names.get(str(who).lower())              # (people it has seen only)
@@ -232,4 +260,5 @@ class Mind:
             if by and by != self.name and item_name(item) and str(t.get("what") or "").strip():
                 self.told[item_name(item)] = f'{by}: "{str(t["what"]).strip()[:80]}"'
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(json.dumps({"aims": self.aims, "people": self.relations, "told": self.told}, indent=1))
+        self.path.write_text(json.dumps({"aims": self.aims, "people": self.relations, "told": self.told,
+                                         **({"home": list(self.home)} if self.home else {})}, indent=1))
