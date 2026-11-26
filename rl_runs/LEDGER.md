@@ -568,3 +568,10 @@ verdict: SHIP (targets: score, rooms; 21 min)
 
 - From: r64 best (shipped), `--init`. Changed: ring is retired (never legal): a room comes from build. Home starts 20%.
 - Target: builds_5 above 0; rooms may dip first (ring's 1-tile boxes go).
+- **Result (r65):** stopped on score patience at +1.2M. Without ring, rooms fell (55% -> 2-25%) and grade per room rose
+  (about 3.5 of 6 at +480k), then faded; build picked 26-117 times per kit episode; live-like score up to 7.27. No house
+  of 5 checks. Not gated (no better builder than r64).
+- **Where the builder stands after r51-r65:** build alone lays a full hut (6/6 from a pack in one pick; 5-6/6 from kits
+  on held-out worlds); the learned policy has not learned to finish one (best 3/6 at home, from a home begun). Each run
+  found a real blocker in the macro or the env (all fixed, see above); what is left is the policy's credit for a long,
+  rare payoff.
