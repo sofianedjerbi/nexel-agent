@@ -93,3 +93,10 @@ def test_a_recipe_with_counts_is_no_pack_dump():
     pack = {"wood": 14, "stone": 2}
     assert not acts.pack_dump("6 wood and 3 stone", ITEMS, pack)          # (what a thing takes, not what it carries)
     assert acts.pack_dump("got 14 wood and 2 stone", ITEMS, pack)
+
+
+def test_a_reply_cut_short_is_never_said_as_json():
+    """Live: a long burst made the labels overrun the token cap, and Rook said '{"heard": ["greet", ...' to a player."""
+    cut = '{"heard": ["greet", "chat", "ask fiber", "how ITEM", "ask ITEM", "ask IT'
+    assert acts.read(cut, 6, ITEMS) == ("", [], None)
+    assert acts.read('{"say": "sure, take some", "heard": ["ask wood", "chat"', 2, ITEMS)[0] == "sure, take some"

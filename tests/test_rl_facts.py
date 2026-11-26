@@ -17,7 +17,7 @@ def test_one_record_per_event_type():
     assert F.read({"type": "tile"}) is None
     assert [type(ev) for ev in F.events({"events": [{"type": "join", "name": "Mira"}, {"type": "xp"}, {"type": "boss", "what": "wake"}]})] \
         == [F.Join, F.Boss]
-    assert set(F.PARSERS) == {"say", "shout", "attack", "give", "death", "creature_died", "craft", "join", "boss", "pick_up"}
+    assert set(F.PARSERS) == {"say", "shout", "attack", "give", "death", "creature_died", "craft", "join", "boss", "pick_up", "drop"}
     assert F.read({"type": "pick_up", "name": "Rook", "items": {"wood": 2}, "x": 3, "y": 4}) == F.Took("Rook", {"wood": 2}, None, (3, 4))
     assert F.read({"type": "death", "name": "Mira", "x": 3, "y": 4, "dropped": {"wood": 1}}) == F.Death("Mira", None, None, (3, 4), {"wood": 1})
 

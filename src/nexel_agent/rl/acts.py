@@ -9,9 +9,9 @@ import json
 import re
 
 # (the words' reply, as the model is told to write it: rl/voice.py)
-REPLY = ('Reply with JSON only: {"heard": [one label for each line said to you, in order: "ask ITEM" (they want an item '
+REPLY = ('Reply with JSON only, your line first: {"say": "your chat line, or empty to say nothing", "heard": [one label for each line said to you, in order: "ask ITEM" (they want an item '
          'from you), "offer ITEM" (they offer you one), "how ITEM" (they ask what it takes or where it is found), "thanks ITEM" '
-         '(they thank you for an item they say you gave them), "pack" (they ask what you carry), "tell" (they tell you a fact), "greet", "bye", "chat"], "say": "your chat line, or empty to say nothing", '
+         '(they thank you for an item they say you gave them), "pack" (they ask what you carry), "tell" (they tell you a fact), "greet", "bye", "chat"], '
          '"promise": "ITEM N" when your line says you will hand them something (and you carry it), else empty, '
          '"deed": "gave ITEM" or "made ITEM" when your line says you already gave them or made it, else empty}')
 KINDS = ("ask", "offer", "how", "thanks", "pack", "tell", "greet", "bye", "chat")
@@ -43,6 +43,9 @@ def read(out: str, n_heard: int, items) -> tuple:
     JSON is taken as the line itself, with nothing heard told apart (as before the acts)."""
     out, d = _json(out)
     if d is None:
+        if out.lstrip().startswith(("{", "[", "`")):          # (JSON cut short - the token cap - is never said: live,
+            m = re.search(r'"say"\s*:\s*"([^"]*)"', out)      # Rook said '{"heard": ["greet", "chat", ...' to a player)
+            return (m.group(1) if m else ""), [], None
         return out, [], None
     heard = []
     for lab in (d.get("heard") or [])[:n_heard]:

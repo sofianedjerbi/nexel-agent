@@ -51,3 +51,19 @@ def test_a_person_who_never_gave_says_so():
     assert "you have given them nothing yet" in n.person("Mira")         # (thanked for a gift never made: the facts say so)
     n.remember("Mira", "you gave them stone")
     assert "you have given them nothing yet" not in n.person("Mira")
+
+
+def test_what_someone_drops_by_it_and_it_picks_up_is_their_gift():
+    """Live: a player dropped 10 fiber by Rook, its magnet picked them up, and it asked for fiber again, unthanked.
+    A pickup of what a person dropped lately is their gift: on the record, trusted, the ask met."""
+    from nexel_agent.rl.facts import Drop, Took
+    from nexel_agent.rl.now import Now
+    n = Now("Rook", ("fiber", "wood"))
+    n.ask("Rook", "doben00", "fiber", t=0.0)
+    for _ in range(7):
+        n.outcome(Drop("doben00", {"fiber": 1}), 1.0)
+    n.outcome(Took("Rook", {"fiber": 7}), 2.0)
+    assert "gave you fiber x7" in n.person("doben00") and n.trust("doben00") > 0
+    assert ("Rook", "doben00") not in n.asks
+    n.outcome(Took("Rook", {"wood": 3}), 3.0)                       # (nobody dropped wood: found, not given)
+    assert "gave you wood" not in n.person("doben00")

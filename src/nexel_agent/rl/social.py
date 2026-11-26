@@ -4,7 +4,7 @@ each per episode, a few in two hundred: never per message, nothing for talking m
 from it here."""
 
 from nexel_worlds.sim.constants import SAY_R, sec
-from .facts import Attack, Death, Give, Say, events, named
+from .facts import Attack, Death, Drop, Give, Say, Took, events, handed, named
 
 ADDRESSED_S = sec(6)          # "answered someone": said something this soon after being spoken to
 TALK_GAP = sec(30)            # a chat cooldown, the same for every speaker: a line once spoken to, or 30 s after the last
@@ -29,6 +29,7 @@ class SocialMemory:
         self.last_hit = (None, None, -10 ** 9)   # who hit me last: (name, id, tick)
         self.home = None                      # (x, y) of the home's inside, once chosen (rl/build.py)
         self.began: dict = {}                 # name: who struck the first blow of the incident with them
+        self.drops: dict = {}                 # name: [(tick, items)] they let fall lately (facts.handed)
         self.where: dict = {}                 # each person: where I last saw them, (x, y, hp)
         self.words_tell = False               # live with a words model: it tells which lines are asks (rl/acts.py), not a name in them
 
@@ -60,6 +61,13 @@ class SocialMemory:
                     self.hit_me.pop(who, None)                       # at them when they come back - live trial 8: Rook
                     if self.last_hit[0] == who:                      # killed Mira 5 times, each time she respawned)
                         self.last_hit = (None, None, -10 ** 9)
+                case Drop(name=who) if who and who != self.me:
+                    self.drops.setdefault(who, []).append((t, dict(ev.items)))
+                case Took(name=who) if who == self.me:               # (dropped by them, picked up: a gift, as a give)
+                    for giver, k, n in handed(self.drops, ev.items, t, sec(30)):
+                        self.got_from.add(giver)
+                        self.got_now[k] = self.got_now.get(k, 0) + n
+                        self.got_by.setdefault(giver, {})[k] = self.got_by.get(giver, {}).get(k, 0) + n
                 case Give(src=who, to=to) if to == self.me and who:
                     self.got_from.add(who)
                     for k, n in ev.items.items():
