@@ -20,7 +20,10 @@ EVAL0 = 1_000_000
 
 class Worker:
     def __init__(self, args=()):
-        env = dict(os.environ, PYTHONPATH=SRC, OMP_NUM_THREADS="1")
+        # (the caller's PYTHONPATH kept: workers that read only the venv's own copy of the game trained r45-r51 on an
+        # older game than the trainer and the tests saw)
+        path = os.pathsep.join(p for p in (SRC, os.environ.get("PYTHONPATH", "")) if p)
+        env = dict(os.environ, PYTHONPATH=path, OMP_NUM_THREADS="1")
         self.p = subprocess.Popen([GAME_PY, "-m", "nexel_agent.rl.worker", *args], stdin=subprocess.PIPE,
                                   stdout=subprocess.PIPE, env=env)
 
