@@ -578,3 +578,9 @@ verdict: SHIP (targets: score, rooms; 21 min)
 - **r64 rolled back (live trial 8):** with the 30B on a QA copy, r64 killed Mira, the peaceful visitor, 5 times
   (first strikes on people 1.94/h; r63 in trial 7: 0, 0). The sim gate called first strikes 'same': the rough
   neighbours it trained among (#51) taught it to fight people, and the gate did not see it. models/rook.npz is r63 again.
+
+## r66
+
+- From: r64 best, `--init`, on the new pin (nexel-worlds cebd7b4). Changed: no fight to the end with a person it
+  struck first (022ec7f), a fallen hitter forgotten, no rough neighbours (ba4db8c), ring retired (88c917d).
+- Gate: the sim gate against r63 (shipped), then tools/live_gate.py, then a live trial with the 30B before shipping.
