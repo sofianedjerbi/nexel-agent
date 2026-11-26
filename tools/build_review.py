@@ -1,7 +1,7 @@
-"""The build review page (#33, lite: no renders): every closed room of the saved live runs drawn top-down as a grid of
-its tiles, read from the world, beside the judge's three reports (rl/judge.py: v1 verdict, v2 sense, v3 looks;
-tools/judge_builds.py). The player's rooms run by run; the real players' (the same in every QA copy) once, from the
-last run. Drafts go outside the repos: the page is written to ~/nexel/local/builds/.
+"""The build review page (#33): every closed room of the saved live runs drawn top-down as a grid of its tiles, read
+from the world, beside the judge's three reports (rl/judge.py: v1 verdict, v2 sense, v3 looks; tools/judge_builds.py),
+and its renders where tools/render_build.py made them (#32). The player's rooms run by run; the real players' (the
+same in every QA copy) once, from the last run. Drafts go outside the repos: the page is written to ~/nexel/local/builds/.
 
     python tools/build_review.py                       # every run in rl_runs/score
     python tools/build_review.py rl_runs/score/<run>   # some of them
@@ -17,6 +17,7 @@ from pathlib import Path
 from nexel_worlds.tiles import BLOCKS, GROUNDS
 
 import judge_builds as J
+from render_build import VIEWS, render_name
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = Path.home() / "nexel" / "local" / "builds" / "index.html"   # (~/nexel/local: drafts, beside the repos, in no worktree)
@@ -61,31 +62,37 @@ def report(r: dict) -> str:
             f'<p class="f">at {r["at"][0]}, {r["at"][1]} · {html.escape("; ".join(facts))}</p></div>')
 
 
-def room(r: dict) -> str:
-    return f'<div class="room">{grid(r["map"])}{report(r)}</div>'
+def renders(run: str | None, r: dict, out: Path) -> str:
+    """The room's renders (tools/render_build.py), if made: beside its grid, linked from the page's folder."""
+    there = [render_name(run, r, v) for v in VIEWS] if run else []
+    return "".join(f'<img class="shot" src="renders/{n}" alt="{n}">' for n in there if (out.parent / "renders" / n).exists())
 
 
-def page(runs: list, sims: list = ()) -> str:
+def room(r: dict, run: str | None = None, out: Path = OUT) -> str:
+    return f'<div class="room">{grid(r["map"])}{renders(run, r, out)}{report(r)}</div>'
+
+
+def page(runs: list, sims: list = (), out: Path = OUT) -> str:
     """runs: [(run name, the player, its rooms judged)], oldest first; sims: tools/sim_builds.py's files, read."""
     parts = ['<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Build review</title><style>',
              "body{font:14px/1.45 system-ui,sans-serif;background:#1d1f24;color:#e8e6df;margin:0;padding:20px 28px 60px}",
              "h1{font-size:20px;margin:0 0 4px}h2{font-size:16px;margin:26px 0 8px;border-top:1px solid #333842;padding-top:12px}",
              ".note{color:#a9a6a0;max-width:900px}.room{display:flex;gap:18px;align-items:flex-start;margin:10px 0 16px}",
              "table.g{border-collapse:collapse}table.g td{width:16px;height:16px;padding:0;border:1px solid #1d1f24}",
-             "td.in{outline:1px solid #fff4;outline-offset:-1px}",
+             "td.in{outline:1px solid #fff4;outline-offset:-1px}img.shot{width:240px;image-rendering:pixelated;border:1px solid #333842}",
              "td.r{background-image:repeating-linear-gradient(45deg,#0004 0 2px,transparent 2px 5px)!important}",
              ".rep p{margin:2px 0}.rep .f{color:#a9a6a0;font-size:13px}.key span{display:inline-block;width:12px;height:12px;"
              "vertical-align:middle;margin:0 4px 0 10px;border:1px solid #0006}</style></head><body>",
              "<h1>Build review: the AI player's homes, beside real players'</h1>",
              f'<p class="note">Every closed room of the saved live runs (rl_runs/score), drawn top-down tile by tile from the '
-             f"world, beside the build judge's three reports (rl/judge.py). No renders: #33 lite. Made by tools/build_review.py, "
+             f"world, beside the build judge's three reports (rl/judge.py), and its renders where tools/render_build.py made them. Made by tools/build_review.py, "
              f"{time.strftime('%Y-%m-%d %H:%M')}. Hatched: under a roof. Outlined: inside.</p>",
              '<p class="key">' + "".join(f'<span style="background:{c}"></span>{k.replace("_", " ")}' for k, c in
                                         list(COLOUR.items())[:12]) + "</p>"]
     for name, who, rows in runs:
         mine = [r for r in rows if r["by"] == who]
         parts.append(f"<h2>Run {html.escape(name)}: {html.escape(who)}'s rooms ({len(mine)})</h2>")
-        parts += [room(r) for r in sorted(mine, key=lambda r: -(r["v1"] + r["v2"] + r["v3"]))] or \
+        parts += [room(r, name, out) for r in sorted(mine, key=lambda r: -(r["v1"] + r["v2"] + r["v3"]))] or \
             [f'<p class="note">{html.escape(who)} closed no room in this run.</p>']
     for sim in sims:
         rows = sorted(sim["rooms"], key=lambda r: -(r["v1"] + r["v2"] + r["v3"]))
@@ -97,7 +104,7 @@ def page(runs: list, sims: list = ()) -> str:
         name, who, rows = runs[-1]
         players = sorted((r for r in rows if r["by"] == J.PLAYERS), key=lambda r: -(r["v1"] + r["v2"] + r["v3"]))
         parts.append(f"<h2>Real players' rooms ({len(players)}), the reference (from run {html.escape(name)}'s copy)</h2>")
-        parts += [room(r) for r in players] or ['<p class="note">None.</p>']
+        parts += [room(r, name, out) for r in players] or ['<p class="note">None.</p>']
     return "\n".join(parts) + "\n</body></html>\n"
 
 
@@ -114,7 +121,7 @@ def main():
         runs.append((d.name, who, J.judged(qa / "world.sqlite", qa / "events.jsonl", who)))
         print(f"{d.name}: {sum(r['by'] == who for r in runs[-1][2])} of {who}'s, {len(runs[-1][2])} rooms in all", flush=True)
     a.out.parent.mkdir(parents=True, exist_ok=True)
-    a.out.write_text(page(runs, [json.loads(p.read_text()) for p in a.sim]))
+    a.out.write_text(page(runs, [json.loads(p.read_text()) for p in a.sim], a.out))
     print(f"file://{a.out}")
 
 
