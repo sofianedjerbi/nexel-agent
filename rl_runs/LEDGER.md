@@ -383,3 +383,12 @@ verdict: keep the shipped body (targets: score; 21 min)
 - **Result (r50):** best 7.03; gate against r47 (today's game): rooms 13% -> 27% (lush, better), build grade 0.22 ->
   0.43, tools better on live-like, score same (6.56 -> 6.71), repeat crafts worse (0.73 -> 0.77), no guard worse.
   **Shipped** for its builds (the owner's call: the smartest body, builds first).
+- **Result (r51):** void as a build test. Its best was its first check (7.33 at +75k), then flat 6 checks. The
+  policy never picked `build`: legal in 3515 decisions, picked 0, p = 0.0001 (a new action's row starts low, and at
+  this entropy PPO never tries it). And its workers ran the venv's own older game (rl/vec.py, fixed in 91ae423).
+
+## r52
+
+- From: r50 best (shipped), `--init`, `--copy-rows build=pursue` (the new action starts as the macro it already uses).
+- The workers run the pinned game (today's: roofs, ores and tool tiers; 200 actions, 13 more than r50 knew).
+- Target: builds_5 up from 0; score and deaths no worse.
