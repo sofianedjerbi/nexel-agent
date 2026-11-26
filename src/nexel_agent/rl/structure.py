@@ -144,17 +144,19 @@ class Structure:
             ring = _rings(set(base))
             depth = ring.get                                               # noqa: E731
         deck = mat in LAND_IN_CELL                                # (stone, earth: held by blocks only, not by a wall
-        top = min(ROOF_RISE - deck, max(depth(p) for p in base))  # standing under: laid on a deck of planks)
+        most = max(depth(p) for p in base)                       # standing under: laid on a deck of planks)
+        top = min(ROOF_RISE - deck, most)                        # (a slope spread to the ridge: no flat top)
+        rise = {p: round(depth(p) * top / most) if most else 0 for p in base}
         out = [[] for _ in range(top + 1 + deck)]
         for p in base:
-            d = min(depth(p), top)
+            d = rise[p]
             if deck:
                 out[0].append((p[0], p[1], eaves if eaves and d == 0 else "plank"))
             for i in range(d + 1):
-                m = eaves if eaves and i == 0 and d == 0 else ridge if ridge and i == d == top and top else mat
+                m = eaves if eaves and i == 0 and d == 0 else ridge if ridge and i == d and depth(p) == most and most else mat
                 if m in LAND_IN_CELL and p in busy:
                     m = "plank"                   # (the game reads earth over a tile with a thing on its land as the
-                if not (deck and eaves and d == 0):           # land's next layer, the thing in its way: nexel-worlds)
+                if not (deck and eaves and d == 0):           # land's next layer, the thing in its way: nexel-worlds#308)
                     out[i + deck].append((p[0], p[1], m))
         return [layer for layer in out if layer]
 
