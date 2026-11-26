@@ -1,0 +1,13 @@
+#!/bin/sh
+# Before a push: the unit tests as CI runs them (ci.yml "Tests": the game at the commit uv.lock pins), and each new
+# commit's subject within commitlint's 100 (a squash adds " (#NN)": merge.sh refuses past 100).
+while read -r _ local_sha _ remote_sha; do
+  [ "$local_sha" = 0000000000000000000000000000000000000000 ] && continue
+  range=$([ "$remote_sha" = 0000000000000000000000000000000000000000 ] && echo "$local_sha" -1 || echo "$remote_sha..$local_sha")
+  # shellcheck disable=SC2086
+  git log --format=%s $range | while read -r s; do
+    [ "${#s}" -gt 94 ] && { echo "pre-push: subject over 94 chars (100 with ' (#NN)'): $s"; exit 1; }
+  done || exit 1
+done
+nice -n 10 uv run --locked pytest tests -q --ignore=tests/e2e -n 4 -p no:cacheprovider || {
+  echo "pre-push: unit tests failed (as CI's Tests would)"; exit 1; }

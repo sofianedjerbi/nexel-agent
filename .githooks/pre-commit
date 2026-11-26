@@ -1,0 +1,6 @@
+#!/bin/sh
+# ruff check on the staged Python files, as CI's blocking lint step (ci.yml "Lint (ruff)", the same version).
+files=$(git diff --cached --name-only --diff-filter=ACM -- '*.py')
+[ -z "$files" ] && exit 0
+# shellcheck disable=SC2086
+uvx ruff@0.17.6 check $files || { echo "pre-commit: ruff check failed (as CI's Lint would)"; exit 1; }

@@ -1,0 +1,5 @@
+#!/bin/sh
+# The commit message as CI checks it (ci.yml "Conventional Commits": commitlint with @commitlint/config-conventional).
+npx --yes -p @commitlint/cli@21 -p @commitlint/config-conventional@21 \
+  commitlint --extends @commitlint/config-conventional --edit "$1" || {
+  echo "commit-msg: the message breaks Conventional Commits (see ~/nexel/CLAUDE.md)"; exit 1; }
