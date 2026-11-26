@@ -27,3 +27,10 @@ def test_a_hut_from_the_pack_by_building_alone():
     hx, hy = env.social.home
     v = judge.verdict(env.sim.world, hx + W // 2, hy + H // 2)
     assert v["grade"] == v["of"], judge.told(v)
+
+
+def test_a_start_with_a_home_kit_holds_the_hut_pieces():
+    env = SimEnv(ep_ticks=10 ** 6, roam=0, rivals=0, home_pct=100)
+    env.reset(7)
+    inv = env.a.inventory
+    assert inv.get("door", 0) + inv.get("roof", 0) + inv.get("stone_wall", 0) + inv.get("wood_wall", 0) > 10

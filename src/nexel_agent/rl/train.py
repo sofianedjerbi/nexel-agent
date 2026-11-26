@@ -193,6 +193,7 @@ def main():
     p.add_argument("--live-seed", type=int, default=-1, help="the live world's seed: --live-pct of the train episodes there")
     p.add_argument("--live-pct", type=int, default=20)
     p.add_argument("--gear-pct", type=int, default=0, help="the share of train starts one step from a tool (rl/starts.py)")
+    p.add_argument("--home-pct", type=int, default=0, help="the share of train starts with a home's pieces in the pack")
     p.add_argument("--thin-pct", type=int, default=50, help="the share of train starts laid out like the live save")
     p.add_argument("--death-ends", type=int, default=1, help="0: as live, a death drops the pack and the episode goes on")
     p.add_argument("--gamma", type=float, default=0.995)
@@ -204,7 +205,7 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     ep = [f"ep_ticks={int(a.days * 12000)}", f"death_ends={a.death_ends}"] + a.env
     live = [f"live_seed={a.live_seed}", f"live_pct={a.live_pct}"] if a.live_seed >= 0 else []
-    env = PipeVecEnv(a.envs, rng_seed=hash(a.run) % 1000, env_args=ep + live + [f"thin_pct={a.thin_pct}", f"gear_pct={a.gear_pct}"])
+    env = PipeVecEnv(a.envs, rng_seed=hash(a.run) % 1000, env_args=ep + live + [f"thin_pct={a.thin_pct}", f"gear_pct={a.gear_pct}", f"home_pct={a.home_pct}"])
     ev = PipeVecEnv(a.eval_envs, env_args=ep)                                       # (held-out worlds as they are)
     ev.live_like = PipeVecEnv(a.eval_envs, env_args=ep + ["thin_pct=100"]) if a.thin_pct else None
     names_from(ev)

@@ -46,3 +46,19 @@ def near_a_tool(sim, a, rng):
              if sim.world.block(a.x + dx, a.y + dy) == "none" and sim.stand(a.x + dx, a.y + dy)]
     if spots and rng.random() < 0.5:
         sim.set_tile(*rng.choice(spots), block="workbench")
+
+
+def with_a_home_kit(sim, a, rng):
+    """The pieces of a home in the pack (a player who came back with them): the walls, a door, a bed, a fire, the
+    roof (rl/build.py's hut), now and then one kind short or lacking, so it makes or fetches the rest."""
+    from .build import PLAN
+    kit = {}
+    for _, _, piece in PLAN:
+        item = rng.choice(("stone_wall", "wood_wall")) if piece == "wall" else piece
+        kit[item] = kit.get(item, 0) + 1
+    if rng.random() < 0.5:
+        short = rng.choice(sorted(kit))
+        kit[short] = max(0, kit[short] - rng.randint(1, kit[short]))
+    for k, n in kit.items():
+        if n:
+            a.add(k, n)

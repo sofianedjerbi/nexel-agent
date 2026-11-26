@@ -37,7 +37,7 @@ OUTCOME = {"won": "defeat_player", "fled": "escape_attack", "endured": "survive_
 class SimEnv:
     def __init__(self, ep_ticks: int = EP_TICKS, decide: int = DECIDE, rivals: int = 1, roam: int = 1,
                  live_seed: int = -1, live_pct: int = 0, folk: int = 2, goals: int = 1, death_ends: int = 1,
-                 shadow_pct: int = 30, thin_pct: int = 0, gear_pct: int = 0):
+                 shadow_pct: int = 30, thin_pct: int = 0, gear_pct: int = 0, home_pct: int = 0):
         """rivals: a sparring partner (rl/rival.py); roam: start anywhere on the land within 400 tiles, not at the
         world's spawn; live_seed/live_pct: that share of the episodes in the live world's seed (its land, unaltered)."""
         self.ep_ticks, self.decide, self.rivals, self.roam = ep_ticks, decide, rivals, roam
@@ -45,6 +45,7 @@ class SimEnv:
         self.death_ends = death_ends      # 0: as live, a death drops the pack and you wake at your spawn; the episode goes on
         self.shadow_pct = shadow_pct      # the share of episodes a neighbour stays right beside the player all along
         self.gear_pct = gear_pct          # the share of starts one step from a tool (starts.near_a_tool)
+        self.home_pct = home_pct          # the share of starts with a home's pieces in the pack (starts.with_a_home_kit)
         self.thin_pct = thin_pct          # the share of starts laid out like the live save near its players (thin_land)
         self.sim = None
 
@@ -60,6 +61,8 @@ class SimEnv:
             starts.thin_land(self.sim, self.a, rng)
         if self.gear_pct and rng.random() * 100 < self.gear_pct:      # (no draw otherwise: the other starts stay as they were)
             starts.near_a_tool(self.sim, self.a, rng)
+        if self.home_pct and rng.random() * 100 < self.home_pct:
+            starts.with_a_home_kit(self.sim, self.a, rng)
         self.sim.tick = self.sim.tick // DAY_TICKS * DAY_TICKS + int(START * DAY_TICKS)
         self.rng = random.Random(seed * 13 + 1)
         self.rival = Rival(self.sim, self.a, seed, pick=self.pick_target) if self.rivals else None
