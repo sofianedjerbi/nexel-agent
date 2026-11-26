@@ -1,7 +1,7 @@
 """The mind's side of a home (#30): where it is (the body chooses it, rl/build.py social.home; the mind keeps it in
 memory.json across sessions and hands it back at the start: rl/mind.py), and one line of facts on it each plan: where
 it is, what the judge says of it (rl/judge.py: v1 told in words, then what v2 and v3 find missing) and what it still
-lacks of the hut's blueprint (rl/build.py PLAN) beyond the pack, down to what that is made of (the game's recipes).
+lacks of its plan (rl/build.py: the hut's blueprint, or the one the architect drew) beyond the pack, down to what that is made of (the game's recipes).
 It changes nothing the body reads: no goal kind, no input.
 
 The judge reads a world; the mind has the observation: Seen is the world as the observation shows it (its grid, its
@@ -14,7 +14,7 @@ from nexel_worlds.tiles import BLOCKS, GROUNDS, RECIPES
 
 from . import judge
 from .actions import LEVEL
-from .build import PLAN, WALLS
+from .build import WALLS, plan_of
 from .facts import compass, counted
 
 _BLOCK, _GROUND = {b.name for b in BLOCKS}, {g.name for g in GROUNDS}
@@ -53,16 +53,18 @@ class Seen:
 def stands(world, x, y, piece) -> bool:
     """Is this piece of the blueprint there (as judge.laid reads one: a roof over it, a wall, a door, the thing)?"""
     b = world.block(x, y)
+    if piece == "path":
+        return world.ground(x, y) == "cobble"
     return bool(world.roof(x, y)) if piece == "roof" else b in WALLS if piece == "wall" else \
         b in judge.ENCLOSE and not judge._SOLID.get(b, True) if piece == "door" else b == piece
 
 
-def lacks(obs: dict, home) -> dict:
+def lacks(obs: dict, home, social=None) -> dict:
     """What the home still lacks, beyond the pack: the blueprint's pieces not standing, as items, those not carried
     made of what their recipe takes (one step down: wood, fiber, stone), all as {item: n}."""
     world, have = Seen(obs), dict((obs.get("self") or {}).get("inventory") or {})
     pieces: dict = {}
-    for dx, dy, p in PLAN:
+    for dx, dy, p in plan_of(social).pieces:
         if not stands(world, home[0] + dx, home[1] + dy, p):
             item = PIECE_ITEM.get(p, p)
             pieces[item] = pieces.get(item, 0) + 1
@@ -80,7 +82,7 @@ def lacks(obs: dict, home) -> dict:
     return {k: n - have.get(k, 0) for k, n in out.items() if n > have.get(k, 0)}
 
 
-def reading(obs: dict, home) -> dict:
+def reading(obs: dict, home, social=None) -> dict:
     """What the judge and the blueprint say of the home, as facts (what told() words, and the brain view shows):
     {"at", "where", "far": out of sight, "verdict": v1 (rl/judge.py verdict, its report left out), "told": v1 in words,
     "sense", "looks": v2 and v3 ({"grade", "of", "failed"}, a closed home only), "lacks": {item: n}}."""
@@ -90,13 +92,14 @@ def reading(obs: dict, home) -> dict:
          "far": max(abs(x - me["x"]), abs(y - me["y"])) > VIEW_R - 2}
     if r["far"]:
         return r
-    v = judge.verdict(world, x, y)
+    ix, iy = inside(home, social)
+    v = judge.verdict(world, ix, iy)
     r.update(verdict={k: v[k] for k in ("grade", "of", "checks", "failed")}, told=judge.told(v), closed=v["report"]["closed"])
     if r["closed"]:
         for k, f in (("sense", judge.sense), ("looks", judge.looks)):
-            s = f(world, x, y)
+            s = f(world, ix, iy)
             r[k] = {"grade": s["grade"], "of": s["of"], "failed": s["failed"]}
-    r["lacks"] = lacks(obs, home)
+    r["lacks"] = lacks(obs, home, social)
     return r
 
 
@@ -117,7 +120,14 @@ def told(obs: dict, home=None, r: dict | None = None) -> str:
     return line + (f"; it lacks {counted(r['lacks'])}." if r["lacks"] else "; you have all it takes.")
 
 
-def day(obs: dict, home) -> str | None:
+def inside(home, social=None) -> tuple:
+    """A tile inside the home, where the judge reads it from: the plan's first stand (the hut's middle, a drawn
+    home's first floor tile; a drawn home's origin is its grid's corner, a wall)."""
+    sx, sy = plan_of(social).stands[0]
+    return home[0] + sx, home[1] + sy
+
+
+def day(obs: dict, home, social=None) -> str | None:
     """A player's day (#15): from five minutes before night until dawn, one line: how long until night falls (or
     until dawn), where its home is, and its bed there (sleeping in a bed is where you wake after dying), or what it
     still needs for one. None in the day before that."""
@@ -133,8 +143,8 @@ def day(obs: dict, home) -> str | None:
     me = obs["self"]
     where = compass(home[0] - me["x"], home[1] - me["y"])
     world = Seen(obs)
-    has = any(stands(world, home[0] + dx, home[1] + dy, p) for dx, dy, p in PLAN if p == "bed") or \
-        judge.report(world, *home).get("contents", {}).get("bed", 0) > 0
+    has = any(stands(world, home[0] + dx, home[1] + dy, p) for dx, dy, p in plan_of(social).pieces if p == "bed") or \
+        judge.report(world, *inside(home, social)).get("contents", {}).get("bed", 0) > 0
     bed = "a bed" if has else "no bed yet: aim for one, and sleep in it"
     if max(abs(home[0] - me["x"]), abs(home[1] - me["y"])) > VIEW_R - 2:
         return f"{when}; your home is {where}: sleep in a bed there, it is where you wake after dying."

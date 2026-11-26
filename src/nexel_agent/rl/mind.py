@@ -193,7 +193,7 @@ class Mind:
         """What its home still takes, for the aim "home": its lacks beyond the pack, or that it has not chosen one."""
         if not self.home:
             return "you have no home yet: find a flat spot and build"
-        lack = home.lacks(obs, self.home)
+        lack = home.lacks(obs, self.home, self.social)
         return f"it lacks {counted(lack)}" if lack else "you have all it takes"
 
     def facts(self, obs: dict) -> str:
@@ -202,7 +202,7 @@ class Mind:
         it, an open ask, the people it knows who are not here."""
         me = obs["self"]
         have, known = me.get("inventory", {}), self.now.items
-        self.home_read = home.reading(obs, self.home) if self.home else None    # (what it is told of its home: the brain view shows it)
+        self.home_read = home.reading(obs, self.home, self.social) if self.home else None    # (what it is told of its home: the brain view shows it)
         self.built()
         close = sorted((sum(short(r, have).values()), name) for name, r in RECIPES.items() if name not in have)
         close = [f"{name} ({needs(name, obs)})" for miss, name in close if 0 < miss <= 2][:5]
@@ -218,7 +218,7 @@ class Mind:
             lines.append("What your aims lack, and who had it: " + "; ".join(lacks) + ".")
         if self.home_read:
             lines.append(home.told(obs, r=self.home_read))
-        if day := home.day(obs, self.home):
+        if day := home.day(obs, self.home, self.social):
             lines.append(day)
         if self.ended:
             lines.append(f"Your last goal: {self.ended}.")

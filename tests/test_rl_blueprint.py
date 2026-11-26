@@ -98,3 +98,37 @@ def test_a_drawn_home_is_laid_by_building_alone_and_judged_as_drawn():
     assert judge.verdict(w, hx + px, hy + py)["failed"] == [], judge.told(judge.verdict(w, hx + px, hy + py))
     assert judge.sense(w, hx + px, hy + py)["failed"] == []
     assert [c for c in judge.looks(w, hx + px, hy + py)["failed"] if f"v3.{c}" not in blueprint.CANNOT] == []
+
+
+def test_live_a_home_not_begun_waits_for_its_drawing_and_keeps_it(tmp_path):
+    import time
+    from types import SimpleNamespace
+
+    from nexel_agent.rl.build import HUT
+    from nexel_agent.rl.core import SimEnv
+    env = SimEnv(ep_ticks=10 ** 6, roam=0, rivals=0)
+    env.reset(5)
+    obs = env.sim.observe(env.a)
+    social, stats = SimpleNamespace(home=None, plan=None), {}
+    d = architect.Drafting(lambda msgs: f"```{GOOD}```", tmp_path / "plan.json", "a home for one")
+    assert not d.holds(social, False, obs)                                # (not building: no drawing)
+    while d.holds(social, True, obs, stats):
+        time.sleep(0.01)
+    assert social.plan.pieces == blueprint.pieces(blueprint.parse(GOOD)) and stats["draft"]["grade"] == stats["draft"]["of"]
+    social2 = SimpleNamespace(home=(3, 4), plan=None)                    # (the next session: the drawing handed back)
+    assert not architect.Drafting(None, tmp_path / "plan.json", "").holds(social2, True, obs)
+    assert social2.plan.pieces == social.plan.pieces and social2.plan is not HUT
+
+
+def test_live_a_drawing_short_of_full_marks_leaves_the_hut(tmp_path):
+    import time
+    from types import SimpleNamespace
+
+    from nexel_agent.rl.core import SimEnv
+    env = SimEnv(ep_ticks=10 ** 6, roam=0, rivals=0)
+    env.reset(5)
+    social = SimpleNamespace(home=None, plan=None)
+    d = architect.Drafting(lambda msgs: "```\n#####\n#...#\n#####\n```", tmp_path / "plan.json", "")
+    while d.holds(social, True, env.sim.observe(env.a)):
+        time.sleep(0.01)
+    assert social.plan is None and not (tmp_path / "plan.json").exists() and d.last["grade"] < d.last["of"]

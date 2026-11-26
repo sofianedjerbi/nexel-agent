@@ -65,3 +65,53 @@ def model(url: str, *, max_tokens: int = 600, temperature: float = 0.4):
         r.raise_for_status()
         return r.json()["choices"][0]["message"]["content"]
     return ask
+
+
+class Drafting:
+    """The live side: when the mind builds a home not begun, the architect draws it first, in a thread, and the body
+    waits for the drawing (it would site the hut otherwise). A drawing at full marks is the plan (social.plan) and is
+    kept in `path` (plan.json, by memory.json: a home drawn is laid as drawn the next session too); short of full
+    marks, or no model, the hut. A home begun is never drawn again."""
+
+    def __init__(self, ask, path, brief: str):
+        import json
+        self.ask, self.path, self.brief, self.task, self.done = ask, path, brief, None, False
+        self.rows = json.loads(path.read_text()).get("rows") if path and path.exists() else None
+        self.last = None                       # the last design: {"grade", "of", "history"} (logged by live.py)
+
+    def holds(self, social, building: bool, obs, stats=None) -> bool:
+        """True while the body is to wait for the drawing; the plan set on social once it is decided (and the design
+        told in `stats`, the run's, as "draft")."""
+        import concurrent.futures
+        import json
+
+        from .build import drawn, laid, plan_of
+        if self.rows and getattr(social, "plan", None) is None:
+            social.plan = drawn(self.rows)
+        if not building or self.done or getattr(social, "plan", None) is not None:
+            return False
+        if social.home and any(laid(obs, social.home[0] + dx, social.home[1] + dy, p) for dx, dy, p in plan_of(social).pieces):
+            self.done = True                   # (the hut begun: laid as it is)
+            return False
+        if self.task is None:
+            self.task = concurrent.futures.ThreadPoolExecutor(1).submit(design, self.brief, self.ask)
+            return True
+        if not self.task.done():
+            return True
+        self.done = True
+        try:
+            d = self.task.result()
+        except Exception as e:                 # (the model gone or broken: the hut)
+            self.last = {"error": repr(e)[:200]}
+            if stats is not None:
+                stats["draft"] = self.last
+            return False
+        self.last = {k: d.get(k) for k in ("grade", "of", "history", "rows")}
+        if stats is not None:
+            stats["draft"] = self.last
+        if d.get("ok") and d["grade"] == d["of"]:
+            self.rows, social.plan, social.home = d["rows"], drawn(d["rows"]), None     # (sited anew, for its shape)
+            if self.path:
+                self.path.parent.mkdir(parents=True, exist_ok=True)
+                self.path.write_text(json.dumps({"rows": self.rows, "brief": self.brief, "grade": d["grade"]}))
+        return False
