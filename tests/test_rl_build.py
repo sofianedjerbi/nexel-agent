@@ -12,13 +12,21 @@ def flat_round(env, r=3):
     env.obs = sim.observe(a)
 
 
+def ring_ok(env):
+    """ring's own rules (rl/ring.py plan): the policy no longer picks it (retired in the mask: build lays rooms)."""
+    from nexel_agent.rl import ring
+    from nexel_agent.rl.actions import GROUND_CH
+    assert not env.encoded()["mask"][idx("ring")]
+    return ring.plan(env.obs, GROUND_CH) is not None
+
+
 def test_ring_closes_a_room_with_a_door():
     env = SimEnv(ep_ticks=10 ** 6, roam=0, rivals=0, folk=0)
     env.reset(5)
     flat_round(env)
     env.a.inventory.update({"stone_wall": 7, "door": 1})
     env.obs = env.sim.observe(env.a)
-    assert env.encoded()["mask"][idx("ring")]
+    assert ring_ok(env)
     for _ in range(12):
         env.step(idx("ring"))
         if "room_with_door" in env.ledger.done:
@@ -75,9 +83,9 @@ def test_ring_places_what_it_holds_and_never_beside_someone():
         f.a.x, f.a.y = env.a.x + 30, env.a.y + 30
     env.a.inventory.update({"stone_wall": 1})
     env.obs = env.sim.observe(env.a)
-    assert not env.encoded()["mask"][idx("ring")]                  # (one piece: place does that)
+    assert not ring_ok(env)                  # (one piece: place does that)
     env.a.inventory.update({"stone_wall": 3})
     env.obs = env.sim.observe(env.a)
-    assert env.encoded()["mask"][idx("ring")]
+    assert ring_ok(env)
     neighbour_beside(env)                                          # (someone beside the ring: it would wall them in)
-    assert not env.encoded()["mask"][idx("ring")]
+    assert not ring_ok(env)

@@ -246,8 +246,8 @@ def legal(obs: dict, facing: str = "S", social=None, goal=None) -> np.ndarray:
                 m[i] = False
         elif kind == "pick_up":
             m[i] = any(it["dx"] == 0 and it["dy"] == 0 for it in obs.get("items", []))
-        elif kind == "ring":
-            m[i] = ring.plan(obs, GROUND_CH) is not None
+        elif kind == "ring":                  # (retired: build lays a room one can live in; ring's 8 walls round the
+            m[i] = False                      # player closed a 1-tile box, the cheap room r64 kept building instead)
         elif kind == "place":
             m[i] = bool(inv.get(arg)) and not frim and (fch in GROUND_CH or BLOCK_NAME.get(fch) == "flower")
             if arg in ("stairs", "ladder"):
