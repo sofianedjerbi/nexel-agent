@@ -29,6 +29,10 @@ HOME = "home"               # an aim that is no item: its home, what it takes it
 GOALS_DOC = ("Goals: gather (an item), craft (an item), give (an item, to a person), ask (a person, for an item), "
              "stay (with a person), help (a person, in a fight), avoid (a person), build (your home: the body lays "
              "it, walls, door, fire, bed, roof, from what you carry, making what it lacks), free (no goal)")
+BUILD = "build your home"     # (the build goal: no goal kind the body knows, the mind's own - steer)
+BUILT = 5                    # a home built: the judge's v1 at 5 of its 6 checks or more (rl/judge.py CHECKS)
+LACKING = {"closed": "walls all round", "door": "a door", "roofed": "a roof", "lit": "a light", "bed": "a bed",
+           "room_enough": "room inside"}
 
 
 def item_name(s) -> str:
@@ -59,6 +63,7 @@ class Mind:
         self.to_say: str | None = None
         self.tried: dict = {}                # goal text: [set, done] this session
         self.building = False                # its home being laid, the planner's call (steer)
+        self.build_end = ""                  # why the building ended, till the next facts grade the home and tell it
         self.names: dict = {}
         self.asks = ""                   # an ask open now, with what it carries of that item
         self.log = self.path.with_name("mind.jsonl")   # each thought: the facts it got, what it answered
@@ -134,10 +139,36 @@ class Mind:
         if not self.building or hurt > 0:
             return i
         if mask is not None and not mask[b]:
-            self.building, self.ended = False, "build (your home): nothing more it can lay or make here now"
-            self.tried.setdefault("build (your home)", [0, 0])[0] += 1
+            self.stop_building("nothing more it can lay or make here now")
             return i
         return b
+
+    def stop_building(self, why: str):
+        """The building ends: told and tallied in the next facts, with how the home stands then (built)."""
+        self.building, self.build_end, self.ended = False, why, f"{BUILD}: {why}"
+
+    def stands(self) -> tuple:
+        """How its home stands, from the home's reading (rl/home.py reading: the judge's v1 on the observation, as the
+        home facts line says it): ("it stands at 4/6, lacking a roof", built: 5 of 6 or more)."""
+        r = self.home_read
+        if not self.home:
+            return "you have no home yet", False
+        if not r or r.get("far"):
+            return "your home is too far to see how it stands", False
+        v = r["verdict"]
+        lack = [LACKING.get(k, k.replace("_", " ")) for k in v["failed"]]
+        return f"it stands at {v['grade']}/{v['of']}" + (f", lacking {', '.join(lack)}" if lack else ", whole"), v["grade"] >= BUILT
+
+    def built(self):
+        """The building that ended since the last facts, graded: done when the home stands at 5 of 6 or more."""
+        if not self.build_end:
+            return
+        how, done = self.stands()
+        self.ended = f"{BUILD}: {how}; {self.build_end}"
+        tally = self.tried.setdefault(BUILD, [0, 0])
+        tally[0] += 1
+        tally[1] += done
+        self.build_end = ""
 
     def end(self, g: Goal, how: str, kept: bool = False):
         if g.promise:
@@ -166,18 +197,20 @@ class Mind:
         it, an open ask, the people it knows who are not here."""
         me = obs["self"]
         have, known = me.get("inventory", {}), self.now.items
+        self.home_read = home.reading(obs, self.home) if self.home else None    # (what it is told of its home: the brain view shows it)
+        self.built()
         close = sorted((sum(short(r, have).values()), name) for name, r in RECIPES.items() if name not in have)
         close = [f"{name} ({needs(name, obs)})" for miss, name in close if 0 < miss <= 2][:5]
         lines = [self.now.text(),
                  ("Your aims: " + "; ".join(f"{a} ({self.home_needs(obs) if a == HOME else needs(a, obs, known)})" for a in self.aims) + "."
                   if self.aims
                   else "You have set yourself no aims yet."),
-                 (f"Your goal now: {goal_text(self.goal)}: {account(self.goal, self.tick)}."
+                 (f"Your goal now: {BUILD}: {self.stands()[0]}." if self.building else
+                  f"Your goal now: {goal_text(self.goal)}: {account(self.goal, self.tick)}."
                   if self.goal.kind != "free" else "You have no goal now.")]
         lacks = self.lacks(have, {p.get("name") for p in people(obs)}, obs)
         if lacks:
             lines.append("What your aims lack, and who had it: " + "; ".join(lacks) + ".")
-        self.home_read = home.reading(obs, self.home) if self.home else None    # (what it is told of its home: the brain view shows it)
         if self.home_read:
             lines.append(home.told(obs, r=self.home_read))
         if day := home.day(obs, self.home):
@@ -250,6 +283,8 @@ class Mind:
 
     def apply(self, d: dict):
         kind = str(d.get("goal", "free")).split()[0].lower() if d.get("goal") else "free"
+        if self.building and kind != "build":
+            self.stop_building("you set another goal")
         self.building = kind == "build"                      # (the home: the body lays it to the end - steer)
         kind = kind if kind in KINDS else "free"
         who = str(d.get("with") or "").strip()
