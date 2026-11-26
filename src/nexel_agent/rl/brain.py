@@ -101,9 +101,9 @@ class Brain:
         """port: serve /feed there (0: any free port, see .port; None: no server). path: append the lines there."""
         self.name, self.q, self.cond = name, queue.SimpleQueue(), threading.Condition()
         self.lines: deque = deque(maxlen=BACKLOG)      # (seq, line)
-        self.seq, self.sticky = 0, {}                    # hello, memory, tally: always sent first to a page that connects
+        self.seq, self.sticky = 0, {}                    # hello, memory, tally, home: always sent first to a page that connects
         self.file = open(path, "a") if path else None
-        self.t_frame, self.mind, self.asked, self.deaths, self.tally = 0.0, None, None, None, None
+        self.t_frame, self.mind, self.asked, self.deaths, self.tally, self.home = 0.0, None, None, None, None, None
         self.server, self.port = None, None
         threading.Thread(target=self._run, daemon=True, name="brain").start()
         if port is not None:
@@ -141,6 +141,7 @@ class Brain:
             from .encode import action_name
             mind = self.mind
             self.tried(mind)
+            self.homed(mind)
             rel = mind.relations if mind else {}
             f = frame(obs, getattr(body, "facing", "S"), action_name(i) if i is not None else None, mask,
                       mind.goal if mind else None, now - mind.goal_at if mind else None,
@@ -161,6 +162,19 @@ class Brain:
         if s != self.tally:
             self.tally = s
             self.emit({"k": "tally", "goals": json.loads(s)})
+
+    def homed(self, mind):
+        """What the mind was last told of its home (mind.home_read: rl/home.py reading, the judge's three reports and
+        what it lacks), as a `home` line when it changed; `none` while the body has chosen no home. No second judge: the
+        reading the mind got."""
+        if mind is None or not hasattr(mind, "home_read"):
+            return
+        line = {"k": "home", "none": True} if not getattr(mind, "home", None) else \
+            {"k": "home", **mind.home_read} if mind.home_read else None
+        s = line and json.dumps(line, sort_keys=True)
+        if s and s != self.home:
+            self.home = s
+            self.emit(line)
 
     def attach(self, mind):
         """Watch the mind: what it is told (facts) and what it answers (apply), as `thought` and `memory` lines."""
@@ -213,7 +227,7 @@ class Brain:
                 self.file.flush()
             with self.cond:
                 self.seq += 1
-                if line["k"] in ("hello", "memory", "tally"):
+                if line["k"] in ("hello", "memory", "tally", "home"):
                     self.sticky[line["k"]] = (self.seq, text)
                 self.lines.append((self.seq, text))
                 self.cond.notify_all()

@@ -216,3 +216,22 @@ def test_no_tally_before_a_goal_ended(tmp_path):
     b.close()
     assert "tally" not in [x["k"] for x in lines(p)]
 
+
+def test_the_home_the_mind_is_told_goes_out_when_it_changes(tmp_path):
+    """mind.home_read (rl/home.py reading), as it was given to the mind: none while no home is chosen, then each new
+    reading once; kept for a late page."""
+    p = tmp_path / "brain.jsonl"
+    b = Brain(None, p, "Rook")
+    m = FakeMind()
+    m.home, m.home_read = None, None
+    bd = body(m)
+    b.see(obs(), bd)
+    m.home, m.home_read = (3, 4), {"at": [3, 4], "where": "2 tiles N", "far": False, "closed": False, "told": "not closed",
+                                   "verdict": {"grade": 0, "of": 6, "checks": {}, "failed": []}, "lacks": {"wood": 9}}
+    for _ in range(2):
+        b.t_frame = 0
+        b.see(obs(), bd)
+    b.close()
+    homes = [x for x in lines(p) if x["k"] == "home"]
+    assert [h.get("none") for h in homes] == [True, None] and homes[1]["where"] == "2 tiles N" and homes[1]["lacks"] == {"wood": 9}
+

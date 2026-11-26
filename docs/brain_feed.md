@@ -84,6 +84,21 @@ did not parse, as `{"raw": "..."}`).
 {"k": "memory", "t": 1795460440.2, "people": {"doben00": {"ally": true, "notes": "gives path, takes berries"}}}
 ```
 
+### `home`: what the mind is told of its home (`mind.home_read`, rl/home.py `reading`), whenever it changes
+
+```json
+{"k": "home", "t": 1795460700.2, "at": [31, 26], "where": "4 tiles N", "far": false, "closed": true,
+ "told": "closed, a door, no roof (0% covered), no light, no bed, 9 tiles inside (grade 3 of 6)",
+ "verdict": {"grade": 3, "of": 6, "checks": {"closed": true, "door": true, "roofed": false, "lit": false, "bed": false, "room_enough": true}, "failed": ["roofed", "lit", "bed"]},
+ "sense": {"grade": 3, "of": 8, "failed": ["chest", "station", "seat", "fit", "light_by_bed"]},
+ "looks": {"grade": 4, "of": 8, "failed": ["roof", "windows", "path", "no_stray"]}, "lacks": {"roof": 9, "bed": 1}}
+{"k": "home", "t": 1795460400.0, "none": true}
+```
+
+The judge's three readings (rl/judge.py: v1 `verdict`, v2 `sense`, v3 `looks`; the last two for a closed home only) and
+what the hut's blueprint still lacks beyond the pack: the same reading the mind's facts word, not a second judge. `far`:
+out of sight (nothing else then). `none`: the body has chosen no home yet. Sent when the mind is next told of it.
+
 ### `tally`: how each goal the mind set went this session (`mind.tried`), whenever it changes
 
 ```json
@@ -96,4 +111,4 @@ ends in the mind's own step. None before the first goal ends.
 ## Size
 
 About 1 KB a frame (the tiles are 169 bytes), one frame a second: some 3.5 MB an hour, plain text, and it compresses
-ten to one. The SSE server keeps the last 400 lines (plus the last `hello`, `memory` and `tally`) for a page that connects late.
+ten to one. The SSE server keeps the last 400 lines (plus the last `hello`, `memory`, `tally` and `home`) for a page that connects late.
