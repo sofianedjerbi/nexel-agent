@@ -1,0 +1,99 @@
+"""The mind's side of a home (#30): where it is (the body chooses it, rl/build.py social.home; the mind keeps it in
+memory.json across sessions and hands it back at the start: rl/mind.py), and one line of facts on it each plan: where
+it is, what the judge says of it (rl/judge.py: v1 told in words, then what v2 and v3 find missing) and what it still
+lacks of the hut's blueprint (rl/build.py PLAN) beyond the pack, down to what that is made of (the game's recipes).
+It changes nothing the body reads: no goal kind, no input.
+
+The judge reads a world; the mind has the observation: Seen is the world as the observation shows it (its grid, its
+legend, its heights and roofs, VIEW_R round the player). Past it nothing is known: open ground."""
+
+import math
+
+from nexel_worlds.sim.constants import VIEW_R
+from nexel_worlds.tiles import BLOCKS, GROUNDS, RECIPES
+
+from . import judge
+from .actions import LEVEL
+from .build import PLAN, WALLS
+from .facts import compass, counted
+
+_BLOCK, _GROUND = {b.name for b in BLOCKS}, {g.name for g in GROUNDS}
+PIECE_ITEM = {"wall": "wood_wall", "door": "door", "roof": "roof"}     # (the blueprint's pieces as items; furniture is its own)
+
+
+class Seen:
+    """The observation as a world, for the judge: block, ground, roof and level of a tile in view."""
+
+    def __init__(self, obs: dict):
+        me, legend = obs["self"], obs.get("legend") or {}
+        self.x0, self.y0 = me["x"] - VIEW_R, me["y"] - VIEW_R
+        self.names = [[legend.get(ch, "") for ch in row] for row in obs.get("grid") or []]
+        self.heights, self.roofs = obs.get("heights"), obs.get("roofs")
+
+    def _at(self, rows, x, y):
+        i, j = x - self.x0, y - self.y0
+        return rows[j][i] if rows and 0 <= j < len(rows) and 0 <= i < len(rows[j]) else None
+
+    def block(self, x, y):
+        n = self._at(self.names, x, y)
+        return n if n in _BLOCK else "none"
+
+    def ground(self, x, y):
+        n = self._at(self.names, x, y)
+        return n if n in _GROUND else "grass"           # (under a block, or out of view: the meadow's)
+
+    def roof(self, x, y):
+        return int(self._at(self.roofs, x, y) == "1")
+
+    def level(self, x, y):
+        return LEVEL.get(self._at(self.heights, x, y) or "0", 0)
+
+
+def stands(world, x, y, piece) -> bool:
+    """Is this piece of the blueprint there (as judge.laid reads one: a roof over it, a wall, a door, the thing)?"""
+    b = world.block(x, y)
+    return bool(world.roof(x, y)) if piece == "roof" else b in WALLS if piece == "wall" else \
+        b in judge.ENCLOSE and not judge._SOLID.get(b, True) if piece == "door" else b == piece
+
+
+def lacks(obs: dict, home) -> dict:
+    """What the home still lacks, beyond the pack: the blueprint's pieces not standing, as items, those not carried
+    made of what their recipe takes (one step down: wood, fiber, stone), all as {item: n}."""
+    world, have = Seen(obs), dict((obs.get("self") or {}).get("inventory") or {})
+    pieces: dict = {}
+    for dx, dy, p in PLAN:
+        if not stands(world, home[0] + dx, home[1] + dy, p):
+            item = PIECE_ITEM.get(p, p)
+            pieces[item] = pieces.get(item, 0) + 1
+    out: dict = {}
+    for item, n in pieces.items():
+        short, r = n - have.get(item, 0), RECIPES.get(item)
+        if short <= 0:
+            continue
+        if r is None:
+            out[item] = out.get(item, 0) + short
+            continue
+        times = math.ceil(short / r.output.get(item, 1))
+        for k, m in r.inputs.items():
+            out[k] = out.get(k, 0) + m * times
+    return {k: n - have.get(k, 0) for k, n in out.items() if n > have.get(k, 0)}
+
+
+def told(obs: dict, home) -> str:
+    """The home in one line of facts: "Your home 12 tiles NW: closed, no roof (40%), no bed (grade 3 of 6); it makes
+    no sense yet: no chest, no seat; it does not look good: no roof, no windows; it lacks 6 wood, 3 fiber"."""
+    me, world = obs["self"], Seen(obs)
+    x, y = home
+    where = compass(x - me["x"], y - me["y"])
+    if max(abs(x - me["x"]), abs(y - me["y"])) > VIEW_R - 2:
+        return f"Your home is {where}: too far to see how it stands."
+    v = judge.verdict(world, x, y)
+    line = f"Your home {where}: {judge.told(v)}"
+    if v["report"]["closed"]:
+        s, look = judge.sense(world, x, y), judge.looks(world, x, y)
+        if s["failed"]:
+            line += "; it makes no sense yet: " + ", ".join(f"no {k.replace('_', ' ')}" for k in s["failed"])
+        if look["failed"]:
+            line += "; it does not look good: " + ", ".join(f"no {k.replace('_', ' ')}" for k in look["failed"])
+    lack = lacks(obs, home)
+    return line + (f"; it lacks {counted(lack)}." if lack else "; you have all it takes.")

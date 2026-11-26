@@ -167,7 +167,7 @@ class LiveBody:
             self.http = httpx.AsyncClient()
             self.mind = Mind(self.a.name, self.a.persona, self.a.model_url, self.http,
                              Path(self.a.memory or f"agents/{self.a.name}/memory.json"), self.now)
-            self.mind.where = self.social.where                 # (where it last saw each person: the body's own memory)
+            self.mind.where, self.mind.social = self.social.where, self.social   # (the body's own memory: where it saw each person, its home)
             self.voice = self.mind.voice = Voice(self.a.name, self.a.persona, self.a.model_url, self.http,
                                                  self.mind.path.with_name("latency.jsonl"), self.now)
             self.voice.out = self.say
