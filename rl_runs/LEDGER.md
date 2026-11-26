@@ -337,3 +337,49 @@ verdict: keep the shipped body (targets: score; 18 min)
 - Changed: the `build` verb (a 3x3 hut, laid step by step) and the build reward (a potential on the judge's grade,
   0.25 a check: rl/judge.py). The game pin moves to main (roofs in the observation, ores and tool tiers).
 - Target: builds_5 (best build passes 5 of 6 checks) up from about 0, score and deaths no worse.
+
+## gate 2026-11-26 01:20: rl_runs/r50/best.zip vs rl_runs/r47/best.zip
+
+| 4 passes | r47/best.zip | r50/best.zip | |
+|---|---|---|---|
+| lush score | 6.556 ± 0.168 | 6.708 ± 0.477 | same |
+| lush deaths | 0.000 ± 0.000 | 0.000 ± 0.000 | same |
+| lush fs_per_near_min | 0.004 ± 0.007 | 0.004 ± 0.010 | same |
+| lush crafts_distinct | 22.703 ± 0.879 | 24.345 ± 0.633 | better |
+| lush repeat_crafts | 0.732 ± 0.008 | 0.770 ± 0.000 | worse |
+| lush fail_pct | 21.400 ± 3.140 | 20.775 ± 4.110 | same |
+| lush tools_made | 0.823 ± 0.166 | 0.980 ± 0.094 | same |
+| lush rooms | 0.130 ± 0.075 | 0.270 ± 0.110 | better |
+| lush build_grade | 0.215 ± 0.105 | 0.432 ± 0.201 | same |
+| lush builds_5 | 0.000 ± 0.000 | 0.000 ± 0.000 | same |
+| lush goals_done | 0.579 ± 0.038 | 0.621 ± 0.044 | same |
+| lush goal_gather | 0.640 ± 0.125 | 0.661 ± 0.045 | same |
+| lush goal_craft | 0.690 ± 0.091 | 0.789 ± 0.090 | same |
+| lush goal_give | 1.000 ± 0.000 | 0.986 ± 0.045 | same |
+| lush goal_ask | 0.872 ± 0.088 | 0.888 ± 0.034 | same |
+| lush goal_stay | 0.710 ± 0.132 | 0.667 ± 0.112 | same |
+| lush goal_help | 0.385 ± 0.063 | 0.446 ± 0.053 | same |
+| lush goal_avoid | 0.295 ± 0.064 | 0.323 ± 0.208 | same |
+| live-like score | 6.641 ± 0.355 | 6.889 ± 0.215 | same |
+| live-like deaths | 0.500 ± 0.918 | 0.250 ± 0.795 | same |
+| live-like fs_per_near_min | 0.002 ± 0.005 | 0.004 ± 0.006 | same |
+| live-like crafts_distinct | 23.543 ± 0.623 | 25.427 ± 0.196 | better |
+| live-like repeat_crafts | 0.728 ± 0.015 | 0.765 ± 0.009 | worse |
+| live-like fail_pct | 19.775 ± 2.150 | 17.325 ± 1.430 | same |
+| live-like tools_made | 0.800 ± 0.061 | 0.940 ± 0.110 | better |
+| live-like rooms | 0.145 ± 0.160 | 0.258 ± 0.149 | same |
+| live-like build_grade | 0.208 ± 0.170 | 0.388 ± 0.236 | same |
+| live-like builds_5 | 0.000 ± 0.000 | 0.000 ± 0.000 | same |
+| live-like goals_done | 0.586 ± 0.059 | 0.613 ± 0.061 | same |
+| live-like goal_gather | 0.613 ± 0.203 | 0.802 ± 0.098 | same |
+| live-like goal_craft | 0.789 ± 0.054 | 0.819 ± 0.216 | same |
+| live-like goal_give | 0.951 ± 0.052 | 0.972 ± 0.088 | same |
+| live-like goal_ask | 0.825 ± 0.218 | 0.844 ± 0.376 | same |
+| live-like goal_stay | 0.734 ± 0.058 | 0.736 ± 0.060 | same |
+| live-like goal_help | 0.384 ± 0.111 | 0.397 ± 0.032 | same |
+| live-like goal_avoid | 0.306 ± 0.186 | 0.354 ± 0.066 | same |
+
+verdict: keep the shipped body (targets: score; 21 min)
+- **Result (r50):** best 7.03; gate against r47 (today's game): rooms 13% -> 27% (lush, better), build grade 0.22 ->
+  0.43, tools better on live-like, score same (6.56 -> 6.71), repeat crafts worse (0.73 -> 0.77), no guard worse.
+  **Shipped** for its builds (the owner's call: the smartest body, builds first).
