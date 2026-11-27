@@ -7,6 +7,8 @@ set every 20 s, with the learned body (paid for crafting every thing once) actin
 
 from collections import Counter
 
+import numpy as np
+
 from nexel_worlds.tiles import BLOCKS, PLACEABLE, RECIPES
 
 from .actions import ACTIONS
@@ -14,6 +16,10 @@ from .goals import Goal
 from .pursue import DROPS
 
 BUILD = next(k for k, a in enumerate(ACTIONS) if a[0] == "build")
+UNASKED = ("craft", "place", "dig", "dig_at", "dig_down", "water", "ring")
+CALM = np.array([a[0] not in UNASKED for a in ACTIONS])   # (what the learned body does unhurt and unsteered: no
+                                                          # crafting, placing or digging of its own - trial 7: 22
+                                                          # workbenches placed while the build waited; trial 5: its site dug)
 PURSUE = next(k for k, a in enumerate(ACTIONS) if a[0] == "pursue")
 NOT_MADE = ("dig", "till")                   # (the land dug, soil tilled: a tool's work, no material)
 AS_ITEM = {"wall": "wood_wall"}              # (a wall of the pack's choosing: wood, the cheaper, counted)

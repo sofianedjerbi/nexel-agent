@@ -51,6 +51,7 @@ def env_for(seed):
 def run_goal(pol, kind, item, n, seed, controller, budget):
     env, rng = env_for(seed), np.random.default_rng(seed)
     env.goals.goal = Goal(kind, item, None, env.obs["tick"], 0)
+    env.goals.goal.look = controller == "skills"          # (as the live mind sets it: rl/mind.py apply)
     for d in range(1, budget + 1):
         enc = env.encoded()
         mask = enc["mask"]

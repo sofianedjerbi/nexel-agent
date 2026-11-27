@@ -96,3 +96,23 @@ def test_from_an_empty_pack_a_tower_of_three_storeys_stands(seed):
     from test_rl_structure import DESIGNS
     env, left, n = run(DESIGNS["tower"], seed, 2000)
     assert left == [], (n, len(left), left[:4])
+
+
+def test_unhurt_and_unsteered_the_body_moves_eats_and_talks_but_makes_nothing_of_its_own():
+    """Trial 7: with the build waiting, the learned body placed 22 workbenches; trial 5: it dug its own site."""
+    from nexel_agent.rl.actions import ACTIONS
+    from nexel_agent.rl.project import CALM
+    kinds = {a[0] for a, ok in zip(ACTIONS, CALM, strict=True) if ok}
+    assert not kinds & {"craft", "place", "dig", "dig_at", "dig_down"}
+    assert {"step", "attack", "eat", "pursue", "build", "say"} <= kinds
+
+
+def test_a_thought_that_fails_is_kept_with_its_cause(tmp_path):
+    """Trial 7: 75 thoughts failed and nothing said why."""
+    import asyncio
+
+    from nexel_agent.rl.mind import Mind
+    m = Mind("Rook", "", "http://x", None, tmp_path / "m.json")
+    asyncio.run(m.think({"self": {}}))
+    log = (tmp_path / "mind_errors.log").read_text()
+    assert m.stats["errors"] == 1 and "Error" in log and not m.busy

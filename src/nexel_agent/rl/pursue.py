@@ -72,15 +72,15 @@ def _piles(obs):
     return [(p["dx"], p["dy"], dict(p["items"])) for p in obs.get("items") or [] if p.get("items")]
 
 
-def craft(obs, item, ground_ch, tool_for, dirs, depth=0, blocked=(), keep=()):
+def craft(obs, item, ground_ch, tool_for, dirs, depth=0, blocked=(), keep=(), look=False):
     r = RECIPES.get(item)
     if r is None or depth > DEPTH:
         return None
     inv = obs["self"].get("inventory", {})
     lacks = [k for k, n in r.inputs.items() if inv.get(k, 0) < n]
     for lack in lacks:        # (what it can get at now - the stone in view while no tree is -: dug or picked up
-        step = gather(obs, lack, ground_ch, tool_for, dirs, blocked, keep)            # where something here gives it,
-        step = step or craft(obs, lack, ground_ch, tool_for, dirs, depth + 1, blocked, keep)   # else made)
+        step = gather(obs, lack, ground_ch, tool_for, dirs, blocked, keep, look)      # where something here gives it,
+        step = step or craft(obs, lack, ground_ch, tool_for, dirs, depth + 1, blocked, keep, look)   # else made)
         if step is not None:
             return step
     if lacks:
@@ -91,10 +91,12 @@ def craft(obs, item, ground_ch, tool_for, dirs, depth=0, blocked=(), keep=()):
         if at is None:
             if inv.get(r.station):
                 me = obs["self"]                     # (not on the home's own tiles: a bench put on a wall's tile
+                hs = obs.get("heights")              # (and on its own level: a bench put on a slope is refused,
                 d = next((k for k, (dx, dy) in dirs.items() if obs["grid"][VIEW_R + dy][VIEW_R + dx] in ground_ch - {WATER}
-                          and (me["x"] + dx, me["y"] + dy) not in keep), None)             # left the wall unlaid)
+                          and (me["x"] + dx, me["y"] + dy) not in keep          # 580 times over, scenario craft axe)
+                          and (not hs or hs[VIEW_R + dy][VIEW_R + dx] == hs[VIEW_R][VIEW_R])), None)
                 return ("place", {"dir": d, "item": r.station}) if d else None
-            return craft(obs, r.station, ground_ch, tool_for, dirs, depth + 1, blocked, keep)
+            return craft(obs, r.station, ground_ch, tool_for, dirs, depth + 1, blocked, keep, look)
         return _walk(obs, *at, ground_ch)                   # (in view, not in reach: walk to it)
     return "craft", {"recipe": item}
 
@@ -122,7 +124,7 @@ def next_step(obs, goal, social, *, person, wanted, handed, tool_for, ground_ch,
     if goal.kind == "gather" and goal.item:
         return gather(obs, goal.item, ground_ch, tool_for, dirs, goal.blocked, own(social), getattr(goal, "look", False))
     if goal.kind == "craft" and goal.item:
-        return craft(obs, goal.item, ground_ch, tool_for, dirs, blocked=goal.blocked, keep=own(social))
+        return craft(obs, goal.item, ground_ch, tool_for, dirs, blocked=goal.blocked, keep=own(social), look=getattr(goal, "look", False))
     if goal.kind in ("ask", "give", "stay"):
         return with_person(obs, goal, social, person(obs, goal), wanted, handed, ground_ch)
     return None

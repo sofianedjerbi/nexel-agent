@@ -243,8 +243,11 @@ class Mind(Building):
                 f.write(json.dumps({"t": round(time.time(), 1), "facts": msgs[1]["content"].removesuffix("\n/no_think"), "reply": out, **timing}) + "\n")
             self.apply(json.loads(re.search(r"\{.*\}", re.sub(r"<think>.*?</think>", "", out, flags=re.S), re.S).group(0)))
             self.stats["thoughts"] += 1
-        except Exception:
+        except Exception as e:                                 # (kept, with where: trial 7 lost 75 thoughts unseen)
             self.stats["errors"] += 1
+            import traceback
+            with open(self.log.with_name("mind_errors.log"), "a") as f:
+                f.write(f"{time.strftime('%H:%M:%S')} {type(e).__name__}: {e}\n{traceback.format_exc(limit=6)}\n")
         finally:
             self.busy = False
 
@@ -261,6 +264,7 @@ class Mind(Building):
         item = item_name(d.get("item")) or None
         g = Goal(kind, item, who, self.tick, self.pack.get(item, 0) if item else 0)
         g.seen = self.where.get(who) if who else None
+        g.look = kind in ("gather", "craft")                   # (its skill looks further when none is in view: rl/pursue.py)
         if (g.kind, g.item, g.person) != (self.goal.kind, self.goal.item, self.goal.person):
             if self.goal.promise:                               # (the planner's call: it may break its word)
                 self.end(self.goal, "broken: you set another goal")

@@ -26,7 +26,7 @@ from .facts import HOSTILE, Join, Say, dist, events
 from .social import SocialMemory
 from .mind import goal_text
 from .now import Now
-from .project import BUILD, PURSUE, Project
+from .project import BUILD, CALM, PURSUE, Project
 from .voice import Voice
 
 POLICY = Path(__file__).resolve().parents[3] / "models/rook.npz"     # (the shipped body: models/README.md)
@@ -226,7 +226,7 @@ class LiveBody:
                 enc = encode(obs, self.facing, self.last, self.last_ok, self.hurt, self.social.flags(obs), goal,
                              self.social.people_flags(obs, N_NEAR), self.ledger.done)
                 mask = legal(obs, self.facing, self.social, goal, self.mind.held(obs) if self.mind else None) if self.a.mask else None
-                i = self.pol.act(enc, self.rng, mask)
+                i = self.pol.act(enc, self.rng, mask & CALM if mask is not None and not self.hurt else mask)
                 words = self.mind.build_words if self.mind else None                # (named in any goal: drawn)
                 if self.mind and not (self.draft and self.draft.holds(self.social, self.mind.building or bool(words), obs, self.stats, words)):
                     i = self.mind.steer(i, mask, self.hurt)        # (a home not begun is drawn first: rl/architect.py)
