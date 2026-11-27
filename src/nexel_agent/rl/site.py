@@ -57,7 +57,7 @@ def _pit(obs, X, Y, plan=None):
     return None
 
 
-def site(obs, ground_ch, plan=None) -> tuple | None:
+def site(obs, ground_ch, plan=None, clearable=frozenset()) -> tuple | None:
     """The plan's origin (the hut's inside top-left) at the nearest spot in view where it all stands on flat, open
     ground."""
     plan = plan or _hut()
@@ -69,9 +69,10 @@ def site(obs, ground_ch, plan=None) -> tuple | None:
     for oy in range(-VIEW_R + 1 - y0, VIEW_R - 1 - y1):
         for ox in range(-VIEW_R + 1 - x0, VIEW_R - 1 - x1):
             X, Y = me["x"] + ox, me["y"] + oy
-            if all(_at(obs, "grid", X + dx, Y + dy) in (ground_ch - LIQUID_CH) | {YOU} and (X + dx, Y + dy) not in wet
-                   for dx, dy in plan.clear) and flat(obs, X, Y, plan):
-                d = math.hypot(ox + sx, oy + sy)
+            chs = [_at(obs, "grid", X + dx, Y + dy) for dx, dy in plan.clear]
+            if all(ch in (ground_ch - LIQUID_CH) | {YOU} | clearable for ch in chs) \
+                    and not any((X + dx, Y + dy) in wet for dx, dy in plan.clear) and flat(obs, X, Y, plan):
+                d = math.hypot(ox + sx, oy + sy) + 2 * sum(ch in clearable for ch in chs)   # (a tree to clear: a step more)
                 if best is None or d < best[0]:
                     best = (d, (X, Y))
     return best and best[1]

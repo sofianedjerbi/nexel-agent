@@ -39,8 +39,9 @@ TIER = {"wood_pickaxe": 1, "pickaxe": 2, "iron_pickaxe": 3, "titanium_pickaxe": 
 TILLED_CH = {g.char for g in GROUNDS if g.name in ("tilled", "wet_tilled")}
 SOWN_CH = {CH[k] for k in ("sprout", "crop", "ripe_crop")}
 PATH_CH = next(g.char for g in GROUNDS if g.name == "cobble")                           # (what the path item lays)
-BLOCK_CH = {b.char for b in BLOCKS if b.name != "none" and b.hardness > 0}   # (what stands in the way and can be dug: a
-#                                                                             tree, a stump, a flower grown on the spot)
+NATURAL = ("tree", "fruit_tree", "bare_fruit_tree", "stump", "bush", "berry_bush", "bare_bush", "thicket", "rock",
+           "mushroom", "flower")                     # (what grows or lies on the land: cleared off a site, as a player
+CLEARABLE = frozenset(CH[k] for k in NATURAL if k in CH)    # clears it; never what someone made - a chest, a bed, crops)
 
 
 def blueprint() -> list:
@@ -80,9 +81,10 @@ def next_step(obs, social, *, ground_ch, tool_for, dirs):
         return None
     plan = plan_of(social)
     if getattr(social, "home", None) is None:
-        social.home = site(obs, ground_ch, plan)
+        social.home = site(obs, ground_ch, plan, frozenset() if plan is HUT else CLEARABLE)
         if social.home is None:
-            return None
+            return _look_further(obs, social, plan)
+        social.search = None
     again = lambda: next_step(obs, social, ground_ch=ground_ch, tool_for=tool_for, dirs=dirs)    # noqa: E731
     hx, hy = social.home
     me, inv = obs["self"], obs["self"].get("inventory", {})
@@ -116,7 +118,7 @@ def next_step(obs, social, *, ground_ch, tool_for, dirs):
             return "move_to", {"x": X, "y": Y}
         if ch == YOU and any(i.get("dx") == 0 and i.get("dy") == 0 for i in obs.get("items") or []):
             return "pick_up", {}
-        if ch in BLOCK_CH and not (piece and laid(obs, X, Y, piece)) and ch not in WALL_CH | DOOR_CH:
+        if ch in CLEARABLE and not (piece and laid(obs, X, Y, piece)):
             d = next((k for k, v in dirs.items() if v == (X - me["x"], Y - me["y"])), None)
             if d is None:                                    # (to a tile beside it: a flower is walked onto, and
                 by = next(((X + i, Y + j) for i, j in dirs.values()            # the tile one stands on shows it, not
@@ -124,7 +126,7 @@ def next_step(obs, social, *, ground_ch, tool_for, dirs):
                 return "move_to", {"x": by[0], "y": by[1]}
             w = tool_for(obs, d)
             return "dig", {"dir": d, **({"with": w} if w else {})}
-    land = level_at(obs, hx + plan.ground[0][0], hy + plan.ground[0][1])
+    land = home_level(obs, social, plan)
     open_ = lambda s: _at(obs, "grid", hx + s[0], hy + s[1]) in ground_ch | {YOU}       # noqa: E731
     for cell in plan.cells:
         dx, dy, dz, piece = cell
@@ -159,6 +161,49 @@ def next_step(obs, social, *, ground_ch, tool_for, dirs):
     return None
 
 
+SEARCH = tuple((dx * k, dy * k) for k in (1, 2)                # (a view's walk each way in turn, then two views)
+               for dx, dy in ((1, 0), (0, 1), (-1, 0), (0, -1), (1, 1), (-1, 1), (-1, -1), (1, -1)))
+
+
+def _look_further(obs, social, plan):
+    """No spot in view for a drawn build: a view's walk from where it began looking, a way at a time, a look again
+    there, as a player goes looking for flat land; the next way once there with none, or stuck (the sea in the way).
+    The hut, the body's own, is sited in view or not at all, as it was trained."""
+    if plan is HUT:
+        return None
+    me, t = obs["self"], obs.get("tick")
+    pos = (me["x"], me["y"])
+    s = getattr(social, "search", None)
+    if s is None:
+        s = social.search = {"from": pos, "i": 0, "seen": None, "stuck": 0}
+    while s["i"] < len(SEARCH):
+        dx, dy = SEARCH[s["i"]]
+        tx, ty = s["from"][0] + dx * (VIEW_R - 1), s["from"][1] + dy * (VIEW_R - 1)
+        if s["seen"] is not None and s["seen"][1] != t:      # (ticks went by: moved, or not)
+            s["stuck"] = s["stuck"] + 1 if s["seen"][0] == pos else 0
+        if s["seen"] is None or s["seen"][1] != t:
+            s["seen"] = (pos, t)
+        if max(abs(tx - pos[0]), abs(ty - pos[1])) <= 2 or s["stuck"] >= 3:
+            s["i"], s["stuck"], s["seen"] = s["i"] + 1, 0, None
+            continue
+        return "move_to", {"x": tx, "y": ty}
+    return None
+
+
+def home_level(obs, social, plan) -> int:
+    """The land's level at the home: read where it is in view, and kept (out of view it is not 0, and what was dug or
+    laid up there is known by its height)."""
+    hx, hy = social.home
+    X, Y = hx + plan.ground[0][0], hy + plan.ground[0][1]
+    kept = getattr(social, "home_at", None)
+    if kept and kept[0] == (X, Y) and _at(obs, "grid", X, Y) is None:
+        return kept[1]
+    lv = level_at(obs, X, Y)
+    if _at(obs, "grid", X, Y) is not None:
+        social.home_at = ((X, Y), lv)
+    return lv
+
+
 def level_at(obs, X, Y) -> int:
     """The land's level at a tile, from the observation's heights (none sent: all the low ground, 0)."""
     from .actions import LEVEL
@@ -169,7 +214,7 @@ def laid_by(obs, social, plan):
     """Is the cell laid: on the land, as the observation shows it; a block a storey over the land, as its roofs show;
     higher up, or a flight of stairs, as the game said when it was laid (social.up_laid: the view is the land's)."""
     hx, hy = social.home
-    land = level_at(obs, hx + plan.ground[0][0], hy + plan.ground[0][1])
+    land = home_level(obs, social, plan)
     up = getattr(social, "up_laid", set())
     if getattr(social, "seen_laid", None) is None:
         social.seen_laid = set()                             # (laid on the land, as last seen)
