@@ -147,8 +147,13 @@ def plan_from(kept: dict):
     """The plan of a design kept: a build of storeys (its JSON), or a grid."""
     from .build import drawn
     from .plan import of_structure
+    from .compound import describe
     from .dug import design_of
-    return of_structure(design_of(kept["spec"])) if kept.get("spec") else drawn(kept["rows"])
+    if not kept.get("spec"):
+        return drawn(kept["rows"])
+    plan = of_structure(design_of(kept["spec"]))
+    plan.words = describe(kept["spec"])                     # (what it is, told in the mind's facts: rl/home.py)
+    return plan
 
 
 class Drafting:

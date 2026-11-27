@@ -109,7 +109,7 @@ def reading(obs: dict, home, social=None) -> dict:
         plan = plan_of(social)                               # the land's view are no room to judge)
         is_laid = laid_by(obs, social, plan)
         left = [c[3] for c in plan.cells if not is_laid(c)]
-        r.update(pieces=[len(plan.cells) - len(left), len(plan.cells)], left=dict(Counter(left)),
+        r.update(pieces=[len(plan.cells) - len(left), len(plan.cells)], left=dict(Counter(left)), what=getattr(plan, "words", None),
                  lacks=lacks(obs, home, social))
         return r
     ix, iy = inside(home, social)
@@ -134,7 +134,7 @@ def told(obs: dict, home=None, r: dict | None = None) -> str:
     if "pieces" in r:
         n, of = r["pieces"]
         left = ", ".join(f"{k} x{v}" if v > 1 else k for k, v in r["left"].items())
-        return (f"Your build {r['where']}: {n} of {of} pieces done" + (f"; left: {left}" if left else ", whole")
+        return (f"Your build {r['where']}" + (f" ({r['what']})" if r.get("what") else "") + f": {n} of {of} pieces done" + (f"; left: {left}" if left else ", whole")
                 + (f"; it lacks {counted(r['lacks'])}." if r["lacks"] else "; you have all it takes."))
     line = f"Your home {r['where']}: {r['told']}"
     if r["closed"]:
