@@ -17,6 +17,7 @@ from pathlib import Path
 import numpy as np
 
 from nexel_worlds.client import Client
+from . import architect
 from .achieve import Ledger, from_wire
 from .brain import Brain
 from .core import split
@@ -45,7 +46,7 @@ class LiveBody:
         self.ledger, self.made, self.pack = Ledger(), {}, None      # what it has done this life, as in the sim (rl/achieve.py)
         self.social, self.social_done, self.http, self.game = SocialMemory(a.name, PACK), set(), None, None
         self.tick, self.me, self.obs_entities, self.fighting = 0, {}, [], False
-        self.mind = self.voice = None                       # (the LLM planner that sets goals: rl/mind.py; words: voice.py)
+        self.mind = self.voice = self.draft = None          # (the LLM planner that sets goals: rl/mind.py; words: voice.py)
         self.now = Now(a.name, PACK)                            # (what is happening to it, for every prompt: rl/voice.py)
         self.log = open(a.log, "a") if a.log else None
         self.brain = Brain(a.brain, a.log and Path(a.log).with_name("brain.jsonl"), a.name, a.persona) if getattr(a, "brain", 0) else None
@@ -168,6 +169,8 @@ class LiveBody:
             self.mind = Mind(self.a.name, self.a.persona, self.a.model_url, self.http,
                              Path(self.a.memory or f"agents/{self.a.name}/memory.json"), self.now)
             self.mind.where, self.mind.social = self.social.where, self.social   # (the body's own memory: where it saw each person, its home)
+            self.draft = architect.Drafting(architect.model(self.a.model_url), self.mind.path.with_name("plan.json"),
+                                  self.a.persona) if getattr(self.a, "architect", 1) else None
             self.voice = self.mind.voice = Voice(self.a.name, self.a.persona, self.a.model_url, self.http,
                                                  self.mind.path.with_name("latency.jsonl"), self.now)
             self.voice.out = self.say
@@ -221,7 +224,9 @@ class LiveBody:
                 enc = encode(obs, self.facing, self.last, self.last_ok, self.hurt, self.social.flags(obs), goal,
                              self.social.people_flags(obs, N_NEAR), self.ledger.done)
                 mask = legal(obs, self.facing, self.social, goal) if self.a.mask else None
-                i = self.pol.act(enc, self.rng, mask) if not self.mind else self.mind.steer(self.pol.act(enc, self.rng, mask), mask, self.hurt)
+                i = self.pol.act(enc, self.rng, mask)
+                if self.mind and not (self.draft and self.draft.holds(self.social, self.mind.building, obs, self.stats, self.mind.build_words)):
+                    i = self.mind.steer(i, mask, self.hurt)        # (a home not begun is drawn first: rl/architect.py)
                 kind = ACTIONS[i][0]
                 steered = bool(self.mind and self.mind.building and kind == "build")    # (the mind's build: rl/mind.py steer)
                 if self.hurt > 0:
@@ -294,6 +299,7 @@ def main():
     p.add_argument("--teleport", default="", help="x,y,z: on a --dev server, start there")
     p.add_argument("--brain", type=int, default=0, help="serve what it sees and thinks on 127.0.0.1:PORT/feed (rl/brain.py)")
     p.add_argument("--memory", default="", help="where the LLM layer keeps its notes on people (memory.json)")
+    p.add_argument("--architect", type=int, default=1, help="a home not begun is drawn by the model first (#66)")
     a = p.parse_args()
     print(json.dumps(asyncio.run(LiveBody(a).play())))
 

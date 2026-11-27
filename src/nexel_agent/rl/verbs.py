@@ -14,7 +14,9 @@ def split(cmd) -> list:
         return [("dig", {"dir": "up", **w}), ("dig", {"dir": args["dir"], "z": args["z"], **w}), ("jump", {"dir": args["dir"]})]
     if tool == "ring":                   # (build's: a walk to where it lays them first, `go`)
         go = [("move_to", args["go"])] if args.get("go") else []
-        return go + [("place", {"x": x, "y": y, "item": it}) for x, y, it in args["pieces"]] or [("noop", {})]
+        return go + [("dig", {"dir": p[4], "z": p[3], "x": p[0], "y": p[1], **({"with": p[5]} if p[5] else {})})
+                     if p[2] == "dig" else ("dig", {"x": p[0], "y": p[1], "with": p[3]}) if p[2] == "till" else ("place", {"x": p[0], "y": p[1], "item": p[2], **({"z": p[3]} if len(p) > 3 else {})})
+                     for p in args["pieces"]] or [("noop", {})]
     if tool == "attack" and args.get("fight"):
         return [cmd] * FIGHT
     return [cmd]                         # (attack at someone who has not hit it: a single swing)

@@ -28,6 +28,7 @@ class SocialMemory:
         self.my_last = -10 ** 9               # when I last said something
         self.last_hit = (None, None, -10 ** 9)   # who hit me last: (name, id, tick)
         self.home = None                      # (x, y) of the home's inside, once chosen (rl/build.py)
+        self.up_laid = set()                  # (x, y, z) laid up a storey, (x, y, "stairs"): the view shows the land only
         self.began: dict = {}                 # name: who struck the first blow of the incident with them
         self.drops: dict = {}                 # name: [(tick, items)] they let fall lately (facts.handed)
         self.where: dict = {}                 # each person: where I last saw them, (x, y, hp)
@@ -129,6 +130,13 @@ class SocialMemory:
         return max(inv, key=inv.get) if inv else None
 
     def achieved(self, tool: str, args: dict, ok: bool, tick: int, near: float, to: str | None = None) -> list:
+        if tool == "dig" and ok and "z" in args and "x" in args:          # (a cell dug, by the build verb: rl/build.py)
+            self.up_laid.add((args["x"], args["y"], args["z"], "dug"))
+        if tool == "place" and ok and "x" in args:          # (what it laid where the view does not show: rl/build.py)
+            if args.get("item") == "stairs":
+                self.up_laid.add((args["x"], args["y"], "stairs"))
+            elif "z" in args:
+                self.up_laid.add((args["x"], args["y"], args["z"]))
         """The social achievements an action that came back earned (the Ledger unlocks each once). near: how far the
         nearest other person is (tiles)."""
         if not ok:
