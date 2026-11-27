@@ -28,6 +28,8 @@ Or dug into the land: "underground": true - a trench stepping down to its door a
 the land its walls and its roof (no storeys, no roof to choose; nothing to gather: the land dug is the walls).
 Or a garden: "garden": true - a plot fenced round, a gate in the middle of the "door" side, beds of tilled soil
 sown with seed, "beds": "rows" (a walk between each two beds) or "full"; no furniture, no roof.
+Or several of these on one site: {{"parts": [design, design, ...]}}, each part after the first with "at": the side
+of those before it it goes on (a house and its garden east of it; a walled yard west of a tower), 2 to 4 parts.
 A roof is made of blocks, as a builder makes one: "flat" is one layer; "gable" steps up a layer a row to a ridge
 along the long side; "hip" steps up on all four sides (on a round: a dome). Its material: {materials} ("roof" is
 shingles; stone or earth sits on a deck of planks); "eaves" (the lowest ring) and "ridge" (the top) in another
@@ -150,53 +152,83 @@ def plan_from(kept: dict):
 
 
 class Drafting:
-    """The live side: when the mind builds a home not begun, the architect draws it first, in a thread, and the body
-    waits for the drawing (it would site the hut otherwise). A drawing at full marks is the plan (social.plan) and is
-    kept in `path` (plan.json, by memory.json: a home drawn is laid as drawn the next session too); short of full
-    marks, or no model, the hut. A home begun is never drawn again."""
+    """The live side: when the mind builds, the architect draws first, in a thread, and the body waits for the drawing
+    (it would site the hut otherwise). For a home not begun: the mind's words for it, or a home for one. Once what was
+    drawn stands, the mind naming another build in its words ("a vegetable garden by the house") has it drawn as a
+    part set beside it (rl/compound.py): the same site, what stands laid already. A drawing at full marks is the plan
+    (social.plan), kept in `path` (plan.json, by memory.json: laid as drawn the next session too); short of full marks,
+    or no model, nothing changes (the hut, or what stands). Words that drew nothing are not drawn again."""
 
     def __init__(self, ask, path, who: str = "", brief: str = "a home for one"):
         import json
-        self.ask, self.path, self.who, self.brief, self.task, self.done = ask, path, who, brief, None, False
+        self.ask, self.path, self.who, self.brief, self.task, self.want = ask, path, who, brief, None, None
         self.kept = json.loads(path.read_text()) if path and path.exists() else None      # ({"spec"} or {"rows"})
+        self.tried = set()                     # (words drawn already, whatever came of them; "": the first home)
         self.last = None                       # the last design: {"grade", "of", "history"} (logged by live.py)
+        self.brief_for = brief
 
     def holds(self, social, building: bool, obs, stats=None, words=None) -> bool:
-        """True while the body is to wait for the drawing; the plan set on social once it is decided (and the design
+        """True while the body is to wait for a drawing; the plan set on social once it is decided (and the design
         told in `stats`, the run's, as "draft")."""
         import concurrent.futures
-        import json
-
-        from .build import laid, plan_of
         if self.kept and getattr(social, "plan", None) is None:
             social.plan = plan_from(self.kept)
-        if not building or self.done or getattr(social, "plan", None) is not None:
+        if not building:
             return False
-        if social.home and any(laid(obs, social.home[0] + dx, social.home[1] + dy, p) for dx, dy, p in plan_of(social).pieces):
-            self.done = True                   # (the hut begun: laid as it is)
+        if self.task is not None:
+            if not self.task.done():
+                return True
+            self._finish(social, stats)
             return False
-        if self.task is None:                  # (the mind's own words for the build, when it said them: the brief)
-            self.brief = (words or self.brief) + (f". It is for: {self.who}" if self.who else "")
-            self.task = concurrent.futures.ThreadPoolExecutor(1).submit(design, self.brief, self.ask, ROUNDS,
-                                                                        NAMED if words else BUDGET)
-            return True
-        if not self.task.done():
-            return True
-        self.done = True
+        want = self._wanted(social, obs, words)
+        if want is None:
+            return False
+        self.want, self.brief = want, want[1] + (f". It is for: {self.who}" if self.who else "")
+        self.tried.add(words or "")
+        self.task = concurrent.futures.ThreadPoolExecutor(1).submit(design, self.brief, self.ask, ROUNDS, want[2])
+        return True
+
+    def _wanted(self, social, obs, words):
+        """("first" | "part", the brief, the budget), or None: nothing to draw now."""
+        from .build import laid_by, plan_of
+        if (words or "") in self.tried:
+            return None
+        plan = plan_of(social)
+        if not self.kept:
+            begun = social.home and any(laid_by(obs, social, plan)(c) for c in plan.cells)
+            return None if begun else ("first", words or self.brief_for, NAMED if words else BUDGET)
+        if words and self.kept.get("spec") and social.home and all(laid_by(obs, social, plan)(c) for c in plan.cells):
+            return ("part", f"{words}; it goes beside a build that stands already: one design, its \"at\" the side it "
+                            "goes on", NAMED)
+        return None
+
+    def _finish(self, social, stats):
+        import json
+
+        from .dug import design_of
+        kind, done, self.task = self.want[0], self.task, None
         try:
-            d = self.task.result()
-        except Exception as e:                 # (the model gone or broken: the hut)
-            self.last = {"error": repr(e)[:200]}
-            if stats is not None:
-                stats["draft"] = self.last
-            return False
-        self.last = {k: d.get(k) for k in ("grade", "of", "history", "rows", "spec")}
+            d = done.result()
+        except Exception as e:                 # (the model gone or broken: nothing changes)
+            d = {"error": repr(e)[:200]}
+        self.last = {k: d.get(k) for k in ("grade", "of", "history", "rows", "spec", "error") if k in d}
         if stats is not None:
             stats["draft"] = self.last
-        if d.get("ok") and d["grade"] == d["of"]:
+        if not d.get("ok") or d["grade"] != d["of"]:
+            return
+        if kind == "first":
             self.kept = {"spec": d["spec"]} if d.get("spec") else {"rows": d["rows"]}
-            social.plan, social.home = plan_from(self.kept), None                      # (sited anew, for its shape)
-            if self.path:
-                self.path.parent.mkdir(parents=True, exist_ok=True)
-                self.path.write_text(json.dumps({**self.kept, "brief": self.brief, "grade": d["grade"]}))
-        return False
+            social.home = None                                                       # (sited anew, for its shape)
+        else:
+            spec = self.kept["spec"]
+            parts = spec["parts"] if spec.get("parts") else [spec]
+            new = {"parts": [*parts, {"at": "east", **d["spec"]}]}
+            try:
+                design_of(new)
+            except (ValueError, KeyError, TypeError):
+                return
+            self.kept = {"spec": new}
+        social.plan = plan_from(self.kept)
+        if self.path:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            self.path.write_text(json.dumps({**self.kept, "brief": self.brief, "grade": d["grade"]}))

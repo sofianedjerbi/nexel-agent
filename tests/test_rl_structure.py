@@ -100,10 +100,11 @@ def test_a_roof_of_any_style_and_material_is_laid_whole_by_building_alone(roof):
     assert b["sited"] and b["failed"] == [], b
 
 
-def test_earth_goes_only_over_bare_land_and_a_wrong_roof_is_told():
+def test_earth_goes_on_its_deck_over_walls_and_furniture_too_and_a_wrong_roof_is_told():
+    """Over the whole deck: what stands on the land under it is no more in its way (nexel-worlds#316)."""
     s = Structure({**DESIGNS["house"], "roof": {"material": "dirt"}})
-    busy = set(s.storeys[0]) | set(s.path)
-    assert all(m != "dirt" for x, y, z, m in s.cells() if z >= 3 and (x, y) in busy)
+    dirt = {(x, y) for x, y, z, m in s.cells() if m == "dirt"}
+    assert set(s.storeys[0]) <= dirt and {m for x, y, z, m in s.cells() if z == 3} == {"plank"}
     for bad, why in (({"style": "spire"}, "style is one of"), ({"material": "glass"}, "a roof is of")):
         assert why in judge3d.judged({**DESIGNS["house"], "roof": bad})["error"]
 
@@ -183,3 +184,82 @@ def test_a_garden_is_fenced_tilled_and_sown_by_building_alone(spec):
     """The fence and gate laid, each bed tilled with the hoe from the pack, then sown: the seed only takes on soil."""
     b = judge3d.built(spec, seed=20)
     assert b["sited"] and b["failed"] == [], b
+
+
+COMPOUNDS = {
+    "house and garden": {"parts": [{**DESIGNS["house"], "roof": {"style": "gable"}}, {**GARDEN, "at": "east"}]},
+    "dug home and its beds": {"parts": [DUG, {"garden": True, "width": 3, "depth": 3, "door": "north", "beds": "full",
+                                              "at": "north"}]},
+    "two storeys and a walled yard": {"parts": [DESIGNS["two storeys"], {**DESIGNS["round base"], "at": "west"}]},
+}
+
+
+def test_parts_are_set_apart_on_their_sides_and_judged_each_as_itself():
+    from nexel_agent.rl.compound import GAP, Compound
+    c = Compound(COMPOUNDS["house and garden"])
+    house, garden = (c._moved(k, p.clear()) for k, p in enumerate(c.parts))
+    assert min(x for x, _ in garden) - max(x for x, _ in house) > GAP                  # (east of it, a gap between)
+    j = judge3d.judged(COMPOUNDS["house and garden"])
+    assert j["kind"] == "home+garden" and j["failed"] == [] and len(j["parts"]) == 2
+    assert "1 to 4" in judge3d.judged({"parts": [GARDEN] * 5})["error"]
+
+
+@pytest.mark.parametrize("name, seed", [("house and garden", 40), ("dug home and its beds", 20),
+                                        ("two storeys and a walled yard", 60)])
+def test_a_compound_longer_than_a_view_is_laid_whole_by_building_alone(name, seed):
+    """A part at the far end out of view is walked to; what was laid at the other end is known as it was last seen;
+    a roof waits for its own part's walls only; the land between the parts is the land's (no pit to fill)."""
+    b = judge3d.built(COMPOUNDS[name], seed=seed)
+    assert b["sited"] and b["failed"] == [], b
+
+
+def test_no_build_is_sited_where_water_runs():
+    """The game's rivers and lakes run onto flat land round them: nothing is sited within WET tiles of water."""
+    from nexel_agent.rl.core import SimEnv
+    from nexel_agent.rl.site import WET, _near_water
+    env = SimEnv(ep_ticks=10 ** 6, roam=0, rivals=0)
+    env.reset(5)
+    a = env.a
+    env.sim.world.set(a.x + 3, a.y, ground="water")
+    wet = _near_water(env.sim.observe(a))
+    assert (a.x + 3 + WET, a.y) in wet and (a.x + 4 + WET, a.y) not in wet
+
+
+def test_the_mind_adds_a_garden_beside_its_home_once_it_stands(tmp_path):
+    """The home drawn and laid; then, the mind naming another build in its words, that part is drawn beside it on the
+    same site and laid, and the whole stands, each part judged as itself."""
+    import json
+    import time
+    from collections import Counter
+
+    from nexel_agent.rl.actions import ACTIONS
+    from nexel_agent.rl.core import SimEnv
+    from nexel_agent.rl.dug import design_of
+    replies = iter([json.dumps(DESIGNS["house"]), json.dumps({**GARDEN, "at": "east"})])
+    d = architect.Drafting(lambda msgs: next(replies), tmp_path / "plan.json", "a farmer")
+    env = SimEnv(ep_ticks=10 ** 6, roam=0, rivals=0)
+    env.reset(20)
+    env.folk = []
+    whole = design_of({"parts": [DESIGNS["house"], {**GARDEN, "at": "east"}]})
+    env.a.inventory.clear()
+    env.a.inventory.update(Counter("stone_wall" if p == "wall" else p for *_, p in whole.cells() if p != "till"))
+    env.a.inventory.update({"hoe": 1})
+    b = next(i for i, a in enumerate(ACTIONS) if a[0] == "build")
+
+    def build(words):
+        for _ in range(400):
+            while d.holds(env.social, True, env.sim.observe(env.a), None, words):
+                time.sleep(0.01)
+            if not env.encoded()["mask"][b]:
+                return
+            env.step(b)
+    build("a stone house")
+    home = env.social.home
+    assert home is not None and json.loads((tmp_path / "plan.json").read_text())["spec"] == DESIGNS["house"]
+    build("a vegetable garden by the house")
+    assert env.social.home == home                                                   # (the same site: it grew)
+    kept = json.loads((tmp_path / "plan.json").read_text())["spec"]
+    assert [p.get("garden", False) for p in kept["parts"]] == [False, True]
+    gx, gy = env.social.plan.ground[0]
+    j = judge3d.judge_at(env.sim, design_of(kept), *home, env.sim.world.level(home[0] + gx, home[1] + gy))
+    assert j["failed"] == [], j["failed"]
