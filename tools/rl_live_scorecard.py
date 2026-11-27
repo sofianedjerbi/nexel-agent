@@ -51,6 +51,8 @@ def main():
     ap.add_argument("--minutes", type=float, default=30)
     ap.add_argument("--port", type=int, default=7792)
     ap.add_argument("--name", default="Rook")
+    ap.add_argument("--persona", default="", help="the player's character (default: rl/live.py's); one of "
+                    "src/nexel_agent/personas.json's by its name, e.g. franky0, or the words")
     ap.add_argument("--policy", default="", help="another body's weights (default: the shipped models/rook.npz)")
     ap.add_argument("--model-url", default=None, help="the words and the planner (default: the player's own); \"\" for none")
     ap.add_argument("--no-visitors", action="store_true")
@@ -75,6 +77,9 @@ def main():
                "--minutes", str(a.minutes), "--log", str(logs / "rl.jsonl"), "--memory", str(logs / "memory.json"),
                "--brain", str(a.port + 1)]          # (brain.jsonl beside rl.jsonl: the replay for tools/brain/index.html)
         cmd += ["--policy", a.policy] if a.policy else []
+        if a.persona:                                       # (a roster name, or the words themselves)
+            roster = {p["name"]: p["persona"] for p in json.loads((ROOT / "src" / "nexel_agent" / "personas.json").read_text())}
+            cmd += ["--persona", roster.get(a.persona, a.persona)]
         cmd += ["--model-url", a.model_url] if a.model_url is not None else []
         player = subprocess.Popen(cmd, cwd=ROOT, stdout=open(logs / "report.json", "w"), stderr=open(logs / "stderr.log", "w"))
         if not a.no_visitors:
