@@ -150,3 +150,11 @@ def test_from_an_empty_pack_the_tower_stands_where_its_site_had_land_in_the_way(
     from test_rl_structure import DESIGNS
     env, left, n = run(DESIGNS["tower"], 21, 6000)
     assert left == [], (n, len(left))
+
+
+def test_no_site_has_land_under_the_eaves_closer_than_a_storey():
+    """The round home, seed 21: a hill one layer up under its eaves; the game refuses a block "too low over the floor:
+    leave room to stand under it", 199 times. The site check now leaves a storey under every overhanging cell."""
+    from test_rl_structure import DESIGNS
+    env, left, n = run(DESIGNS["round home"], 21, 3000)
+    assert left == [], (n, len(left))

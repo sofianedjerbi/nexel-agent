@@ -4,6 +4,7 @@ water (it runs onto flat land: nexel_worlds/flow.py); kept flat, a pit dug in it
 import math
 
 from nexel_worlds.sim.constants import VIEW_R
+from nexel_worlds.sim.storeys import STOREY
 from nexel_worlds.sim.observe import WATER, YOU
 from nexel_worlds.tiles import GROUNDS
 from nexel_worlds.tiles import REACH as TILE_REACH
@@ -38,8 +39,8 @@ def flat(obs, X, Y, plan=None) -> bool:
             continue                                         # (out of view: unknown, not lower - r59 left home after
         if h < lv or ((dx, dy) in plan.clear and h != lv):   # home each time it walked 9 tiles off)
             return False
-        if h - lv >= _over(plan).get((dx, dy), 99):          # (a hill under the roof's overhang, as high as its
-            return False                                     # eaves: no block goes there - the house left unroofed)
+        if h - lv > _over(plan).get((dx, dy), 99) - STOREY:  # (a block over the land leaves a storey to stand under
+            return False                                     # it, the game's rule: a hill under the eaves, unroofed)
     return True
 
 
