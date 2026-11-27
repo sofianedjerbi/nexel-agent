@@ -103,16 +103,25 @@ def _cost_parts(s) -> str:
     return " (" + ", ".join(f"{k} {v}" for k, v in by.items() if v) + ")" if by else ""
 
 
-def judged(reply: str, budget: int) -> dict:
+def judged(reply: str, budget: int, want: dict | None = None) -> dict:
     """The design in a reply judged, its cost a check of its own (over the budget fails it): a design's JSON as a
-    build of storeys (rl/judge3d.py), a grid as drawn (blueprint.judged)."""
+    build of storeys (rl/judge3d.py), a grid as drawn (blueprint.judged). `want`, what the words asked plainly
+    (rl/asked.py): a design unlike it fails "words"."""
     from . import judge3d
+    from .asked import unlike
     spec = spec_of(reply)
     if spec is not None:
         j = judge3d.judged(spec)
         c = j["structure"].cost() if j["ok"] else 0
         parts = _cost_parts(j["structure"]) if j["ok"] else ""
         j = {**j, "spec": spec, "told": judge3d.told(j) if j["ok"] else j["told"]}
+        if j["ok"] and want:
+            j["of"] += 1
+            if differs := unlike(spec, want):
+                j["failed"], j["told"] = j["failed"] + ["words"], (j["told"] if j["told"] != "nothing failed" else "") \
+                    + ("; " if j["failed"] else "") + differs
+            else:
+                j["grade"] += 1
     else:
         j = blueprint.judged(grid_of(reply))
         c = cost(j["rows"]) if j["ok"] and j.get("rows") else 0
@@ -122,7 +131,7 @@ def judged(reply: str, budget: int) -> dict:
         j["failed"] = j["failed"] + ["cost"]
         j["told"] = (j["told"] if j["told"] != "nothing failed" else "") + (
             f"{'; ' if j['failed'][:-1] else ''}it takes {c} walls, planks and roof tiles{parts}, at most {budget}: "
-            "cut what costs most - fewer storeys, a smaller inside, a flat roof (a gable or hip adds layers)")
+            "cut what costs most and the words did not ask for - fewer storeys, a smaller inside, a flat roof (a gable or hip adds layers)")
     elif j["ok"]:
         j["grade"] += 1
     return j
@@ -133,17 +142,20 @@ def _rank(j) -> tuple:
     return bool(j.get("ok")), "cost" not in j.get("failed", ()), j["grade"]      # (no design at all: last)
 
 
-def design(brief: str, ask, rounds: int = ROUNDS, budget: int = BUDGET) -> dict:
+def design(brief: str, ask, rounds: int = ROUNDS, budget: int = BUDGET, words: str | None = None) -> dict:
     """The best drawing for `brief` in `rounds`: {"rows", "grade", "of", "failed", "told", "history": [grades]}.
-    `ask(messages) -> reply text` is the model."""
+    `ask(messages) -> reply text` is the model; `words`, what was asked for (the brief, if not given), whose plain
+    asks a design keeps (rl/asked.py)."""
+    from .asked import asked
     from .structure import ROOF_MATERIALS, UPSTAIRS_FURNITURE
+    want = asked(brief if words is None else words)
     msgs = [{"role": "user", "content": DRAW.format(brief=brief, furniture=", ".join(blueprint.FURNITURE), budget=budget,
                                                     upstairs=", ".join(UPSTAIRS_FURNITURE),
                                                     materials=", ".join(ROOF_MATERIALS))}]
     best, history = None, []
     for _ in range(rounds):
         reply = ask(msgs)
-        j = judged(reply, budget)
+        j = judged(reply, budget, want)
         history.append(j["grade"])
         if best is None or _rank(j) > _rank(best):
             best = j
@@ -227,7 +239,7 @@ class Drafting:
             return False
         self.want, self.brief = want, want[1] + (f". It is for: {self.who}" if self.who else "") + carried(obs)
         self.tried.add(words or "")
-        self.task = concurrent.futures.ThreadPoolExecutor(1).submit(design, self.brief, self.ask, ROUNDS, want[2])
+        self.task = concurrent.futures.ThreadPoolExecutor(1).submit(design, self.brief, self.ask, ROUNDS, want[2], want[1])
         return True
 
     def _wanted(self, social, obs, words):
