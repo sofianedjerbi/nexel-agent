@@ -71,7 +71,7 @@ class Project:
         plan = plan_of(social)
         need = lacking(plan, laid_by(obs, social, plan), inv) if getattr(social, "home", None) else Counter()
         need = Counter({k: n for k, n in need.items() if DROPS.get(k)})    # (earth, stone blocks: dug from the land,
-        if not need or social.home is None:     # not gathered yet - #88; all in the pack: the builder lays it, as
+        if not need or social.home is None:     # not gathered yet - #89; all in the pack: the builder lays it, as
             return (BUILD, None) if build_ok else None              # built() proves; no spot yet: it chooses one)
         self.item = max(need, key=lambda k: (need[k], k))
         self.until = inv.get(self.item, 0) + min(need[self.item], self.BATCH)
