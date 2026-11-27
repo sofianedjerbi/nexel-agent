@@ -9,7 +9,7 @@ compound with one more part: what was laid reads as laid.
 from .structure import SIDE
 
 GAP = 2                     # tiles of open ground between two parts (a fence nearer a wall reads as a piece astray)
-MOST_PARTS = 4
+MOST_PARTS = 6
 
 
 class Compound:
@@ -34,6 +34,10 @@ class Compound:
             self.at.append((ox, oy))
             x0, y0 = min(x0, a0 + ox), min(y0, b0 + oy)
             x1, y1 = max(x1, a1 + ox), max(y1, b1 + oy)
+        if spec.get("walled"):                                  # (a wall round them all, laid last: rl/rampart.py)
+            from .rampart import Rampart
+            self.parts.append(Rampart((x0, y0, x1, y1), spec["walled"]))
+            self.at.append((0, 0))
         self.n, self.inside = 1, self.parts[0].inside          # (what the mind's home is read from: the first part)
 
     def _moved(self, k, tiles):
@@ -90,8 +94,9 @@ def _box(tiles):
 def describe(spec: dict) -> str:
     """A design in a few words, for the mind's facts: "a two-storey house, a gable roof of shingles; a garden east"."""
     if spec.get("parts"):
-        return "; ".join(describe(p) + (f" {p['at']}" if k and p.get("at") else "") for k, p in enumerate(spec["parts"]))
-    shape = "round" if spec.get("shape") == "round" else ""
+        return "; ".join(describe(p) + (f" {p['at']}" if k and p.get("at") else "") for k, p in enumerate(spec["parts"])) \
+            + ("; a wall round them all" if spec.get("walled") else "")
+    shape = {"round": "round", "wings": "winged"}.get(spec.get("shape"), "")
     if spec.get("garden"):
         return " ".join(w for w in ("a", shape, "garden") if w)
     if spec.get("underground"):

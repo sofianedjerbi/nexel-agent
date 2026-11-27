@@ -93,6 +93,9 @@ def judge_at(sim, s: Structure, x0, y0, lv) -> dict:
                 "nothing failed", "kind": "+".join(j["kind"] for j in js), "parts": js}
     if hasattr(s, "beds"):
         return garden_at(sim, s, x0, y0)
+    if hasattr(s, "encloses"):
+        from .rampart import rampart_at
+        return rampart_at(sim, s, x0, y0)
     from .dug import DEPTH, DugView
     inside = sorted(s.inside)
     dug = hasattr(s, "digs")

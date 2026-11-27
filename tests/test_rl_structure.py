@@ -201,7 +201,7 @@ def test_parts_are_set_apart_on_their_sides_and_judged_each_as_itself():
     assert min(x for x, _ in garden) - max(x for x, _ in house) > GAP                  # (east of it, a gap between)
     j = judge3d.judged(COMPOUNDS["house and garden"])
     assert j["kind"] == "home+garden" and j["failed"] == [] and len(j["parts"]) == 2
-    assert "1 to 4" in judge3d.judged({"parts": [GARDEN] * 5})["error"]
+    assert "1 to 6" in judge3d.judged({"parts": [GARDEN] * 7})["error"]
 
 
 @pytest.mark.parametrize("name, seed", [("house and garden", 40), ("dug home and its beds", 20),
