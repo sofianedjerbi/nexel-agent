@@ -370,3 +370,12 @@ def test_eaves_are_the_roofs_outer_ring_whatever_its_style():
     assert architect._rank({"ok": True, "failed": ["cost"], "grade": 22}) < \
         architect._rank({"ok": True, "failed": ["v2.chest"], "grade": 18})
     assert architect._rank({"ok": False, "failed": [], "grade": 0}) < architect._rank({"ok": True, "failed": ["cost"], "grade": 16})
+
+
+def test_the_last_piece_under_its_feet_is_stepped_off_and_laid():
+    """Bench run 11: a garden's path stood unfinished - its last tile was under the builder's feet (the view shows
+    the builder there, not the ground), so it was skipped and nothing was left to do; and stepping off onto the other
+    path tile, the first was forgotten. Now it steps off to lay it, and what it saw laid under its feet stays laid."""
+    spec = {"garden": True, "door": "south", "beds": "rows", "path": 2, "width": 5, "depth": 3}
+    b = judge3d.built(spec, seed=20)
+    assert b["failed"] == [] and b["picks"] < 100, b
