@@ -321,11 +321,28 @@ def test_a_goal_left_for_another_is_set_aside_and_told_and_kept():
     m = Mind("Rook", "a quiet player", "http://x", FakeHTTP("{}"), path)
     m.now.items = ("fiber", "wood")
     m.goal = Goal("ask", "fiber", "doben00", m.tick, 0)
+    m.names = {"doben00": "doben00"}                                         # (doben00 is there: seen)
     m.apply({"goal": "stay", "with": "doben00"})
     m.now.see(OBS)
     facts = m.messages(OBS)[1]["content"]
     assert "Goals you set aside" in facts and "ask fiber (with doben00)" in facts
     again = Mind("Rook", "a quiet player", "http://x", FakeHTTP("{}"), path)
     assert again.agenda.saved() and again.agenda.saved()[0]["item"] == "fiber"
+    again.names = {"doben00": "doben00"}
     again.apply({"goal": "ask", "with": "doben00", "item": "fiber"})
     assert not any(x["item"] == "fiber" for x in again.agenda.saved())
+
+
+def test_a_goal_with_someone_it_never_saw_is_not_set_and_it_is_told_so():
+    """Live trial 2, alone in the world: the planner asked "player_near_forest_edge" for fiber 19 times - a player it
+    made up, its goal then telling the name back to it. A goal with a person it never saw ends at once, told why."""
+    path = tmp_path_factory()
+    m = Mind("Rook", "a quiet player", "http://x", FakeHTTP("{}"), path)
+    m.now.items = ("fiber", "wood")
+    m.apply({"goal": "ask", "with": "player_near_forest_edge", "item": "fiber"})
+    assert m.goal.person is None and "nobody named player_near_forest_edge" in m.ended
+    m.names = {"mira": "Mira"}
+    m.apply({"goal": "ask", "with": "mira", "item": "fiber"})
+    assert m.goal.person == "Mira"                                            # (seen: as the game spells her)
+    m.apply({"goal": "gather", "with": "nobody_here", "item": "wood"})
+    assert (m.goal.kind, m.goal.person) == ("gather", None)                  # (a goal with no one: it stands)
