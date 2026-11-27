@@ -223,7 +223,7 @@ class Mind(Building):
                 "Reply with JSON only: "
                 '{"why": "one sentence first: what you want most now, and the quickest way to it from these facts", '
                 '"aims": ["1 to 3 items you want to own or build, from your character (kept: repeat them, or change them)"], '
-                '"goal": "gather|craft|give|ask|stay|help|avoid|build|free", "with": "a name you see, or empty", "item": "a game item name, or empty", "build": "with build: the build you want, in your own words (what, how big, its roof, of what), or empty", "say": "a short chat line or empty", '
+                '"goal": "gather|craft|give|ask|stay|help|avoid|build|free", "with": "a name you see, or empty", "item": "a game item name, or empty", "build": "the build you want, in your own words (what, how big, its roof, of what): your body builds it to the end, gathering what it takes; kept till you name another, or none to give it up; or empty", "say": "a short chat line or empty", '
                 '"relation_update": {"PERSON": {"ally": true|false}}, '
                 '"learned": {"ITEM": {"by": "who told you", "what": "what they said it takes or where it is found, short"}}}. '
                 "The line you say, if any: " + CHAT_STYLE)
@@ -253,7 +253,8 @@ class Mind(Building):
         if self.building and kind != "build":
             self.stop_building("you set another goal")
         self.building = kind == "build"                      # (the home: the body lays it to the end - steer)
-        self.build_words = str(d.get("build") or "").strip()[:240] or None if self.building else None   # (architect's brief)
+        said = str(d.get("build") or "").strip()[:240]          # (the architect's brief, named in any goal: kept till
+        self.build_words = None if said.lower() == "none" else said or self.build_words   # another, "none" - trial 6 lost two)
         kind = kind if kind in KINDS else "free"
         said = str(d.get("with") or "").strip()
         who = self.names.get(said.lower()) or None             # (the name as the game spells it; people it saw only)

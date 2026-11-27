@@ -45,3 +45,16 @@ def test_what_a_plan_lacks_is_read_down_to_the_land():
 def test_from_an_empty_pack_a_house_stands_through_the_project_alone(seed):
     env, left, n = run(HOUSE, seed, 6000)
     assert env.social.home is not None and left == [], (n, len(left), left[:6], dict(env.a.inventory))
+
+
+def test_the_build_the_mind_names_is_kept_whatever_its_goal_till_another_or_none(tmp_path):
+    """Live trial 6: the mind named "a 2-storey round house with gabled shingle roof" with a gather goal, twice, and
+    both were dropped (the words were kept only with the goal build)."""
+    from nexel_agent.rl.mind import Mind
+    m = Mind("Rook", "", "http://x", None, tmp_path / "m.json")
+    m.apply({"goal": "gather", "item": "fiber", "build": "a round house with a gabled shingle roof"})
+    assert m.build_words == "a round house with a gabled shingle roof" and m.goal.kind == "gather"
+    m.apply({"goal": "craft", "item": "axe", "build": ""})
+    assert m.build_words == "a round house with a gabled shingle roof"
+    m.apply({"goal": "gather", "item": "wood", "build": "none"})
+    assert m.build_words is None
