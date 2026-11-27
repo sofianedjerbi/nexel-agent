@@ -216,6 +216,13 @@ def level_at(obs, X, Y) -> int:
     return LEVEL.get(_at(obs, "heights", X, Y), 0) if obs.get("heights") else 0
 
 
+def own(social) -> set:
+    """The home's tiles in the world: dug by the builder only (live trial 5: 463 digs on the site between builds)."""
+    if getattr(social, "home", None) is None:
+        return set()
+    return {(social.home[0] + x, social.home[1] + y) for x, y in plan_of(social).clear | {c[:2] for c in plan_of(social).cells}}
+
+
 def laid_by(obs, social, plan):
     """Is the cell laid: on the land, as the observation shows it; a block a storey over the land, as its roofs show;
     higher up, or a flight of stairs, as the game said when it was laid (social.up_laid: the view is the land's)."""

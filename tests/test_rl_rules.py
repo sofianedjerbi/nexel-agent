@@ -236,3 +236,25 @@ def test_the_ores_and_tool_tiers_have_their_own_block_at_the_end():
     v = encode(obs, last_action=ACTIONS_V4 - 1)["vec"]
     assert v[V4 + ITEMS_V2.index("iron_ore")] > 0 and np.count_nonzero(v[V4:V4 + len(ITEMS_V2)]) == 1
     assert v[V4 - 1] == 1 and o["vec"].shape == (VEC,)                       # (build, the last action r57 knew: the last slot before the block)
+
+
+def test_the_home_is_dug_by_the_builder_only():
+    """Live trial 5: between build goals the policy and its gathering dug 463 times on the home's site, its walls taken
+    back up and a shaft 9 deep under it. On the home's tiles no dig is legal and no gathering digs; off them, as ever."""
+    from nexel_agent.rl.actions import pursued
+    from nexel_agent.rl.goals import Goal
+    from nexel_agent.rl.social import SocialMemory
+    env = SimEnv(ep_ticks=10 ** 6, roam=0, rivals=0, folk=0)
+    env.reset(5)
+    a = env.a
+    env.sim.set_tile(a.x + 1, a.y, block="tree")
+    social, wood = SocialMemory("Rook", ("wood",)), Goal("gather", "wood")
+    obs = env.sim.observe(a)
+    m = legal(obs, "E", social)
+    assert m[idx("dig_E")] and m[idx("dig_down")] and pursued(obs, wood, social) == ("dig", {"dir": "E"})
+    social.home = (a.x, a.y)                                       # (the hut's tiles, from here)
+    m = legal(obs, "E", social)
+    assert not m[idx("dig_E")] and not m[idx("dig_down")] and not m[idx("dig_E_axe")]
+    assert pursued(obs, wood, social) != ("dig", {"dir": "E"})
+    social.home = (a.x - 20, a.y)                                  # (a home elsewhere: here, as ever)
+    assert legal(obs, "E", social)[idx("dig_E")]
