@@ -332,3 +332,16 @@ def test_the_planner_is_told_every_kind_it_can_build():
     from nexel_agent.rl.mind import GOALS_DOC
     for kind in ("tower", "round", "underground", "garden", "gabled", "earth", "beside it"):
         assert kind in GOALS_DOC, kind
+
+
+def test_the_mind_is_told_what_its_build_is_in_a_few_words():
+    from nexel_agent.rl.compound import describe
+    assert describe(DESIGNS["tower"]) == "a three-storey tower"
+    assert describe(DESIGNS["round base"]) == "a round walled yard"
+    assert describe({**DESIGNS["house"], "roof": {"style": "gable", "material": "dirt"}}) == "a house, a gable roof of earth"
+    assert describe(COMPOUNDS["house and garden"]) == "a house, a gable roof of shingles; a garden east"
+    plan = architect.plan_from({"spec": COMPOUNDS["house and garden"]})
+    assert plan.words == describe(COMPOUNDS["house and garden"])
+    from nexel_agent.rl import home as H
+    r = {"far": False, "where": "3 tiles N", "pieces": [10, 90], "left": {"fence": 4}, "lacks": {}, "what": plan.words}
+    assert H.told({}, r=r).startswith("Your build 3 tiles N (a house, a gable roof of shingles; a garden east): 10 of 90")

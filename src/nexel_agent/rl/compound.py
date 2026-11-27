@@ -85,3 +85,23 @@ class Compound:
 def _box(tiles):
     xs, ys = [x for x, _ in tiles], [y for _, y in tiles]
     return min(xs), min(ys), max(xs), max(ys)
+
+
+def describe(spec: dict) -> str:
+    """A design in a few words, for the mind's facts: "a two-storey house, a gable roof of shingles; a garden east"."""
+    if spec.get("parts"):
+        return "; ".join(describe(p) + (f" {p['at']}" if k and p.get("at") else "") for k, p in enumerate(spec["parts"]))
+    shape = "round" if spec.get("shape") == "round" else ""
+    if spec.get("garden"):
+        return " ".join(w for w in ("a", shape, "garden") if w)
+    if spec.get("underground"):
+        return " ".join(w for w in ("a", shape, "home dug underground") if w)
+    n = int(spec.get("storeys", 1))
+    roof = spec.get("roof", True)
+    what = " ".join(w for w in ("a", shape, "walled yard") if w) if roof is False else " ".join(
+        w for w in ("a", {2: "two-storey", 3: "three-storey"}.get(n, ""), shape, "house" if n < 3 else "tower") if w)
+    if isinstance(roof, dict):
+        mat = {"roof": "shingles", "stone_block": "stone", "dirt": "earth"}.get(roof.get("material", "roof"),
+                                                                                    roof.get("material", "roof"))
+        what += f", a {roof.get('style', 'flat')} roof of {mat}"
+    return what
