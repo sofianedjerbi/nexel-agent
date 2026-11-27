@@ -223,7 +223,7 @@ class LiveBody:
                 goal = self.mind.goal if self.mind else None
                 enc = encode(obs, self.facing, self.last, self.last_ok, self.hurt, self.social.flags(obs), goal,
                              self.social.people_flags(obs, N_NEAR), self.ledger.done)
-                mask = legal(obs, self.facing, self.social, goal) if self.a.mask else None
+                mask = legal(obs, self.facing, self.social, goal, self.mind.held(obs) if self.mind else None) if self.a.mask else None
                 i = self.pol.act(enc, self.rng, mask)
                 if self.mind and not (self.draft and self.draft.holds(self.social, self.mind.building, obs, self.stats, self.mind.build_words)):
                     i = self.mind.steer(i, mask, self.hurt)        # (a home not begun is drawn first: rl/architect.py)

@@ -258,3 +258,23 @@ def test_the_home_is_dug_by_the_builder_only():
     assert pursued(obs, wood, social) != ("dig", {"dir": "E"})
     social.home = (a.x - 20, a.y)                                  # (a home elsewhere: here, as ever)
     assert legal(obs, "E", social)[idx("dig_E")]
+
+
+def test_what_the_aims_are_made_of_is_kept_from_the_bodys_own_crafts(tmp_path):
+    """Live trial 6: a bed aimed at for the hour, 13 fiber gathers done of 13, and the pack at 0 fiber and 0 wood
+    beside 16 spears, 17 campfires and 7 bandanas the body made of them. With the mind's aims held, a craft spending
+    what an aim is made of makes only the aim, its inputs or its station; with none, every craft is as before."""
+    from nexel_agent.rl.mind import Mind
+    env = SimEnv(ep_ticks=10 ** 6, roam=0)
+    env.reset(5)
+    env.a.inventory.update({"wood": 9, "stone": 3, "fiber": 4})
+    obs = env.sim.observe(env.a)
+    m = Mind("Rook", "", "http://x", None, tmp_path / "m.json")
+    m.aims = ["bed"]
+    held = m.held(obs)
+    assert held[0] == {"wood", "fiber"} and {"bed", "workbench"} <= held[1]
+    free, kept = legal(obs), legal(obs, held=held)
+    assert free[idx("craft_campfire")] and not kept[idx("craft_campfire")]      # (wood the bed takes)
+    assert kept[idx("craft_workbench")] and kept[idx("craft_stone")] == free[idx("craft_stone")]
+    m.aims = []
+    assert (legal(obs, held=m.held(obs)) == free).all()

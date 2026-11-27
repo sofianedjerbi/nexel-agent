@@ -209,10 +209,11 @@ def _front(obs, d):
     return ch, lv(fx, fy) - lv(VIEW_R, VIEW_R), rim
 
 
-def legal(obs: dict, facing: str = "S", social=None, goal=None) -> np.ndarray:
+def legal(obs: dict, facing: str = "S", social=None, goal=None, held=None) -> np.ndarray:
     """Which actions the game would not refuse outright, from what the observation shows: what you carry, a station
     or a bed within reach, a being in reach (height counted), what is in front (a block to dig, bare ground only a
-    hoe tills and only a pickaxe cuts into, a hill's rim where nothing is built, a tile already taken), a full belly."""
+    hoe tills and only a pickaxe cuts into, a hill's rim where nothing is built, a tile already taken), a full belly.
+    held: (inputs, makes) from the mind's aims (rl/mind.py held): a craft spending an input makes only what is in makes."""
     me = obs["self"]
     inv = me.get("inventory", {})
     near = {ch for row in obs["grid"][VIEW_R - USE_R:VIEW_R + USE_R + 1] for ch in row[VIEW_R - USE_R:VIEW_R + USE_R + 1]}
@@ -265,7 +266,8 @@ def legal(obs: dict, facing: str = "S", social=None, goal=None) -> np.ndarray:
             m[i] = bool(inv.get(arg)) and me.get("hunger", 0) < FOOD_MAX
         elif kind == "craft":
             r = RECIPES.get(arg)                  # (a learned action the game no longer has: never legal, rl/vocab.py)
-            m[i] = r is not None and not short(r, inv) and (not r.station or _STATION_CH[r.station] in near)
+            m[i] = r is not None and not short(r, inv) and (not r.station or _STATION_CH[r.station] in near) and not (
+                held and arg not in held[1] and held[0] & set(r.inputs))
         elif kind == "water":
             m[i] = bool(inv.get("watering_can"))
         elif kind == "sleep":
