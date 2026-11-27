@@ -36,7 +36,8 @@ def test_a_lacking_aim_names_who_had_it(tmp_path):
     m.now.see(obs([{"type": "give", "from": "Mira", "to": "Rook", "items": {"fiber": 1}}]))
     facts = m.facts(obs(entities=[seen], inv={"wood": 2}))
     line = next(x for x in facts.splitlines() if x.startswith("What your aims lack"))
-    assert "3 stone (doben00 (here))" in line and "1 fiber (Mira, trust +0." in line and "you owe them 1 item)" in line
+    assert "3 stone (doben00 (here); none in sight: " in line and "1 fiber (Mira, trust +0." in line
+    assert "you owe them 1 item; none in sight: bare bush or berry bush or thicket gives it)" in line                # (and where the land gives it)
     m.apply({"goal": "free"})                                              # (kept across sessions)
     assert "seen_with" in Mind("Rook", "", "", None, tmp_path / "memory.json").relations["doben00"]
 

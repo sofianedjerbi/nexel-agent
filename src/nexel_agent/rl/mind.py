@@ -146,7 +146,7 @@ class Mind(Building):
         close = sorted((sum(short(r, have).values()), name) for name, r in RECIPES.items() if name not in have)
         close = [f"{name} ({needs(name, obs)})" for miss, name in close if 0 < miss <= 2][:5]
         lines = [self.now.text(),
-                 ("Your aims: " + "; ".join(f"{a} ({self.home_needs(obs) if a == HOME else needs(a, obs, known)})" for a in self.aims) + "."
+                 ("Your aims: " + "; ".join(f"{a} ({self.home_needs(obs) if a == HOME else self.aim_needs(a, obs, known)})" for a in self.aims) + "."
                   if self.aims
                   else "You have set yourself no aims yet."),
                  (f"Your goal now: {BUILD}: {self.stands()[0]}." if self.building else
@@ -186,12 +186,22 @@ class Mind(Building):
         with it or gave it some), how far it trusts each and who owes whom, who of them is here, and what in sight gives
         it (the game's drops: a tree, wood). Facts only: whether to ask, trade or go and get it is the model's call."""
         out, seen = [], set("".join((obs or {}).get("grid") or []))
-        for item, n in {k: n for a in self.aims if a in RECIPES for k, n in short(RECIPES[a], have).items()}.items():
+        aims = [a for a in self.aims if a in RECIPES and not have.get(a)]
+        for item, n in {k: n for a in aims for k, n in short(RECIPES[a], have).items()}.items():
             had = [", ".join([p + (" (here)" if p in here else "")] + self.now.standing(p)) for p in self.now.who_has(item)[:2]]
             src = sorted({BLOCK_NAME[c].replace("_", " ") for c in DROPS.get(item, ()) & seen})
+            land = sorted({BLOCK_NAME[c].replace("_", " ") for c in DROPS.get(item, ())})
             out.append(f"{n} {item} (" + ("; ".join(had) if had else "nobody you know had any")
-                       + (f"; in sight, {' or '.join(src)} gives it" if src else "") + ")")
+                       + (f"; in sight, {' or '.join(src)} gives it" if src
+                          else f"; none in sight: {' or '.join(land)} gives it" if land else "") + ")")
         return out[:4]
+
+    @staticmethod
+    def aim_needs(item: str, obs: dict, known=()) -> str:
+        """An aim it owns already reads as owned, and its recipe's inputs are no longer lacks (live trial 4: two beds
+        carried, 'bed: you lack 3 fiber' read for an hour, 15 fiber gathers, no build)."""
+        have = ((obs.get("self") or {}).get("inventory") or {}).get(item, 0)
+        return f"you have {have}: it is yours already" if have else needs(item, obs, known)
 
     def messages(self, obs: dict) -> list:
         sys_ = (f"You are {self.name}, a player in a survival sandbox game. Your character: {self.persona}\n"
