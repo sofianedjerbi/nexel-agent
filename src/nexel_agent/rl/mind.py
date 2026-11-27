@@ -205,6 +205,15 @@ class Mind(Building):
         have = ((obs.get("self") or {}).get("inventory") or {}).get(item, 0)
         return f"you have {have}: it is yours already" if have else needs(item, obs, known)
 
+    def held(self, obs: dict) -> tuple:
+        """(inputs, makes): what its aims not yet owned are made from, and what may still be made of those (the aims,
+        the inputs, their stations, the goal's item). The body's own crafts leave the inputs be (live trial 6: 13 fiber gathers of 13,
+        a bed aimed at for the hour, the pack at 0 fiber and 0 wood beside 16 spears, 17 campfires, 7 bandanas)."""
+        have = (obs.get("self") or {}).get("inventory") or {}
+        aims = [RECIPES[a] for a in self.aims if a in RECIPES and not have.get(a)]
+        inputs = {k for r in aims for k in r.inputs}
+        return inputs, {*self.aims, *inputs, *(r.station for r in aims), getattr(self.goal, "item", None)}
+
     def messages(self, obs: dict) -> list:
         sys_ = (f"You are {self.name}, a player in a survival sandbox game. Your character: {self.persona}\n"
                 "Your body plays by itself (moving, eating, fighting back) and goes after the goal you set: gather sends "
