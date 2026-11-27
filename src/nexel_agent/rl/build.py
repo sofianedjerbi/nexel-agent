@@ -22,17 +22,15 @@ from nexel_worlds.tiles import BLOCKS
 from .judge import ENCLOSE
 from .social import laid_as
 from .plan import BLOCKS as CELL_BLOCKS
-from .site import _at, _pit, flat, site, tried
+from .site import _at, _pit, flat, no_way, site, tried, way_out
 from .plan import Plan, drawn, of_pieces  # noqa: F401  (drawn: the grid's plan, for its callers)
 from .pursue import craft
 
-W = H = 3                                                   # the inside
-DOOR = (1, H)                                               # in the south wall's middle
+W, H, DOOR = 3, 3, (1, 3)                                   # the inside; the door in the south wall's middle
 FURNITURE = ((0, 0, "campfire"), (W - 1, 0, "bed"))         # a corner each
 FAR = 240                   # a home further off is given up (fallen, back at spawn); a trip for wood or stone goes 100+
 _SOLID, CH = {b.name: b.solid for b in BLOCKS}, {b.name: b.char for b in BLOCKS}
-WALLS = tuple(k for k in ENCLOSE if _SOLID[k])
-DOORS = tuple(k for k in ENCLOSE if not _SOLID[k])
+WALLS, DOORS = tuple(k for k in ENCLOSE if _SOLID[k]), tuple(k for k in ENCLOSE if not _SOLID[k])
 WALL_CH, DOOR_CH = {CH[k] for k in WALLS}, {CH[k] for k in DOORS}
 DIRS4 = {"N": (0, -1), "E": (1, 0), "S": (0, 1), "W": (-1, 0)}
 TIER = {"wood_pickaxe": 1, "pickaxe": 2, "iron_pickaxe": 3, "titanium_pickaxe": 4}      # (the best digs fastest)
@@ -88,6 +86,8 @@ def next_step(obs, social, *, ground_ch, tool_for, dirs):
     again = lambda: next_step(obs, social, ground_ch=ground_ch, tool_for=tool_for, dirs=dirs)    # noqa: E731
     hx, hy = social.home
     me, inv = obs["self"], obs["self"].get("inventory", {})
+    if (out := way_out(obs, ground_ch, own(social), dirs, tool_for)) is not None:
+        return out
     cx, cy = min(((hx + x, hy + y) for x, y in plan.clear), key=lambda p: abs(p[0] - me["x"]) + abs(p[1] - me["y"]))
     if _at(obs, "grid", cx, cy) is None:                     # (none of it in view: walk home, a view at a time, to its
         dx, dy = cx - me["x"], cy - me["y"]                  # nearest tile - a compound is longer than a view)
@@ -141,9 +141,9 @@ def next_step(obs, social, *, ground_ch, tool_for, dirs):
         if dz <= 0 and piece not in (*CELL_BLOCKS, "dig") and _at(obs, "grid", X, Y) not in ground_ch:
             continue                                         # (someone or something on it: the next piece)
         if piece != "dig" and (_item(piece, inv) is None or inv.get(piece, 0) < getattr(plan, "flights", {}).get((dx, dy), 0)):
-            if piece == "till" and (step := craft(obs, TILL_TOOL, ground_ch, tool_for, dirs, keep=own(social))):
+            if piece == "till" and (step := craft(obs, TILL_TOOL, ground_ch, tool_for, dirs, blocked=no_way(social), keep=own(social))):
                 return step                                  # (no hoe: one made)
-            step = next((s for w in (WALLS if piece == "wall" else (piece,)) if (s := craft(obs, w, ground_ch, tool_for, dirs, keep=own(social)))), None)
+            step = next((s for w in (WALLS if piece == "wall" else (piece,)) if (s := craft(obs, w, ground_ch, tool_for, dirs, blocked=no_way(social), keep=own(social)))), None)
             if step is not None:
                 return step
             continue

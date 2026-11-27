@@ -158,3 +158,11 @@ def test_no_site_has_land_under_the_eaves_closer_than_a_storey():
     from test_rl_structure import DESIGNS
     env, left, n = run(DESIGNS["round home"], 21, 3000)
     assert left == [], (n, len(left))
+
+
+def test_walled_in_by_its_own_wall_rocks_and_a_bush_the_builder_digs_its_way_out():
+    """The T on seed 7: its own wall east, rocks south and west, a berry bush north; every walk "no path" 199 times."""
+    from test_rl_wings import WINGS
+    spec = {**WINGS["T"], "roof": {"style": "gable", "material": "roof", "ridge": "plank"}}
+    env, left, n = run(spec, 7, 2000)
+    assert left == [], (n, len(left))
