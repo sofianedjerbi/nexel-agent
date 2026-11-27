@@ -95,6 +95,10 @@ def craft(obs, item, ground_ch, tool_for, dirs, depth=0, blocked=(), keep=(), lo
                 d = next((k for k, (dx, dy) in dirs.items() if obs["grid"][VIEW_R + dy][VIEW_R + dx] in ground_ch - {WATER}
                           and (me["x"] + dx, me["y"] + dy) not in keep          # 580 times over, scenario craft axe)
                           and (not hs or hs[VIEW_R + dy][VIEW_R + dx] == hs[VIEW_R][VIEW_R])), None)
+                if d is None and keep:               # (every tile round it the home's or a slope: a step off the
+                    off = next(((dx, dy) for dx, dy in _cells(obs, ground_ch - {WATER}, blocked)          # site first -
+                                if (dx, dy) != (0, 0) and (me["x"] + dx, me["y"] + dy) not in keep), None)  # the round
+                    return _walk(obs, *off, ground_ch) if off else None                     # home, 80 walls left)
                 return ("place", {"dir": d, "item": r.station}) if d else None
             return craft(obs, r.station, ground_ch, tool_for, dirs, depth + 1, blocked, keep, look)
         return _walk(obs, *at, ground_ch)                   # (in view, not in reach: walk to it)
