@@ -35,12 +35,16 @@ UPSTAIRS_FURNITURE = tuple(f for f in bp.FURNITURE if PLACEABLE.get(f, f) in UPS
 def footprint(spec) -> tuple:
     """(inside, ring): the inside tiles and the wall tiles round them, from the walls' top-left (0, 0)."""
     if spec.get("shape", "rect") == "round":
+        if "radius" not in spec:
+            raise ValueError("a round needs its radius")
         r = float(spec["radius"])
         if not 2 <= r <= 6:
             raise ValueError("radius from 2 to 6")
         n = math.ceil(r) + 1
         inside = {(x + n, y + n) for x in range(-n, n + 1) for y in range(-n, n + 1) if math.hypot(x, y) < r - .5}
     else:
+        if "width" not in spec or "depth" not in spec:
+            raise ValueError("a design needs its width and depth (or shape round and a radius)")
         w, d = int(spec["width"]), int(spec["depth"])
         if not (2 <= w <= bp.MOST - 2 and 2 <= d <= bp.MOST - 2):
             raise ValueError(f"width and depth from 2 to {bp.MOST - 2}")
@@ -132,6 +136,7 @@ class Structure:
         """The roof's layers, the lowest first: [[(x, y, material)]]. Flat, one; a gable, each a row in from the long
         sides; a hip, a ring in from every side; ROOF_RISE layers at the most (what is left at the top, flat)."""
         style, mat, eaves, ridge = self.roof["style"], self.roof["material"], self.roof.get("eaves"), self.roof.get("ridge")
+        edge = {p for p, k in _rings(set(base)).items() if k == 0}   # (the eaves: the roof's outer ring, whatever its style)
         xs, ys = [x for x, _ in base], [y for _, y in base]
         cx, cy = (min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2
         along_x = max(xs) - min(xs) >= max(ys) - min(ys)           # (the ridge along the long side)
@@ -150,10 +155,10 @@ class Structure:
         for p in base:
             d = rise[p]
             if deck:
-                out[0].append((p[0], p[1], eaves if eaves and d == 0 else "plank"))
+                out[0].append((p[0], p[1], eaves if eaves and p in edge else "plank"))
             for i in range(d + 1):
-                m = eaves if eaves and i == 0 and d == 0 else ridge if ridge and i == d and depth(p) == most and most else mat
-                if not (deck and eaves and d == 0):           # land's next layer, the thing in its way: nexel-worlds#308)
+                m = eaves if eaves and i == 0 and p in edge else ridge if ridge and i == d and depth(p) == most and most else mat
+                if not (deck and eaves and p in edge):           # land's next layer, the thing in its way: nexel-worlds#308)
                     out[i + deck].append((p[0], p[1], m))
         return [layer for layer in out if layer]
 

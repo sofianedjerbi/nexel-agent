@@ -14,13 +14,14 @@ from pathlib import Path
 
 from nexel_agent.rl import architect, judge3d
 
-BRIEFS = (("a home for one", 82), ("a small home for one by a river", 82), ("a cosy cabin for a farmer", 82),
-          ("a home for two, a bed each", 104), ("a workshop home: a workbench by the door", 82),
-          ("a round hut", 90), ("a round base for a camp: an open yard walled round, a campfire in it", 60),
+BRIEFS = (("a home for one", 130), ("a small home for one by a river", 130), ("a cosy cabin for a farmer", 130),
+          ("a home for two, a bed each", 140), ("a workshop home: a workbench by the door", 130),
+          ("a round hut", 160), ("a round base for a camp: an open yard walled round, a campfire in it", 60),
           ("a two-storey house: a bedroom upstairs", 150), ("a watchtower, three storeys high", 170),
-          ("a stone cottage", 82), ("a cottage under a gable roof of shingles with stone eaves", 140),
+          ("a stone cottage", 150), ("a cottage under a gable roof of shingles with stone eaves", 140),
           ("a sod-roofed hut: earth on the roof", 150), ("a round house with a domed roof", 200),
-          ("a home dug underground, hidden from the glooms", 82), ("a vegetable garden by the house", 40))
+          ("a home dug underground, hidden from the glooms", 82), ("a vegetable garden", 40),
+          ("a house for one with its vegetable garden beside it", 180))
 
 
 def main():

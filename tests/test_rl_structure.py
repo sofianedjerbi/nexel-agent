@@ -345,3 +345,37 @@ def test_the_mind_is_told_what_its_build_is_in_a_few_words():
     from nexel_agent.rl import home as H
     r = {"far": False, "where": "3 tiles N", "pieces": [10, 90], "left": {"fence": 4}, "lacks": {}, "what": plan.words}
     assert H.told({}, r=r).startswith("Your build 3 tiles N (a house, a gable roof of shingles; a garden east): 10 of 90")
+
+
+def test_over_budget_the_architect_is_told_what_costs_most_and_any_design_is_read():
+    import json
+    big = {**DESIGNS["two storeys"], "width": 5, "depth": 5, "roof": {"style": "gable"}}
+    j = architect.judged(json.dumps(big), 82)
+    assert "cost" in j["failed"] and "roof" in j["told"] and "walls" in j["told"] and "flat roof" in j["told"]
+    assert architect.spec_of(json.dumps({"garden": True})) == {"garden": True}                # (read as a design...)
+    assert "width and depth" in architect.judged('{"garden": true}', 82)["told"]               # (...and told what it lacks)
+    assert architect.judged(json.dumps({**DESIGNS["house"], "roof": {"style": "gable"}}), architect.BUDGET)["failed"] == []
+
+
+def test_eaves_are_the_roofs_outer_ring_whatever_its_style():
+    """Bench run 9: on a flat roof every tile was at depth 0, so "eaves" of stone took it all, and stone is held by no
+    wall: none of it went down. The eaves are the outer ring only; and the best design is one within the budget."""
+    s = Structure({**DESIGNS["house"], "roof": {"style": "flat", "eaves": "stone_block"}})
+    roof = [(x, y, m) for x, y, z, m in s.cells() if z == 3]
+    xs, ys = [x for x, _, _ in roof], [y for _, y, _ in roof]
+    edge = lambda x, y: x in (min(xs), max(xs)) or y in (min(ys), max(ys))          # noqa: E731
+    assert all((m == "stone_block") == edge(x, y) for x, y, m in roof)
+    b = judge3d.built({**DESIGNS["house"], "roof": {"style": "flat", "eaves": "stone_block"}}, seed=5)
+    assert b["failed"] == [], b
+    assert architect._rank({"ok": True, "failed": ["cost"], "grade": 22}) < \
+        architect._rank({"ok": True, "failed": ["v2.chest"], "grade": 18})
+    assert architect._rank({"ok": False, "failed": [], "grade": 0}) < architect._rank({"ok": True, "failed": ["cost"], "grade": 16})
+
+
+def test_the_last_piece_under_its_feet_is_stepped_off_and_laid():
+    """Bench run 11: a garden's path stood unfinished - its last tile was under the builder's feet (the view shows
+    the builder there, not the ground), so it was skipped and nothing was left to do; and stepping off onto the other
+    path tile, the first was forgotten. Now it steps off to lay it, and what it saw laid under its feet stays laid."""
+    spec = {"garden": True, "door": "south", "beds": "rows", "path": 2, "width": 5, "depth": 3}
+    b = judge3d.built(spec, seed=20)
+    assert b["failed"] == [] and b["picks"] < 100, b

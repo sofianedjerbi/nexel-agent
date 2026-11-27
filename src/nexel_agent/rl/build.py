@@ -128,11 +128,15 @@ def next_step(obs, social, *, ground_ch, tool_for, dirs):
             return "dig", {"dir": d, **({"with": w} if w else {})}
     land = home_level(obs, social, plan)
     open_ = lambda s: _at(obs, "grid", hx + s[0], hy + s[1]) in ground_ch | {YOU}       # noqa: E731
+    underfoot = None
     for cell in plan.cells:
         dx, dy, dz, piece = cell
         X, Y = hx + dx, hy + dy
-        if is_laid(cell) or not plan.held(cell, is_laid) or (dz <= 0 and (me["x"], me["y"]) == (X, Y) and piece not in CELL_BLOCKS):
-            continue                                         # (under its feet: the tile shows it, not what is laid)
+        if is_laid(cell) or not plan.held(cell, is_laid):
+            continue
+        if dz <= 0 and (me["x"], me["y"]) == (X, Y) and piece not in CELL_BLOCKS:
+            underfoot = underfoot or cell                    # (under its feet: the tile shows it, not what is laid)
+            continue
         if dz <= 0 and piece not in (*CELL_BLOCKS, "dig") and _at(obs, "grid", X, Y) not in ground_ch:
             continue                                         # (someone or something on it: the next piece)
         if piece != "dig" and _item(piece, inv) is None:
@@ -152,6 +156,8 @@ def next_step(obs, social, *, ground_ch, tool_for, dirs):
         here = (me["x"], me["y"]) == (sx, sy) and (not stand[2] or me.get("z") == sz)    # pick walks there and lays
         go = {} if here else {"go": {"x": sx, "y": sy, **({"z": sz} if stand[2] else {})}}   # all in reach)
         return "ring", {"pieces": run, **go}
+    if underfoot is not None and (st := plan.stand_for(underfoot, open_, is_laid)) is not None:
+        return "move_to", {"x": hx + st[0], "y": hy + st[1]}     # (all else done: a step off to see, and lay it)
     far = [(hx + c[0], hy + c[1]) for c in plan.cells if _at(obs, "grid", hx + c[0], hy + c[1]) is None and not is_laid(c)]
     if far:                                                  # (what is left is out of view - the other end of a
         fx, fy = min(far, key=lambda p: abs(p[0] - me["x"]) + abs(p[1] - me["y"]))     # compound: a view nearer it)
@@ -228,8 +234,8 @@ def laid_by(obs, social, plan):
         if p == "dig":                                       # (dug: as the game said, or the floor seen lower)
             return (X, Y, land + dz, "dug") in up or (obs.get("heights") is not None and level_at(obs, X, Y) < land + dz)
         if dz <= 0:                                          # (out of view now: as it was when last seen)
-            if _at(obs, "grid", X, Y) is None:
-                return (X, Y, dz, p) in seen
+            if _at(obs, "grid", X, Y) in (None, YOU):        # (under its feet too: the tile shows it, not what is
+                return (X, Y, dz, p) in seen                 # laid there)
             if laid(obs, X, Y, p):
                 seen.add((X, Y, dz, p))
                 return True
