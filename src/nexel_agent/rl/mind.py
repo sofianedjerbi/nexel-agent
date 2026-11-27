@@ -27,6 +27,7 @@ from .voice import CHAT_STYLE, THOUGHT_TOKENS
 
 PROMISE = sec(120)         # a promise to hand something over is kept within this, or broken
 THINK_S = 20.0             # (the model it asks: rl/voice.py MODEL, the same server as the words)
+PERSON_KINDS = ("give", "ask", "stay", "help", "avoid")    # goals that are with a person
 HOME = "home"               # an aim that is no item: its home, what it takes its lacks (rl/home.py)
 GOALS_DOC = ("Goals: gather (an item), craft (an item), give (an item, to a person), ask (a person, for an item), "
              "stay (with a person), help (a person, in a fight), avoid (a person), build (what you describe in "
@@ -233,8 +234,8 @@ class Mind(Building):
         self.building = kind == "build"                      # (the home: the body lays it to the end - steer)
         self.build_words = str(d.get("build") or "").strip()[:240] or None if self.building else None   # (architect's brief)
         kind = kind if kind in KINDS else "free"
-        who = str(d.get("with") or "").strip()
-        who = self.names.get(who.lower(), who) or None               # (the name as the game spells it)
+        said = str(d.get("with") or "").strip()
+        who = self.names.get(said.lower()) or None             # (the name as the game spells it; people it saw only)
         item = item_name(d.get("item")) or None
         g = Goal(kind, item, who, self.tick, self.pack.get(item, 0) if item else 0)
         g.seen = self.where.get(who) if who else None
@@ -248,6 +249,8 @@ class Mind(Building):
             self.stats["goals"][kind] = self.stats["goals"].get(kind, 0) + 1
             if item and self.now.items and item not in self.now.items:
                 self.end(g, f"there is no item called {item} in the game")
+            elif said and who is None and kind in PERSON_KINDS:   # (live trial 2: it asked a player it made up, 19
+                self.end(g, f"nobody named {said} is here or known to you")   # times, alone in the world)
         say = str(d.get("say") or "").strip()
         self.to_say = say[:120] or None
         if isinstance(d.get("aims"), list) and d["aims"]:
