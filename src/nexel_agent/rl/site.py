@@ -105,7 +105,8 @@ def _hut():
 
 
 TRIES = 4                     # (a dig refused this often from one stand: tried from another side - seed 21's mushroom,
-                              # "behind the land", dug at 199 times from the same tile)
+                              # "behind the land", dug at 199 times from the same tile; a dig still under way is no try:
+                              # a rock takes 54 ticks, the T's on seed 7 was given up and walked from forever)
 
 
 def tried(social, X, Y, here, count=True) -> bool:

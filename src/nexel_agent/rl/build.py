@@ -120,7 +120,7 @@ def next_step(obs, social, *, ground_ch, tool_for, dirs):
             return "pick_up", {}
         if ch in CLEARABLE and not (piece and laid(obs, X, Y, piece)):
             d = next((k for k, v in dirs.items() if v == (X - me["x"], Y - me["y"])), None)
-            if d is not None and not tried(social, X, Y, (me["x"], me["y"])):
+            if d is not None and not tried(social, X, Y, (me["x"], me["y"]), count=not me.get("action")):  # (a dig under way: no try)
                 return "dig", {"dir": d, **({"with": w} if (w := tool_for(obs, d)) else {})}
             by = next(((X + i, Y + j) for i, j in dirs.values() if _at(obs, "grid", X + i, Y + j) in ground_ch  # (to a tile
                        and not tried(social, X, Y, (X + i, Y + j), count=False)), None if d else (X, Y))  # beside it; a
