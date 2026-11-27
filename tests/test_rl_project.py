@@ -136,3 +136,17 @@ def test_inside_its_own_site_the_builder_steps_off_to_put_a_bench_down():
     from test_rl_structure import DESIGNS
     env, left, n = run(DESIGNS["round home"], 9, 1500)
     assert left == [], (n, len(left))
+
+
+def test_a_clearing_dig_refused_from_one_side_is_tried_from_another():
+    """Seed 21: a mushroom on the tower's site "behind the land" from where the builder stood, dug at 199 times."""
+    from nexel_agent.rl.site import TRIES, tried
+    s = SimpleNamespace()
+    assert not any(tried(s, 3, 4, (3, 3)) for _ in range(TRIES))
+    assert tried(s, 3, 4, (3, 3)) and not tried(s, 3, 4, (2, 4), count=False)
+
+
+def test_from_an_empty_pack_the_tower_stands_where_its_site_had_land_in_the_way():
+    from test_rl_structure import DESIGNS
+    env, left, n = run(DESIGNS["tower"], 21, 6000)
+    assert left == [], (n, len(left))

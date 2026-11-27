@@ -102,3 +102,17 @@ def _near_water(obs) -> set:
 def _hut():
     from .build import HUT
     return HUT
+
+
+TRIES = 4                     # (a dig refused this often from one stand: tried from another side - seed 21's mushroom,
+                              # "behind the land", dug at 199 times from the same tile)
+
+
+def tried(social, X, Y, here, count=True) -> bool:
+    """Has clearing (X, Y) from `here` been tried TRIES times (counting this try, unless count is False)?"""
+    t = social.__dict__.setdefault("clear_tries", {})
+    if t.get((X, Y, here), 0) >= TRIES:
+        return True
+    if count:
+        t[(X, Y, here)] = t.get((X, Y, here), 0) + 1
+    return False
