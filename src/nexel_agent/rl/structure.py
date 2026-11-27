@@ -19,8 +19,9 @@ from nexel_worlds.sim.storeys import STOREY, UPSTAIRS
 from nexel_worlds.tiles import PLACEABLE
 
 from . import blueprint as bp
+from .wings import gable as _gable, wings as _wings
 
-SHAPES = ("rect", "round")
+SHAPES = ("rect", "round", "wings")      # (wings: rectangles joined, an L, a T, a cross)
 MOST_STOREYS = 3            # the top floor 6 layers up: a flight of stairs leads 7 at most (climbing.RISE)
 SIDE = {"north": (0, -1), "south": (0, 1), "west": (-1, 0), "east": (1, 0)}
 THINGS = ("wall", "door", "fence", *bp.FURNITURE)
@@ -42,6 +43,8 @@ def footprint(spec) -> tuple:
             raise ValueError("radius from 2 to 6")
         n = math.ceil(r) + 1
         inside = {(x + n, y + n) for x in range(-n, n + 1) for y in range(-n, n + 1) if math.hypot(x, y) < r - .5}
+    elif spec.get("shape") == "wings":
+        inside = set().union(*_wings(spec))
     else:
         if "width" not in spec or "depth" not in spec:
             raise ValueError("a design needs its width and depth (or shape round and a radius)")
@@ -81,6 +84,7 @@ class Structure:
         self.roof = roof_of(spec.get("roof", True))
         self.roofed = self.roof is not None
         self.inside, self.ring = footprint(spec)
+        self.wings = [_around(_around(w)) for w in _wings(spec)] if self.shape == "wings" else []
         door = str(spec.get("door", "south")).lower()
         if door not in SIDE:
             raise ValueError(f"door is one of {', '.join(SIDE)}")
@@ -137,13 +141,12 @@ class Structure:
         sides; a hip, a ring in from every side; ROOF_RISE layers at the most (what is left at the top, flat)."""
         style, mat, eaves, ridge = self.roof["style"], self.roof["material"], self.roof.get("eaves"), self.roof.get("ridge")
         edge = {p for p, k in _rings(set(base)).items() if k == 0}   # (the eaves: the roof's outer ring, whatever its style)
-        xs, ys = [x for x, _ in base], [y for _, y in base]
-        cx, cy = (min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2
-        along_x = max(xs) - min(xs) >= max(ys) - min(ys)           # (the ridge along the long side)
         if style == "flat":
             depth = lambda p: 0                                            # noqa: E731
+        elif style == "gable" and self.shape == "wings":          # (each wing its own ridge, along its long side)
+            depth = lambda p: max(_gable(w, p) for w in self.wings)        # noqa: E731
         elif style == "gable":
-            depth = lambda p: int((max(ys) - min(ys)) / 2 - abs(p[1] - cy)) if along_x else int((max(xs) - min(xs)) / 2 - abs(p[0] - cx))   # noqa: E731
+            depth = lambda p: _gable(base, p)                              # noqa: E731
         else:
             ring = _rings(set(base))
             depth = ring.get                                               # noqa: E731

@@ -17,8 +17,9 @@ planks over each storey that has one above it, a flight of stairs outside up to 
 roof over the top (one tile past its walls) unless you leave it open.
 
 Answer with JSON only:
-{{"shape": "rect" or "round", "width": tiles west to east, "depth": tiles north to south (rect),
-  "radius": 2 to 6 (round), "storeys": 1 to 3, "door": "north"|"south"|"east"|"west",
+{{"shape": "rect" or "round" or "wings", "width": tiles west to east, "depth": tiles north to south (rect),
+  "radius": 2 to 6 (round), "wings": [[x, y, width, depth], ...] (2 to 4 rectangles joined side to side into one
+  inside: an L, a T, a U, a cross; each wing under its own gable), "storeys": 1 to 3, "door": "north"|"south"|"east"|"west",
   "roof": false (open) or {{"style": "flat"|"gable"|"hip", "material": ..., "eaves": ..., "ridge": ...}},
   "furniture": {{"bed": [x, y], "table": [x, y, storey], ...}}, "path": 2 or 3}}
 Places are from the inside's top-left (x west to east, y north to south; a round's inside is its box), storey 0
