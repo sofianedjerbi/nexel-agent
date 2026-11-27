@@ -26,7 +26,7 @@ from .facts import HOSTILE, Join, Say, dist, events
 from .social import SocialMemory
 from .mind import goal_text
 from .now import Now
-from .project import BUILD, Project
+from .project import BUILD, PURSUE, Project
 from .voice import Voice
 
 POLICY = Path(__file__).resolve().parents[3] / "models/rook.npz"     # (the shipped body: models/README.md)
@@ -232,6 +232,8 @@ class LiveBody:
                     i = self.mind.steer(i, mask, self.hurt)        # (a home not begun is drawn first: rl/architect.py)
                     p = self.project.act(obs, self.social, mask is None or bool(mask[BUILD])) if not self.hurt else None
                     i, goal = (p[0], p[1] or goal) if p else (i, goal)       # (the project owns the body; hurt, reflexes)
+                    if not p and not self.hurt and goal is not None and goal.kind in ("gather", "craft") and (mask is None or mask[PURSUE]):
+                        i = PURSUE                     # (a goal's skill acts when it has a step: tools/scenarios.py, 2-22x fewer)
                 kind = ACTIONS[i][0]
                 steered = bool(self.mind and self.mind.building and kind == "build")    # (the mind's build: rl/mind.py steer)
                 if self.hurt > 0:
