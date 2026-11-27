@@ -379,3 +379,26 @@ def test_the_last_piece_under_its_feet_is_stepped_off_and_laid():
     spec = {"garden": True, "door": "south", "beds": "rows", "path": 2, "width": 5, "depth": 3}
     b = judge3d.built(spec, seed=20)
     assert b["failed"] == [] and b["picks"] < 100, b
+
+
+def test_a_build_the_mind_names_is_drawn_over_a_hut_the_body_began(tmp_path):
+    """Live trial 1: the body sited and began a hut on its own; the mind then asked for "a round house with a domed
+    roof" and it was never drawn (a home begun was never drawn again), and left the build goal before a drawing could
+    come back. Now the mind's words are drawn over the hut, and the drawing is kept whenever it comes back."""
+    import json
+    import time
+    from types import SimpleNamespace
+
+    from nexel_agent.rl.core import SimEnv
+    env = SimEnv(ep_ticks=10 ** 6, roam=0, rivals=0)
+    env.reset(5)
+    social = SimpleNamespace(home=(env.a.x + 2, env.a.y + 2), plan=None, up_laid=set())
+    env.sim.world.set(env.a.x + 1, env.a.y + 1, block="stone_wall")              # (a piece of the hut, laid)
+    obs = env.sim.observe(env.a)
+    d = architect.Drafting(lambda msgs: json.dumps(DESIGNS["round home"]), tmp_path / "plan.json")
+    assert not d.holds(social, True, obs)                                            # (no words: the hut goes on)
+    assert d.holds(social, True, obs, None, "a round house with a domed roof")
+    while not d.task.done():
+        time.sleep(0.01)
+    assert not d.holds(social, False, obs)                                           # (the mind moved on: kept)
+    assert json.loads((tmp_path / "plan.json").read_text())["spec"]["shape"] == "round" and social.home is None

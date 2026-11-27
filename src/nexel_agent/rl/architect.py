@@ -185,7 +185,8 @@ class Drafting:
     drawn stands, the mind naming another build in its words ("a vegetable garden by the house") has it drawn as a
     part set beside it (rl/compound.py): the same site, what stands laid already. A drawing at full marks is the plan
     (social.plan), kept in `path` (plan.json, by memory.json: laid as drawn the next session too); short of full marks,
-    or no model, nothing changes (the hut, or what stands). Words that drew nothing are not drawn again."""
+    or no model, nothing changes (the hut, or what stands). Words that drew nothing are not drawn again. The mind's
+    words for a build are drawn over a hut the body began on its own."""
 
     def __init__(self, ask, path, who: str = "", brief: str = "a home for one"):
         import json
@@ -201,12 +202,12 @@ class Drafting:
         import concurrent.futures
         if self.kept and getattr(social, "plan", None) is None:
             social.plan = plan_from(self.kept)
-        if not building:
-            return False
-        if self.task is not None:
-            if not self.task.done():
-                return True
+        if self.task is not None:              # (a drawing comes back whether the mind still builds or not: kept
+            if not self.task.done():           # for when it builds again)
+                return building
             self._finish(social, stats)
+            return False
+        if not building:
             return False
         want = self._wanted(social, obs, words)
         if want is None:
@@ -222,9 +223,11 @@ class Drafting:
         if (words or "") in self.tried:
             return None
         plan = plan_of(social)
-        if not self.kept:
+        if not self.kept:                      # (a build the mind names in its words is drawn over a hut the body
+            if words:                          # began on its own - live trial 1: the body sited a hut before the
+                return ("first", words, NAMED) # mind asked for "a round house with a domed roof", and that was lost)
             begun = social.home and any(laid_by(obs, social, plan)(c) for c in plan.cells)
-            return None if begun else ("first", words or self.brief_for, NAMED if words else BUDGET)
+            return None if begun else ("first", self.brief_for, BUDGET)
         if words and self.kept.get("spec") and social.home and all(laid_by(obs, social, plan)(c) for c in plan.cells):
             return ("part", f"{words}; it goes beside a build that stands already: one design, its \"at\" the side it "
                             "goes on", NAMED)
