@@ -96,7 +96,7 @@ class Mind(Building):
         p = next((b for b in people(obs) if b.get("name") == g.person), None)
         done = judge(g, tick, lambda k: self.pack.get(k, 0), results, got_from, dist(p) if p else 99.0, p and p.get("id"))
         if done or tick >= g.until:
-            self.end(g, account(g, tick, "done" if done else "timed out, not done"), kept=bool(done))
+            self.end(g, account(g, tick, "done" if done else "timed out, not done"), kept=bool(done), done=bool(done))
 
     def commit(self, to: str, item: str, n: int = 1):
         """Its own line promised `to` the item (rl/acts.py): the promise is its goal now, a give with a deadline. Kept
@@ -119,17 +119,19 @@ class Mind(Building):
             self.now.ask(self.name, g.person, g.item)
         return r
 
-    def end(self, g: Goal, how: str, kept: bool = False):
+    def end(self, g: Goal, how: str, kept: bool = False, done: bool = False):
+        """The goal ended, `how` told back ("4 s of 180 s, done"); `done`, whether it was (live trial 5: read from how
+        it began, every goal tallied "0 of 27" though done, and the agenda never took one up)."""
         if g.promise:
             self.now.remember(g.person, "you kept a promise to them" if kept else "you broke a promise to them")
             how += "; it was a promise"
         self.ended = f"{goal_text(g)}: {how}"
-        if how.startswith("done"):
+        if done:
             self.agenda.taken_up(g)
         if g.kind != "free":                                    # (how each goal it set went, this session)
             tally = self.tried.setdefault(goal_text(g), [0, 0])
             tally[0] += 1
-            tally[1] += how.startswith("done")
+            tally[1] += done
         self.goal, self.goal_at, self.salient = Goal(start=self.tick), time.monotonic(), True
 
     def due(self) -> bool:

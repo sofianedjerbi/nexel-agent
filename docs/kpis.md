@@ -19,7 +19,7 @@ Live (a QA copy, with the scripted visitors; tools/scorecard.py), beside the rea
   each judge's grades (rl/judge.py: v1 verdict, v2 sense, v3 looks; tools/judge_builds.py) - higher (#27). The same
   of the real players' rooms in the copy, the reference beside it.
 
-_Made by `tools/kpis.py show`, 2026-11-26. Arrows: which way is better._
+_Made by `tools/kpis.py show`, 2026-11-27. Arrows: which way is better._
 
 ## Body in the sim: lush held-out worlds
 
@@ -525,6 +525,7 @@ _Made by `tools/kpis.py show`, 2026-11-26. Arrows: which way is better._
 | 20261126-180251 | words | 31 | 0.45 | 6.25 | 1.94 | 90 | 31 | 12.7 | 5/6 |
 | 20261126-183530 | silent | 11 | 1 | - | 0 | 82 | 1 | 17.6 | 2/2 |
 | 20261126-184538 | silent | 10 | 1.1 | - | 0 | 83 | 3 | 13.8 | 2/2 |
+| 20261127-120124 | silent | 60 | 0.02 | - | 0 | 95 | 56 | 29.3 | - |
 
 ## Live builds: its closed rooms, beside the real players' in the same copy
 
@@ -534,3 +535,4 @@ _Made by `tools/kpis.py show`, 2026-11-26. Arrows: which way is better._
 | 20261126-180251 | 0 | - | - | - | 3 | 4 | 5 | 6 |
 | 20261126-183530 | 0 | - | - | - | 3 | 4 | 5 | 6 |
 | 20261126-184538 | 0 | - | - | - | 3 | 4 | 5 | 6 |
+| 20261127-120124 | 0 | - | - | - | 3 | 4 | 5 | 6 |
