@@ -28,33 +28,50 @@ LAND = {k for k, chars in DROPS.items() if chars - _BUILT}      # (what the land
                                                                 # a wall dug back up)
 
 
-def raw(item: str, n: int, have: Counter, out: Counter, depth: int = 0):
-    """What `n` of `item` takes from the land, what `have` holds used first (and taken from it), added to `out`."""
-    use = min(have[item], n)
-    have[item] -= use
-    n -= use
-    r = RECIPES.get(item)
-    if n <= 0:
-        return
-    if item in LAND or r is None or depth > 4:
-        out[item] += n
-        return
-    if r.station and not have[r.station]:                       # (a station made once, then used for every craft)
-        raw(r.station, 1, have, out, depth + 1)
-        have[r.station] += 1
-    times = -(-n // r.output.get(item, 1))
-    for k, m in r.inputs.items():
-        raw(k, m * times, have, out, depth + 1)
+def bill(demand: Counter, inv: dict) -> Counter:
+    """The least raw material that makes `demand` from the pack `inv`. Demand is summed per item and expanded top
+    down, an item only after every item that consumes it, so a recipe yielding several (a wood: 2 shingles) is
+    crafted ceil(demand / yield) times, not once a cell; a station is made once (research notes, Theorem 1:
+    exact for an acyclic recipe table with one recipe an item; expanded a cell at a time it counted 107 wood for
+    107 shingles, 54 do)."""
+    order, seen = [], set()
+
+    def visit(k):                                     # (post-order: what an item is made of comes before it)
+        if k in seen:
+            return
+        seen.add(k)
+        r = RECIPES.get(k)
+        if r is not None and k not in LAND:
+            for c in [*r.inputs, *([r.station] if r.station else [])]:
+                visit(c)
+        order.append(k)
+    for k in list(demand):
+        visit(k)
+    need, have, out, stations = Counter(demand), Counter(inv), Counter(), set()
+    for k in reversed(order):                         # (consumers first: an item's whole demand is known)
+        n = need[k] - have[k]
+        r = RECIPES.get(k)
+        if n <= 0:
+            continue
+        if k in LAND or r is None:
+            out[k] += n
+            continue
+        times = -(-n // r.output.get(k, 1))
+        for c, m in r.inputs.items():
+            need[c] += m * times
+        if r.station and r.station not in stations:
+            stations.add(r.station)
+            need[r.station] += 1
+    return out
 
 
 def lacking(plan, is_laid, inv: dict) -> Counter:
     """The raw material the plan's pieces not laid yet still take, beyond what the pack holds."""
-    have, out = Counter(inv), Counter()
-    flights = getattr(plan, "flights", {})
-    for cell in plan.cells:                  # (a flight of stairs is one piece of a stairs item a step: trial of the
-        if cell[3] not in NOT_MADE and not is_laid(cell):            # tower, its top flight 2 steps of 5, unroofed)
-            raw(AS_ITEM.get(cell[3], cell[3]), flights.get(cell[:2], 1) if cell[3] == "stairs" else 1, have, out)
-    return out
+    flights, demand = getattr(plan, "flights", {}), Counter()
+    for cell in plan.cells:                  # (a flight of stairs is one piece of a stairs item a step)
+        if cell[3] not in NOT_MADE and not is_laid(cell):
+            demand[AS_ITEM.get(cell[3], cell[3])] += flights.get(cell[:2], 1) if cell[3] == "stairs" else 1
+    return bill(demand, inv)
 
 
 class Project:
