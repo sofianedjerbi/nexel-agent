@@ -14,18 +14,20 @@ SHELL = ("wall", "door", "fence")
 
 
 class Plan:
-    def __init__(self, cells, stands, spare=(), clear=None, from_=None, ways=None):
+    def __init__(self, cells, stands, spare=(), clear=None, from_=None, ways=None, part=None):
         self.cells, self.stands, self.spare = list(cells), tuple(stands), tuple(spare)
         self.from_, self.ways = dict(from_ or {}), dict(ways or {})   # (a stand: the cells that open the way to it)
         ground = [(x, y) for x, y, z, p in self.cells if z == 0] + [(x, y) for x, y, z in self.stands if z == 0]
         self.clear = set(clear) if clear is not None else set(ground)
+        self.rim = {(x + i, y + j) for x, y in self.clear for i in (-1, 0, 1) for j in (-1, 0, 1)} - self.clear
         self.under = {(x, y, z) for x, y, z, p in self.cells if p in BLOCKS}   # (a block on one: laid after it)
         self.dug = [c for c in self.cells if c[3] == "dig"]
         self.dug_tiles = {c[:2] for c in self.dug}
-        self.shells = {}                                      # (dz: the walls and doors standing at that height)
-        for x, y, z, p in self.cells:
-            if p in SHELL:
-                self.shells.setdefault(z, []).append((x, y, z, p))
+        self.part = dict(part or {})                          # (a compound's: which part a cell is of)
+        self.shells = {}                                      # ((part, dz): its walls and doors at that height)
+        for c in self.cells:
+            if c[3] in SHELL:
+                self.shells.setdefault((self.part.get(c, 0), c[2]), []).append(c)
 
     @property
     def pieces(self) -> list:
@@ -82,7 +84,7 @@ class Plan:
         if (dx, dy, dz - 1) in self.under:                # (a roof's layer on the one under it: that one first)
             below = next(c for c in self.cells if c[:3] == (dx, dy, dz - 1))
             return laid(below)
-        return all(laid(c) for c in self.shells.get(dz - STOREY, ()))
+        return all(laid(c) for c in self.shells.get((self.part.get(cell, 0), dz - STOREY), ()))
 
 
 def of_pieces(pieces, stands, spare=()) -> Plan:
@@ -92,14 +94,11 @@ def of_pieces(pieces, stands, spare=()) -> Plan:
 
 
 def of_structure(s) -> Plan:
-    """A build of storeys (rl/structure.py Structure)."""
+    """A design drawn (rl/structure.py, rl/dug.py, rl/garden.py, rl/compound.py): each says its own cells, stands,
+    open ground, the cells laid from a stand of their own, and the ways to its stands."""
     stands, spare = s.stands()
-    if hasattr(s, "digs"):                                # (dug: rl/dug.py says its own ways)
-        return Plan(s.cells(), stands, spare, clear=s.clear(), from_=s.from_(), ways=s.ways())
-    feet = {(top[0], top[1], 0, "stairs"): tuple((x, y, 0) for x, y in at) for top, _, at, _ in s.stairs}
-    up = {STOREY * k: (top[0], top[1], 0, "stairs") for top, _, _, k in s.stairs}
-    return Plan(s.cells(), stands, spare, clear=s.clear(), from_=feet,
-                ways={st: (up[st[2]],) for st in stands if st[2] in up})
+    return Plan(s.cells(), stands, spare, clear=s.clear(), from_=s.from_(), ways=s.ways(),
+                part=s.part_of() if hasattr(s, "part_of") else None)
 
 
 def drawn(rows) -> Plan:

@@ -174,6 +174,15 @@ class Structure:
         spare += [(x, y, 0) for _, _, feet, _ in self.stairs for x, y in feet]
         return tuple(st), tuple(spare)
 
+    def from_(self) -> dict:
+        """A flight of stairs, laid from beside its second step (the game runs it out from the floor it leads to)."""
+        return {(top[0], top[1], 0, "stairs"): tuple((x, y, 0) for x, y in at) for top, _, at, _ in self.stairs}
+
+    def ways(self) -> dict:
+        """A stand up a storey: once that storey's stairs are laid."""
+        up = {STOREY * k: (top[0], top[1], 0, "stairs") for top, _, _, k in self.stairs}
+        return {st: (up[st[2]],) for st in self.stands()[0] if st[2] in up}
+
     def clear(self) -> set:
         """The tiles that must be open ground for it: what stands on the land, the path, the stairs and their foot."""
         return self.inside | self.ring | set(self.path) | {p for _, steps, _, _ in self.stairs for p in steps}

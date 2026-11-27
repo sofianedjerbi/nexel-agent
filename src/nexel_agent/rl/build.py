@@ -17,11 +17,11 @@ from nexel_worlds.sim.constants import VIEW_R
 from nexel_worlds.sim.observe import ITEMS, YOU
 from nexel_worlds.sim.storeys import EARTH, STOREY
 from nexel_worlds.tiles import GROUNDS, TILL_TOOL
-from nexel_worlds.tiles import REACH as TILE_REACH
 from nexel_worlds.tiles import BLOCKS
 
 from .judge import ENCLOSE
 from .plan import BLOCKS as CELL_BLOCKS
+from .site import _at, _pit, flat, site
 from .plan import Plan, drawn, of_pieces  # noqa: F401  (drawn: the grid's plan, for its callers)
 from .pursue import craft
 
@@ -38,7 +38,6 @@ DIRS4 = {"N": (0, -1), "E": (1, 0), "S": (0, 1), "W": (-1, 0)}
 TIER = {"wood_pickaxe": 1, "pickaxe": 2, "iron_pickaxe": 3, "titanium_pickaxe": 4}      # (the best digs fastest)
 TILLED_CH = {g.char for g in GROUNDS if g.name in ("tilled", "wet_tilled")}
 SOWN_CH = {CH[k] for k in ("sprout", "crop", "ripe_crop")}
-LIQUID_CH = {g.char for g in GROUNDS if g.liquid}                                       # (no home on water, nor its path)
 PATH_CH = next(g.char for g in GROUNDS if g.name == "cobble")                           # (what the path item lays)
 BLOCK_CH = {b.char for b in BLOCKS if b.name != "none" and b.hardness > 0}   # (what stands in the way and can be dug: a
 #                                                                             tree, a stump, a flower grown on the spot)
@@ -53,7 +52,6 @@ def blueprint() -> list:
 
 
 PLAN = blueprint()
-REACH = TILE_REACH["use"]          # (a piece is laid from where it stands: the hut's corners are this far from its middle)
 
 
 HUT = of_pieces(PLAN, ((W // 2, H // 2),))
@@ -61,70 +59,6 @@ HUT = of_pieces(PLAN, ((W // 2, H // 2),))
 
 def plan_of(social) -> Plan:
     return getattr(social, "plan", None) or HUT
-
-
-def _at(obs, key, X, Y):
-    me, rows = obs["self"], obs.get(key)
-    gx, gy = X - me["x"] + VIEW_R, Y - me["y"] + VIEW_R
-    if not rows or not (0 <= gy < len(rows) and 0 <= gx < len(rows[gy])):
-        return None
-    return rows[gy][gx]
-
-
-def flat(obs, X, Y, plan=HUT) -> bool:
-    """The hut whose inside's top-left is (X, Y) stands on one level, clear of a hill's rim: no lower tile beside it,
-    diagonals too (the game builds nothing there: world.rim). A pit dug in it since makes it no site."""
-    from .actions import LEVEL
-    if not obs.get("heights"):
-        return True                                          # (no relief in view at all)
-    sx, sy = plan.ground[0]
-    lv = LEVEL.get(_at(obs, "heights", X + sx, Y + sy))
-    if lv is None:
-        return False
-    x0, y0, x1, y1 = plan.box()
-    for dx in range(x0 - 1, x1 + 2):
-        for dy in range(y0 - 1, y1 + 2):
-            h = LEVEL.get(_at(obs, "heights", X + dx, Y + dy))
-            if h is None or (dx, dy) in plan.dug_tiles:      # (its own trench and room dug: no pit to fill)
-                continue                                     # (out of view: unknown, not lower - r59 left home after
-            if h < lv or (x0 <= dx <= x1 and y0 <= dy <= y1 and h != lv):   # home each time it walked 9 tiles off)
-                return False
-    return True
-
-
-def _pit(obs, X, Y, plan=HUT):
-    """A tile in reach of a stand that is lower than the spot, on or beside it: ((x, y), the stand), or None."""
-    from .actions import LEVEL
-    sx, sy = plan.ground[0]
-    lv = LEVEL.get(_at(obs, "heights", X + sx, Y + sy))
-    x0, y0, x1, y1 = plan.box()
-    for dx in range(x0 - 1, x1 + 2):
-        for dy in range(y0 - 1, y1 + 2):
-            h = LEVEL.get(_at(obs, "heights", X + dx, Y + dy))
-            if (dx, dy) in plan.dug_tiles:
-                continue
-            s = next((s for s in plan.ground if max(abs(s[0] - dx), abs(s[1] - dy)) <= REACH), None)
-            if h is not None and lv is not None and h < lv and s is not None:
-                return (X + dx, Y + dy), s
-    return None
-
-
-def site(obs, ground_ch, plan=HUT) -> tuple | None:
-    """The plan's origin (the hut's inside top-left) at the nearest spot in view where it all stands on flat, open
-    ground."""
-    me = obs["self"]
-    best = None
-    x0, y0, x1, y1 = plan.box()
-    sx, sy = plan.ground[0]
-    for oy in range(-VIEW_R + 1 - y0, VIEW_R - 1 - y1):
-        for ox in range(-VIEW_R + 1 - x0, VIEW_R - 1 - x1):
-            X, Y = me["x"] + ox, me["y"] + oy
-            if all(_at(obs, "grid", X + dx, Y + dy) in (ground_ch - LIQUID_CH) | {YOU} for dx, dy in plan.clear) \
-                    and flat(obs, X, Y, plan):
-                d = math.hypot(ox + sx, oy + sy)
-                if best is None or d < best[0]:
-                    best = (d, (X, Y))
-    return best and best[1]
 
 
 def laid(obs, X, Y, piece) -> bool:
@@ -152,9 +86,9 @@ def next_step(obs, social, *, ground_ch, tool_for, dirs):
     again = lambda: next_step(obs, social, ground_ch=ground_ch, tool_for=tool_for, dirs=dirs)    # noqa: E731
     hx, hy = social.home
     me, inv = obs["self"], obs["self"].get("inventory", {})
-    cx, cy = hx + plan.ground[0][0], hy + plan.ground[0][1]
-    if _at(obs, "grid", cx, cy) is None:                     # (out of view: walk home, a view at a time)
-        dx, dy = cx - me["x"], cy - me["y"]
+    cx, cy = min(((hx + x, hy + y) for x, y in plan.clear), key=lambda p: abs(p[0] - me["x"]) + abs(p[1] - me["y"]))
+    if _at(obs, "grid", cx, cy) is None:                     # (none of it in view: walk home, a view at a time, to its
+        dx, dy = cx - me["x"], cy - me["y"]                  # nearest tile - a compound is longer than a view)
         d = math.hypot(dx, dy)
         if d > FAR:                                          # (far off - fallen and back at spawn: a home here)
             social.home = None
@@ -174,7 +108,8 @@ def next_step(obs, social, *, ground_ch, tool_for, dirs):
                 return "move_to", {"x": hx + sx, "y": hy + sy}       # down - r63 left a closed room for a pit 4 tiles off)
             return "place", {"item": earth, "x": px, "y": py}
     on_land = {(x, y): p for x, y, z, p in plan.cells if z <= 0 and p not in (*CELL_BLOCKS, "dig")}   # (a dug floor's too)
-    for dx, dy in sorted(plan.clear, key=lambda q: (q[1], q[0])):      # (the ground cleared first, as a player clears
+    near_me = lambda q: (abs(hx + q[0] - me["x"]) + abs(hy + q[1] - me["y"]), q[1], q[0])    # noqa: E731
+    for dx, dy in sorted(plan.clear, key=near_me):          # (the ground cleared first, the nearest first, as a player clears
         X, Y = hx + dx, hy + dy                                           # it: a tree, a stump, a flower grown since)
         ch, piece = _at(obs, "grid", X, Y), on_land.get((dx, dy))
         if ch == ITEMS:                                      # (a pile on it - what was dug there dropped: taken up)
@@ -215,6 +150,12 @@ def next_step(obs, social, *, ground_ch, tool_for, dirs):
         here = (me["x"], me["y"]) == (sx, sy) and (not stand[2] or me.get("z") == sz)    # pick walks there and lays
         go = {} if here else {"go": {"x": sx, "y": sy, **({"z": sz} if stand[2] else {})}}   # all in reach)
         return "ring", {"pieces": run, **go}
+    far = [(hx + c[0], hy + c[1]) for c in plan.cells if _at(obs, "grid", hx + c[0], hy + c[1]) is None and not is_laid(c)]
+    if far:                                                  # (what is left is out of view - the other end of a
+        fx, fy = min(far, key=lambda p: abs(p[0] - me["x"]) + abs(p[1] - me["y"]))     # compound: a view nearer it)
+        d = math.hypot(fx - me["x"], fy - me["y"])
+        k = min(1, (VIEW_R - 2) / d)
+        return "move_to", {"x": me["x"] + round((fx - me["x"]) * k), "y": me["y"] + round((fy - me["y"]) * k)}
     return None
 
 
@@ -230,6 +171,9 @@ def laid_by(obs, social, plan):
     hx, hy = social.home
     land = level_at(obs, hx + plan.ground[0][0], hy + plan.ground[0][1])
     up = getattr(social, "up_laid", set())
+    if getattr(social, "seen_laid", None) is None:
+        social.seen_laid = set()                             # (laid on the land, as last seen)
+    seen = social.seen_laid
 
     def is_laid(cell):
         dx, dy, dz, p = cell
@@ -238,8 +182,14 @@ def laid_by(obs, social, plan):
             return (X, Y, "stairs") in up
         if p == "dig":                                       # (dug: as the game said, or the floor seen lower)
             return (X, Y, land + dz, "dug") in up or (obs.get("heights") is not None and level_at(obs, X, Y) < land + dz)
-        if dz <= 0:
-            return laid(obs, X, Y, p)
+        if dz <= 0:                                          # (out of view now: as it was when last seen)
+            if _at(obs, "grid", X, Y) is None:
+                return (X, Y, dz, p) in seen
+            if laid(obs, X, Y, p):
+                seen.add((X, Y, dz, p))
+                return True
+            seen.discard((X, Y, dz, p))
+            return False
         if p in CELL_BLOCKS and dz == STOREY and _at(obs, "roofs", X, Y) == "1":
             return True
         return (X, Y, land + dz) in up

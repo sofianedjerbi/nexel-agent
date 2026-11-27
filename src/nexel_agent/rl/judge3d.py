@@ -85,6 +85,12 @@ def judged(spec) -> dict:
 
 def judge_at(sim, s: Structure, x0, y0, lv) -> dict:
     """The build `s` as it stands in `sim` at (x0, y0) (its walls' top-left), its land at level `lv`, judged."""
+    if hasattr(s, "parts"):                               # (a compound: each part as itself, where it is set)
+        js = [judge_at(sim, p, x0 + ox, y0 + oy, lv) for p, (ox, oy) in zip(s.parts, s.at)]
+        failed = [f"part {k}: {f}" for k, j in enumerate(js) for f in j["failed"]]
+        of = sum(j["of"] for j in js)
+        return {"ok": True, "grade": of - len(failed), "of": of, "failed": failed, "told": "; ".join(failed) or
+                "nothing failed", "kind": "+".join(j["kind"] for j in js), "parts": js}
     if hasattr(s, "beds"):
         return garden_at(sim, s, x0, y0)
     from .dug import DEPTH, DugView
@@ -177,10 +183,8 @@ def built(spec, seed=5, picks=800) -> dict:
     if env.social.home is None:
         return {"sited": False}
     hx, hy = env.social.home
-    lv = env.sim.world.level(hx + min(s.inside)[0], hy + min(s.inside)[1])
-    if hasattr(s, "digs"):                                # (dug: the land's top, its level before the digging)
-        lv = env.sim.world.level(hx + s.top[0], hy + s.top[1])
-    j = judge_at(env.sim, s, hx, hy, lv)
+    gx, gy = env.social.plan.ground[0]                   # (a stand on the land left as it was: its level)
+    j = judge_at(env.sim, s, hx, hy, env.sim.world.level(hx + gx, hy + gy))
     return {"sited": True, "picks": n, **{k: j[k] for k in ("grade", "of", "failed")}}
 
 

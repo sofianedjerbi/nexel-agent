@@ -184,3 +184,42 @@ def test_a_garden_is_fenced_tilled_and_sown_by_building_alone(spec):
     """The fence and gate laid, each bed tilled with the hoe from the pack, then sown: the seed only takes on soil."""
     b = judge3d.built(spec, seed=20)
     assert b["sited"] and b["failed"] == [], b
+
+
+COMPOUNDS = {
+    "house and garden": {"parts": [{**DESIGNS["house"], "roof": {"style": "gable"}}, {**GARDEN, "at": "east"}]},
+    "dug home and its beds": {"parts": [DUG, {"garden": True, "width": 3, "depth": 3, "door": "north", "beds": "full",
+                                              "at": "north"}]},
+    "two storeys and a walled yard": {"parts": [DESIGNS["two storeys"], {**DESIGNS["round base"], "at": "west"}]},
+}
+
+
+def test_parts_are_set_apart_on_their_sides_and_judged_each_as_itself():
+    from nexel_agent.rl.compound import GAP, Compound
+    c = Compound(COMPOUNDS["house and garden"])
+    house, garden = (c._moved(k, p.clear()) for k, p in enumerate(c.parts))
+    assert min(x for x, _ in garden) - max(x for x, _ in house) > GAP                  # (east of it, a gap between)
+    j = judge3d.judged(COMPOUNDS["house and garden"])
+    assert j["kind"] == "home+garden" and j["failed"] == [] and len(j["parts"]) == 2
+    assert "1 to 4" in judge3d.judged({"parts": [GARDEN] * 5})["error"]
+
+
+@pytest.mark.parametrize("name, seed", [("house and garden", 40), ("dug home and its beds", 20),
+                                        ("two storeys and a walled yard", 60)])
+def test_a_compound_longer_than_a_view_is_laid_whole_by_building_alone(name, seed):
+    """A part at the far end out of view is walked to; what was laid at the other end is known as it was last seen;
+    a roof waits for its own part's walls only; the land between the parts is the land's (no pit to fill)."""
+    b = judge3d.built(COMPOUNDS[name], seed=seed)
+    assert b["sited"] and b["failed"] == [], b
+
+
+def test_no_build_is_sited_where_water_runs():
+    """The game's rivers and lakes run onto flat land round them: nothing is sited within WET tiles of water."""
+    from nexel_agent.rl.core import SimEnv
+    from nexel_agent.rl.site import WET, _near_water
+    env = SimEnv(ep_ticks=10 ** 6, roam=0, rivals=0)
+    env.reset(5)
+    a = env.a
+    env.sim.world.set(a.x + 3, a.y, ground="water")
+    wet = _near_water(env.sim.observe(a))
+    assert (a.x + 3 + WET, a.y) in wet and (a.x + 4 + WET, a.y) not in wet
