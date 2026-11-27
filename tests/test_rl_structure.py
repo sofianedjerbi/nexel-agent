@@ -123,7 +123,7 @@ def test_the_mind_says_the_build_in_its_words_and_the_architect_draws_those(tmp_
     m.apply({"goal": "build", "build": "a round house with a sod roof"})
     assert m.building and m.build_words == "a round house with a sod roof"
     m.apply({"goal": "gather", "item": "wood", "build": "a castle"})
-    assert m.build_words is None                                                    # (words for a build only)
+    assert not m.building and m.build_words == "a castle"       # (named with any goal: kept and drawn - #87, trial 6)
     seen = []
 
     def ask(msgs):

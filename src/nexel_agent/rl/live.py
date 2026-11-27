@@ -7,7 +7,6 @@ voice.FALLBACK_MODEL (the 4B) on a Mac with less than ~20 GB free.
     python -m mlx_lm.server --model mlx-community/Qwen3-30B-A3B-Instruct-2507-4bit --port 8080
     nexel-agent --name Rook          # the shipped models/rook.npz, the game at :7777, words from :8080 (= python -m nexel_agent)"""
 
-import argparse
 import asyncio
 import json
 import math
@@ -19,6 +18,7 @@ import numpy as np
 from nexel_worlds.client import Client
 from . import architect
 from .achieve import Ledger, from_wire
+from .args import parser
 from .brain import Brain
 from .core import split
 from .encode import ACTIONS, N_NEAR, PACK, action_name, encode, legal, to_command
@@ -26,6 +26,7 @@ from .facts import HOSTILE, Join, Say, dist, events
 from .social import SocialMemory
 from .mind import goal_text
 from .now import Now
+from .project import BUILD, Project
 from .voice import Voice
 
 POLICY = Path(__file__).resolve().parents[3] / "models/rook.npz"     # (the shipped body: models/README.md)
@@ -47,6 +48,7 @@ class LiveBody:
         self.social, self.social_done, self.http, self.game = SocialMemory(a.name, PACK), set(), None, None
         self.tick, self.me, self.obs_entities, self.fighting = 0, {}, [], False
         self.mind = self.voice = self.draft = None          # (the LLM planner that sets goals: rl/mind.py; words: voice.py)
+        self.project = Project()                            # (a drawn build laid to its end: rl/project.py, #87)
         self.now = Now(a.name, PACK)                            # (what is happening to it, for every prompt: rl/voice.py)
         self.log = open(a.log, "a") if a.log else None
         self.brain = Brain(a.brain, a.log and Path(a.log).with_name("brain.jsonl"), a.name, a.persona) if getattr(a, "brain", 0) else None
@@ -225,8 +227,11 @@ class LiveBody:
                              self.social.people_flags(obs, N_NEAR), self.ledger.done)
                 mask = legal(obs, self.facing, self.social, goal, self.mind.held(obs) if self.mind else None) if self.a.mask else None
                 i = self.pol.act(enc, self.rng, mask)
-                if self.mind and not (self.draft and self.draft.holds(self.social, self.mind.building, obs, self.stats, self.mind.build_words)):
+                words = self.mind.build_words if self.mind else None                # (named in any goal: drawn)
+                if self.mind and not (self.draft and self.draft.holds(self.social, self.mind.building or bool(words), obs, self.stats, words)):
                     i = self.mind.steer(i, mask, self.hurt)        # (a home not begun is drawn first: rl/architect.py)
+                    p = self.project.act(obs, self.social, mask is None or bool(mask[BUILD])) if not self.hurt else None
+                    i, goal = (p[0], p[1] or goal) if p else (i, goal)       # (the project owns the body; hurt, reflexes)
                 kind = ACTIONS[i][0]
                 steered = bool(self.mind and self.mind.building and kind == "build")    # (the mind's build: rl/mind.py steer)
                 if self.hurt > 0:
@@ -283,24 +288,7 @@ class LiveBody:
 
 
 def main():
-    p = argparse.ArgumentParser(prog="nexel-agent", description="The AI player of Nexel Worlds: a trained body, a local model for its plans and words.")
-    p.add_argument("--name", default="Rook")
-    p.add_argument("--persona", default="a quiet player who learned the world by living in it; wants a house of its own with "
-                   "a bed and a door, and good tools, and gets what it lacks from other players by asking or trading")
-    p.add_argument("--policy", default=str(POLICY), help="the learned body (default: the shipped models/rook.npz)")
-    p.add_argument("--game", default="ws://127.0.0.1:7777/agent")
-    p.add_argument("--model-url", default=MODEL_URL, help="a local model server for the words and the planner (none: it does not "
-                   "talk; if nothing answers there it plays on in silence); serve voice.MODEL there (Qwen3-30B-A3B-Instruct-2507 "
-                   "4-bit), or voice.FALLBACK_MODEL")
-    p.add_argument("--minutes", type=float, default=None)
-    p.add_argument("--log", default="")
-    p.add_argument("--seed", type=int, default=0)
-    p.add_argument("--mask", type=int, default=1, help="the policy was trained with the legal-action mask")
-    p.add_argument("--teleport", default="", help="x,y,z: on a --dev server, start there")
-    p.add_argument("--brain", type=int, default=0, help="serve what it sees and thinks on 127.0.0.1:PORT/feed (rl/brain.py)")
-    p.add_argument("--memory", default="", help="where the LLM layer keeps its notes on people (memory.json)")
-    p.add_argument("--architect", type=int, default=1, help="a home not begun is drawn by the model first (#66)")
-    a = p.parse_args()
+    a = parser(POLICY, MODEL_URL).parse_args()
     print(json.dumps(asyncio.run(LiveBody(a).play())))
 
 
