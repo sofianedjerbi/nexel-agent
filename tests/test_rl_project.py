@@ -68,3 +68,31 @@ def test_a_flight_of_stairs_is_counted_a_stairs_item_a_step():
     only_stairs = lambda c: c[3] != "stairs"                                 # noqa: E731  (all else laid)
     assert lacking(plan, only_stairs, {}) == {"wood": -(-steps // 2)}       # (a wood makes 2 stairs)
 
+
+
+
+def test_a_plank_laid_up_a_storey_is_not_read_as_the_wall_standing_on_it():
+    """The tower (#91): kept by its place alone, the first floor's plank read as the wall on it laid; the wall never
+    went up, the second flight ran to the first floor and the top storey was never reached."""
+    from nexel_agent.rl.social import SocialMemory
+    s = SocialMemory("Rook", ("wood",))
+    s.achieved("place", {"item": "plank", "x": 4, "y": 2, "z": 3}, True, 0, 99)
+    assert (4, 2, 3, "block") in s.up_laid and (4, 2, 3, "thing") not in s.up_laid
+    s.achieved("place", {"item": "wood_wall", "x": 4, "y": 2, "z": 3}, True, 0, 99)
+    assert (4, 2, 3, "thing") in s.up_laid
+
+
+def test_a_flight_waits_for_its_doors_column():
+    from test_rl_structure import DESIGNS
+    plan = of_structure(design_of(DESIGNS["tower"]))
+    top = [c for c in plan.cells if c[3] == "stairs"][-1]
+    after = plan.after[top]
+    assert any(c[3] == "door" and c[2] == 6 for c in after) and any(c[3] == "wall" and c[2] == 3 for c in after)
+    assert not plan.held(top, lambda c: c not in after) and plan.held(top, lambda c: True)
+
+
+@pytest.mark.parametrize("seed", [9])
+def test_from_an_empty_pack_a_tower_of_three_storeys_stands(seed):
+    from test_rl_structure import DESIGNS
+    env, left, n = run(DESIGNS["tower"], seed, 2000)
+    assert left == [], (n, len(left), left[:4])

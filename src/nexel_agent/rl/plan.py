@@ -77,6 +77,8 @@ class Plan:
             return laid((dx, dy, dz, "till"))
         if p == "dig":
             return True                                   # (dug from its own stand, once that is dug: stand_for)
+        if p == "stairs" and not all(laid(c) for c in getattr(self, "after", {}).get(cell, ())):
+            return False                                  # (a flight once its door's column stands: rl/plan.py after)
         if p not in BLOCKS:                               # (a thing up a storey stands on the floor laid under it)
             if dz < 0:                                    # (on a dug floor: once all is dug - a chair set early
                 return all(laid(c) for c in self.dug)     # stands in the way of what is still to dig)
@@ -100,7 +102,12 @@ def of_structure(s) -> Plan:
     plan = Plan(s.cells(), stands, spare, clear=s.clear(), from_=s.from_(), ways=s.ways(),
                 part=s.part_of() if hasattr(s, "part_of") else None)
     plan.flights = {top: len(steps) for top, steps, _, _ in getattr(s, "stairs", [])}   # (stairs a flight takes: a step
-    return plan                                                                       # each, the game runs them out)
+    plan.after = {}                                                                   # each, the game runs them out)
+    for top, steps, _, k in getattr(s, "stairs", []):     # (the game runs a flight up to the first open place beside its
+        door = (2 * top[0] - steps[1][0], 2 * top[1] - steps[1][1])    # top: its door's column laid first, else a storey
+        plan.after[(*top, 0, "stairs")] = [c for c in plan.cells        # under it is open and the flight stops there -
+                                           if c[:2] == door and c[2] <= STOREY * k and c[3] != "stairs"]   # the tower, #91)
+    return plan
 
 
 def drawn(rows) -> Plan:

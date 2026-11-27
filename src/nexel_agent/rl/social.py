@@ -6,6 +6,14 @@ from it here."""
 from nexel_worlds.sim.constants import SAY_R, sec
 from .facts import Attack, Death, Drop, Give, Say, Took, events, handed, named
 
+CELL_ITEMS = ("plank", "roof", "stone_block", "dirt")     # (what fills a cell; anything else stands in one: rl/plan.py BLOCKS)
+
+
+def laid_as(item) -> str:
+    """How a piece laid up a storey is kept in mind: as the cell's block or as a thing standing in it. Kept by its
+    place alone, a plank laid read as the wall on it laid too: the tower's wall never went up, its flight ran short."""
+    return "block" if item in CELL_ITEMS else "thing"
+
 ADDRESSED_S = sec(6)          # "answered someone": said something this soon after being spoken to
 TALK_GAP = sec(30)            # a chat cooldown, the same for every speaker: a line once spoken to, or 30 s after the last
 HIT_S = sec(15)               # "hit me lately", "I hit them lately"
@@ -135,8 +143,8 @@ class SocialMemory:
         if tool == "place" and ok and "x" in args:          # (what it laid where the view does not show: rl/build.py)
             if args.get("item") == "stairs":
                 self.up_laid.add((args["x"], args["y"], "stairs"))
-            elif "z" in args:
-                self.up_laid.add((args["x"], args["y"], args["z"]))
+            elif "z" in args:                   # (a block in the cell or a thing standing there: a plank and the
+                self.up_laid.add((args["x"], args["y"], args["z"], laid_as(args.get("item"))))   # wall on it, both)
         """The social achievements an action that came back earned (the Ledger unlocks each once). near: how far the
         nearest other person is (tiles)."""
         if not ok:
