@@ -22,7 +22,7 @@ from nexel_worlds.tiles import BLOCKS
 from .judge import ENCLOSE
 from .social import laid_as
 from .plan import BLOCKS as CELL_BLOCKS
-from .site import _at, _pit, flat, site
+from .site import _at, _pit, flat, site, tried
 from .plan import Plan, drawn, of_pieces  # noqa: F401  (drawn: the grid's plan, for its callers)
 from .pursue import craft
 
@@ -30,8 +30,7 @@ W = H = 3                                                   # the inside
 DOOR = (1, H)                                               # in the south wall's middle
 FURNITURE = ((0, 0, "campfire"), (W - 1, 0, "bed"))         # a corner each
 FAR = 240                   # a home further off is given up (fallen, back at spawn); a trip for wood or stone goes 100+
-_SOLID = {b.name: b.solid for b in BLOCKS}
-CH = {b.name: b.char for b in BLOCKS}
+_SOLID, CH = {b.name: b.solid for b in BLOCKS}, {b.name: b.char for b in BLOCKS}
 WALLS = tuple(k for k in ENCLOSE if _SOLID[k])
 DOORS = tuple(k for k in ENCLOSE if not _SOLID[k])
 WALL_CH, DOOR_CH = {CH[k] for k in WALLS}, {CH[k] for k in DOORS}
@@ -121,12 +120,13 @@ def next_step(obs, social, *, ground_ch, tool_for, dirs):
             return "pick_up", {}
         if ch in CLEARABLE and not (piece and laid(obs, X, Y, piece)):
             d = next((k for k, v in dirs.items() if v == (X - me["x"], Y - me["y"])), None)
-            if d is None:                                    # (to a tile beside it: a flower is walked onto, and
-                by = next(((X + i, Y + j) for i, j in dirs.values()            # the tile one stands on shows it, not
-                           if _at(obs, "grid", X + i, Y + j) in ground_ch), (X, Y))   # the flower)
-                return "move_to", {"x": by[0], "y": by[1]}
-            w = tool_for(obs, d)
-            return "dig", {"dir": d, **({"with": w} if w else {})}
+            if d is not None and not tried(social, X, Y, (me["x"], me["y"])):
+                return "dig", {"dir": d, **({"with": w} if (w := tool_for(obs, d)) else {})}
+            by = next(((X + i, Y + j) for i, j in dirs.values() if _at(obs, "grid", X + i, Y + j) in ground_ch  # (to a tile
+                       and not tried(social, X, Y, (X + i, Y + j), count=False)), None if d else (X, Y))  # beside it; a
+            if by is None:                                   # flower is walked onto; refused from every side: left)
+                continue
+            return "move_to", {"x": by[0], "y": by[1]}
     land = home_level(obs, social, plan)
     open_ = lambda s: _at(obs, "grid", hx + s[0], hy + s[1]) in ground_ch | {YOU}       # noqa: E731
     underfoot = None
