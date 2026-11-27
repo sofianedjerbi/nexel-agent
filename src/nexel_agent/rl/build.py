@@ -139,7 +139,7 @@ def next_step(obs, social, *, ground_ch, tool_for, dirs):
             continue
         if dz <= 0 and piece not in (*CELL_BLOCKS, "dig") and _at(obs, "grid", X, Y) not in ground_ch:
             continue                                         # (someone or something on it: the next piece)
-        if piece != "dig" and _item(piece, inv) is None:
+        if piece != "dig" and (_item(piece, inv) is None or inv.get(piece, 0) < getattr(plan, "flights", {}).get((dx, dy), 0)):
             if piece == "till" and (step := craft(obs, TILL_TOOL, ground_ch, tool_for, dirs, keep=own(social))):
                 return step                                  # (no hoe: one made)
             step = next((s for w in (WALLS if piece == "wall" else (piece,)) if (s := craft(obs, w, ground_ch, tool_for, dirs, keep=own(social)))), None)
@@ -291,7 +291,7 @@ def _run(obs, hx, hy, ground_ch, inv, plan, stand, is_laid, land=0) -> list:
                 out.append((X, Y, "till", TILL_TOOL))
             continue
         item = _item(piece, left)
-        if item is None:
+        if item is None or left.get(item, 0) < getattr(plan, "flights", {}).get((dx, dy), 0):   # (a flight: a step each)
             continue
         left[item] -= 1
         going.add(cell)

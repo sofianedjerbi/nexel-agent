@@ -44,9 +44,10 @@ def raw(item: str, n: int, have: Counter, out: Counter, depth: int = 0):
 def lacking(plan, is_laid, inv: dict) -> Counter:
     """The raw material the plan's pieces not laid yet still take, beyond what the pack holds."""
     have, out = Counter(inv), Counter()
-    for cell in plan.cells:
-        if cell[3] not in NOT_MADE and not is_laid(cell):
-            raw(AS_ITEM.get(cell[3], cell[3]), 1, have, out)
+    flights = getattr(plan, "flights", {})
+    for cell in plan.cells:                  # (a flight of stairs is one piece of a stairs item a step: trial of the
+        if cell[3] not in NOT_MADE and not is_laid(cell):            # tower, its top flight 2 steps of 5, unroofed)
+            raw(AS_ITEM.get(cell[3], cell[3]), flights.get(cell[:2], 1) if cell[3] == "stairs" else 1, have, out)
     return out
 
 

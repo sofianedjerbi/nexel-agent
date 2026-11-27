@@ -58,3 +58,13 @@ def test_the_build_the_mind_names_is_kept_whatever_its_goal_till_another_or_none
     assert m.build_words == "a round house with a gabled shingle roof"
     m.apply({"goal": "gather", "item": "wood", "build": "none"})
     assert m.build_words is None
+
+
+def test_a_flight_of_stairs_is_counted_a_stairs_item_a_step():
+    from test_rl_structure import DESIGNS
+    s = design_of(DESIGNS["tower"])
+    plan = of_structure(s)
+    steps = sum(len(st) for _, st, _, _ in s.stairs)
+    only_stairs = lambda c: c[3] != "stairs"                                 # noqa: E731  (all else laid)
+    assert lacking(plan, only_stairs, {}) == {"wood": -(-steps // 2)}       # (a wood makes 2 stairs)
+

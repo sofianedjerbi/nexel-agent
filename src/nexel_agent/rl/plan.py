@@ -97,8 +97,10 @@ def of_structure(s) -> Plan:
     """A design drawn (rl/structure.py, rl/dug.py, rl/garden.py, rl/compound.py): each says its own cells, stands,
     open ground, the cells laid from a stand of their own, and the ways to its stands."""
     stands, spare = s.stands()
-    return Plan(s.cells(), stands, spare, clear=s.clear(), from_=s.from_(), ways=s.ways(),
+    plan = Plan(s.cells(), stands, spare, clear=s.clear(), from_=s.from_(), ways=s.ways(),
                 part=s.part_of() if hasattr(s, "part_of") else None)
+    plan.flights = {top: len(steps) for top, steps, _, _ in getattr(s, "stairs", [])}   # (stairs a flight takes: a step
+    return plan                                                                       # each, the game runs them out)
 
 
 def drawn(rows) -> Plan:
