@@ -248,6 +248,20 @@ def test_an_aim_said_as_a_phrase_is_the_items_it_names(tmp_path):
     assert m.aims == ["door", "bed", "hoe"]
 
 
+def test_an_aim_it_owns_reads_as_owned_and_an_unseen_input_names_what_gives_it(tmp_path):
+    """Live trial 4: two beds carried, 'bed: you lack 3 fiber' read for an hour (15 fiber gathers, no build), and
+    'nobody you know had any' was all it was told of fiber. An owned aim lacks nothing; an input with no source in
+    sight names what in the world gives it."""
+    m = Mind("Rook", "a loud builder", "http://x", FakeHTTP("{}"), tmp_path / "memory.json")
+    m.aims = ["bed", "axe"]
+    obs = {**OBS, "self": {**OBS["self"], "inventory": {"bed": 2, "wood": 2, "stone": 2}}, "grid": ["....", "...."]}
+    m.now.see(obs)
+    facts = m.messages(obs)[1]["content"]
+    assert "bed (you have 2: it is yours already)" in facts
+    assert "1 fiber (nobody you know had any; none in sight: " in facts and "thicket" in facts
+    assert "3 fiber" not in facts
+
+
 def test_its_own_ask_line_is_on_the_record_and_a_tree_in_sight_gives_wood(tmp_path):
     """Live trial 4: 25 lines asking Mira for wood, none recorded; the goal read 'you have not asked yet' for 96 plans,
     a tree in sight all along. Its line to the person of an ask goal is the ask; the facts name what in sight gives
