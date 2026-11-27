@@ -355,3 +355,16 @@ def test_over_budget_the_architect_is_told_what_costs_most_and_any_design_is_rea
     assert architect.spec_of(json.dumps({"garden": True})) == {"garden": True}                # (read as a design...)
     assert "width and depth" in architect.judged('{"garden": true}', 82)["told"]               # (...and told what it lacks)
     assert architect.judged(json.dumps({**DESIGNS["house"], "roof": {"style": "gable"}}), architect.BUDGET)["failed"] == []
+
+
+def test_eaves_are_the_roofs_outer_ring_whatever_its_style():
+    """Bench run 9: on a flat roof every tile was at depth 0, so "eaves" of stone took it all, and stone is held by no
+    wall: none of it went down. The eaves are the outer ring only; and the best design is one within the budget."""
+    s = Structure({**DESIGNS["house"], "roof": {"style": "flat", "eaves": "stone_block"}})
+    roof = [(x, y, m) for x, y, z, m in s.cells() if z == 3]
+    xs, ys = [x for x, _, _ in roof], [y for _, y, _ in roof]
+    edge = lambda x, y: x in (min(xs), max(xs)) or y in (min(ys), max(ys))          # noqa: E731
+    assert all((m == "stone_block") == edge(x, y) for x, y, m in roof)
+    b = judge3d.built({**DESIGNS["house"], "roof": {"style": "flat", "eaves": "stone_block"}}, seed=5)
+    assert b["failed"] == [], b
+    assert architect._rank({"failed": ["cost"], "grade": 22}) < architect._rank({"failed": ["v2.chest"], "grade": 18})

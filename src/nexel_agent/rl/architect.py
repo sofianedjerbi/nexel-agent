@@ -7,7 +7,7 @@ import re
 
 from . import blueprint
 
-ROUNDS = 4
+ROUNDS = 5
 NAMED = 200                 # ...and for a build the mind named in its own words (a tower, a round house): its choice
 BUDGET = 130                # walls and blocks, at the most: a home for one 3 by 3 inside under a gable (a flat roof: 64)
 
@@ -128,6 +128,11 @@ def judged(reply: str, budget: int) -> dict:
     return j
 
 
+def _rank(j) -> tuple:
+    """Within budget first (what cannot be gathered is no design to lay), then the grade."""
+    return "cost" not in j.get("failed", ()), j["grade"]
+
+
 def design(brief: str, ask, rounds: int = ROUNDS, budget: int = BUDGET) -> dict:
     """The best drawing for `brief` in `rounds`: {"rows", "grade", "of", "failed", "told", "history": [grades]}.
     `ask(messages) -> reply text` is the model."""
@@ -140,7 +145,7 @@ def design(brief: str, ask, rounds: int = ROUNDS, budget: int = BUDGET) -> dict:
         reply = ask(msgs)
         j = judged(reply, budget)
         history.append(j["grade"])
-        if best is None or j["grade"] > best["grade"]:
+        if best is None or _rank(j) > _rank(best):
             best = j
         if j["ok"] and not j["failed"]:
             break
