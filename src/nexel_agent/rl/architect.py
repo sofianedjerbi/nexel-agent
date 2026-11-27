@@ -30,7 +30,8 @@ the land its walls and its roof (no storeys, no roof to choose; nothing to gathe
 Or a garden: "garden": true - a plot fenced round, a gate in the middle of the "door" side, beds of tilled soil
 sown with seed, "beds": "rows" (a walk between each two beds) or "full"; no furniture, no roof.
 Or several of these on one site: {{"parts": [design, design, ...]}}, each part after the first with "at": the side
-of those before it it goes on (a house and its garden east of it; a walled yard west of a tower), 2 to 4 parts.
+of those before it it goes on (a house and its garden east of it; a walled yard west of a tower), 2 to 6 parts,
+and "walled": the side of its gate, for a wall of stone round the whole site (a base: laid last, a walk inside).
 A roof is made of blocks, as a builder makes one: "flat" is one layer; "gable" steps up a layer a row to a ridge
 along the long side; "hip" steps up on all four sides (on a round: a dome). Its material: {materials} ("roof" is
 shingles; stone or earth sits on a deck of planks); "eaves" (the lowest ring) and "ridge" (the top) in another
