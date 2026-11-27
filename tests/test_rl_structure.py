@@ -395,7 +395,7 @@ def test_a_build_the_mind_names_is_drawn_over_a_hut_the_body_began(tmp_path):
     social = SimpleNamespace(home=(env.a.x + 2, env.a.y + 2), plan=None, up_laid=set())
     env.sim.world.set(env.a.x + 1, env.a.y + 1, block="stone_wall")              # (a piece of the hut, laid)
     obs = env.sim.observe(env.a)
-    d = architect.Drafting(lambda msgs: json.dumps(DESIGNS["round home"]), tmp_path / "plan.json")
+    d = architect.Drafting(lambda msgs: json.dumps({**DESIGNS["round home"], "roof": "hip"}), tmp_path / "plan.json")
     assert not d.holds(social, True, obs)                                            # (no words: the hut goes on)
     assert d.holds(social, True, obs, None, "a round house with a domed roof")
     while not d.task.done():
