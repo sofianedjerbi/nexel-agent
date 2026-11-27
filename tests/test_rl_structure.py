@@ -100,10 +100,11 @@ def test_a_roof_of_any_style_and_material_is_laid_whole_by_building_alone(roof):
     assert b["sited"] and b["failed"] == [], b
 
 
-def test_earth_goes_only_over_bare_land_and_a_wrong_roof_is_told():
+def test_earth_goes_on_its_deck_over_walls_and_furniture_too_and_a_wrong_roof_is_told():
+    """Over the whole deck: what stands on the land under it is no more in its way (nexel-worlds#316)."""
     s = Structure({**DESIGNS["house"], "roof": {"material": "dirt"}})
-    busy = set(s.storeys[0]) | set(s.path)
-    assert all(m != "dirt" for x, y, z, m in s.cells() if z >= 3 and (x, y) in busy)
+    dirt = {(x, y) for x, y, z, m in s.cells() if m == "dirt"}
+    assert set(s.storeys[0]) <= dirt and {m for x, y, z, m in s.cells() if z == 3} == {"plank"}
     for bad, why in (({"style": "spire"}, "style is one of"), ({"material": "glass"}, "a roof is of")):
         assert why in judge3d.judged({**DESIGNS["house"], "roof": bad})["error"]
 

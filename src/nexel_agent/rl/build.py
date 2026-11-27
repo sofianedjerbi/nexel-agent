@@ -23,7 +23,6 @@ from nexel_worlds.tiles import BLOCKS
 from .judge import ENCLOSE
 from .plan import BLOCKS as CELL_BLOCKS
 from .plan import Plan, drawn, of_pieces  # noqa: F401  (drawn: the grid's plan, for its callers)
-from .structure import LAND_IN_CELL
 from .pursue import craft
 
 W = H = 3                                                   # the inside
@@ -283,8 +282,6 @@ def _run(obs, hx, hy, ground_ch, inv, plan, stand, is_laid, land=0) -> list:
                 going.add(cell)
                 out.append((X, Y, "till", TILL_TOOL))
             continue
-        if piece in LAND_IN_CELL and _at(obs, "grid", X, Y) not in ground_ch | {YOU}:
-            continue                                         # (earth over a thing grown on the land: the game refuses it)
         item = _item(piece, left)
         if item is None:
             continue

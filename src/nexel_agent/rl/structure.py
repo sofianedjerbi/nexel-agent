@@ -124,12 +124,11 @@ class Structure:
             out += [(x, y, STOREY * k, p) for (x, y), p in _shell_first(self.storeys[k])]
         if self.roofed:
             under = {p for p, t in self.storeys[-1].items() if t in ("wall", "door")}
-            busy = set(self.storeys[0]) | set(self.path)     # (what stands on the land, or is no bare land, under it)
-            out += [(x, y, STOREY * self.n + i, m) for i, layer in enumerate(self.layers(_held(_around(foot), under), busy))
+            out += [(x, y, STOREY * self.n + i, m) for i, layer in enumerate(self.layers(_held(_around(foot), under)))
                     for x, y, m in layer]
         return out
 
-    def layers(self, base, busy=()) -> list:
+    def layers(self, base) -> list:
         """The roof's layers, the lowest first: [[(x, y, material)]]. Flat, one; a gable, each a row in from the long
         sides; a hip, a ring in from every side; ROOF_RISE layers at the most (what is left at the top, flat)."""
         style, mat, eaves, ridge = self.roof["style"], self.roof["material"], self.roof.get("eaves"), self.roof.get("ridge")
@@ -154,8 +153,6 @@ class Structure:
                 out[0].append((p[0], p[1], eaves if eaves and d == 0 else "plank"))
             for i in range(d + 1):
                 m = eaves if eaves and i == 0 and d == 0 else ridge if ridge and i == d and depth(p) == most and most else mat
-                if m in LAND_IN_CELL and p in busy:
-                    m = "plank"                   # (the game reads earth over a tile with a thing on its land as the
                 if not (deck and eaves and d == 0):           # land's next layer, the thing in its way: nexel-worlds#308)
                     out[i + deck].append((p[0], p[1], m))
         return [layer for layer in out if layer]
