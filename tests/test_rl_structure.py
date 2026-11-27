@@ -345,3 +345,13 @@ def test_the_mind_is_told_what_its_build_is_in_a_few_words():
     from nexel_agent.rl import home as H
     r = {"far": False, "where": "3 tiles N", "pieces": [10, 90], "left": {"fence": 4}, "lacks": {}, "what": plan.words}
     assert H.told({}, r=r).startswith("Your build 3 tiles N (a house, a gable roof of shingles; a garden east): 10 of 90")
+
+
+def test_over_budget_the_architect_is_told_what_costs_most_and_any_design_is_read():
+    import json
+    big = {**DESIGNS["two storeys"], "width": 5, "depth": 5, "roof": {"style": "gable"}}
+    j = architect.judged(json.dumps(big), 82)
+    assert "cost" in j["failed"] and "roof" in j["told"] and "walls" in j["told"] and "flat roof" in j["told"]
+    assert architect.spec_of(json.dumps({"garden": True})) == {"garden": True}                # (read as a design...)
+    assert "width and depth" in architect.judged('{"garden": true}', 82)["told"]               # (...and told what it lacks)
+    assert architect.judged(json.dumps({**DESIGNS["house"], "roof": {"style": "gable"}}), architect.BUDGET)["failed"] == []

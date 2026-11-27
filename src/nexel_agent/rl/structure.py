@@ -35,12 +35,16 @@ UPSTAIRS_FURNITURE = tuple(f for f in bp.FURNITURE if PLACEABLE.get(f, f) in UPS
 def footprint(spec) -> tuple:
     """(inside, ring): the inside tiles and the wall tiles round them, from the walls' top-left (0, 0)."""
     if spec.get("shape", "rect") == "round":
+        if "radius" not in spec:
+            raise ValueError("a round needs its radius")
         r = float(spec["radius"])
         if not 2 <= r <= 6:
             raise ValueError("radius from 2 to 6")
         n = math.ceil(r) + 1
         inside = {(x + n, y + n) for x in range(-n, n + 1) for y in range(-n, n + 1) if math.hypot(x, y) < r - .5}
     else:
+        if "width" not in spec or "depth" not in spec:
+            raise ValueError("a design needs its width and depth (or shape round and a radius)")
         w, d = int(spec["width"]), int(spec["depth"])
         if not (2 <= w <= bp.MOST - 2 and 2 <= d <= bp.MOST - 2):
             raise ValueError(f"width and depth from 2 to {bp.MOST - 2}")

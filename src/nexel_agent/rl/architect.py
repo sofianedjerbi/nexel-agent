@@ -9,7 +9,7 @@ from . import blueprint
 
 ROUNDS = 4
 NAMED = 200                 # ...and for a build the mind named in its own words (a tower, a round house): its choice
-BUDGET = 82                 # walls and roof tiles, at the most: a home for one 3 by 5 inside (the hut, 3 by 3: 64)
+BUDGET = 130                # walls and blocks, at the most: a home for one 3 by 3 inside under a gable (a flat roof: 64)
 
 DRAW = """You design builds for a tile game seen from above, built in storeys. Choose the design; it is drawn
 for you: walls all round the inside, a door in the middle of the wall you name, a path out of it, a floor of
@@ -40,8 +40,8 @@ storey of a one-storey home; a bed, a campfire within 3 tiles of the bed (light,
 chair; each piece reached on foot from its storey's door; the wall with the door an odd number of tiles long (the
 door at its middle, the build mirror-symmetric). A base is a round or a yard left open (no roof): closed, a door
 or gate, a campfire in it. Every wall, plank and roof tile is gathered and made by hand: at most {budget} in all
-(a 3 by 3 one-storey home with a flat roof takes 64; each storey more about 40; a gable or hip about half again
-its flat roof; stone or earth a deck more).
+(a 3 by 3 one-storey home with a flat roof takes 64, under a gable about 130; each storey more about 40; a gable or
+hip is one and a half to twice its flat roof, each step standing on the block under it; stone or earth a deck more).
 
 Brief: {brief}"""
 
@@ -59,7 +59,8 @@ def spec_of(reply: str):
         spec = json.loads(m.group(0))
     except ValueError:
         return None
-    return spec if isinstance(spec, dict) and ("width" in spec or "radius" in spec) else None
+    keys = ("width", "radius", "shape", "garden", "underground", "parts")
+    return spec if isinstance(spec, dict) and any(k in spec for k in keys) else None
 
 
 def grid_of(reply: str) -> str:
@@ -88,6 +89,20 @@ def cost(rows) -> int:
     return sum(p in ("wall", "roof") for _, _, p in blueprint.pieces(rows))
 
 
+def _cost_parts(s) -> str:
+    """What a design's cost is made of, so a redraw knows what to cut: " (walls 75, floors 50, roof 168)"."""
+    from collections import Counter
+
+    from nexel_agent.rl.structure import ROOF_MATERIALS
+    by = Counter()
+    for *_, z, p in s.cells():
+        if p == "wall":
+            by["walls"] += 1
+        elif p in ROOF_MATERIALS:
+            by["floors" if p == "plank" and z % 3 == 0 and z < 3 * getattr(s, "n", 1) else "roof"] += 1
+    return " (" + ", ".join(f"{k} {v}" for k, v in by.items() if v) + ")" if by else ""
+
+
 def judged(reply: str, budget: int) -> dict:
     """The design in a reply judged, its cost a check of its own (over the budget fails it): a design's JSON as a
     build of storeys (rl/judge3d.py), a grid as drawn (blueprint.judged)."""
@@ -96,15 +111,18 @@ def judged(reply: str, budget: int) -> dict:
     if spec is not None:
         j = judge3d.judged(spec)
         c = j["structure"].cost() if j["ok"] else 0
+        parts = _cost_parts(j["structure"]) if j["ok"] else ""
         j = {**j, "spec": spec, "told": judge3d.told(j) if j["ok"] else j["told"]}
     else:
         j = blueprint.judged(grid_of(reply))
         c = cost(j["rows"]) if j["ok"] and j.get("rows") else 0
+        parts = ""
     j["of"] += 1
     if j["ok"] and c > budget:
         j["failed"] = j["failed"] + ["cost"]
-        j["told"] = (j["told"] if j["told"] != "nothing failed" else "") + \
-            f"{'; ' if j['failed'][:-1] else ''}it takes {c} walls, planks and roof tiles, at most {budget}: smaller"
+        j["told"] = (j["told"] if j["told"] != "nothing failed" else "") + (
+            f"{'; ' if j['failed'][:-1] else ''}it takes {c} walls, planks and roof tiles{parts}, at most {budget}: "
+            "cut what costs most - fewer storeys, a smaller inside, a flat roof (a gable or hip adds layers)")
     elif j["ok"]:
         j["grade"] += 1
     return j
