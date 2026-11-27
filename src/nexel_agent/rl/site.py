@@ -38,7 +38,19 @@ def flat(obs, X, Y, plan=None) -> bool:
             continue                                         # (out of view: unknown, not lower - r59 left home after
         if h < lv or ((dx, dy) in plan.clear and h != lv):   # home each time it walked 9 tiles off)
             return False
+        if h - lv >= _over(plan).get((dx, dy), 99):          # (a hill under the roof's overhang, as high as its
+            return False                                     # eaves: no block goes there - the house left unroofed)
     return True
+
+
+def _over(plan) -> dict:
+    """{(dx, dy): the lowest layer of a block over that tile} beyond the plan's own ground: its roof's overhang."""
+    if getattr(plan, "_over", None) is None:
+        plan._over = {}
+        for x, y, z, _ in plan.cells:
+            if z > 0 and (x, y) not in plan.clear:
+                plan._over[(x, y)] = min(z, plan._over.get((x, y), z))
+    return plan._over
 
 
 def _pit(obs, X, Y, plan=None):
