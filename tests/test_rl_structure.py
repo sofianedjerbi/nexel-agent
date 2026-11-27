@@ -300,3 +300,28 @@ def test_the_mind_reads_a_drawn_build_by_what_is_done_and_counts_it_built_when_w
     m = Mind("Rook", "", "", None, tmp_path / "memory.json", Now("Rook"))
     m.home, m.home_read = env.social.home, r
     assert m.stands() == ("it stands whole", True)
+
+
+def test_with_no_spot_in_view_it_looks_further_and_clears_only_what_grows():
+    """A drawn build with nowhere to stand in view walks a view on and looks again (the hut, the body's own, does
+    not); a site may hold trees and flowers to clear, never what someone made."""
+    from types import SimpleNamespace
+
+    from nexel_agent.rl.build import CLEARABLE, CH, HUT, _look_further
+    from nexel_agent.rl.core import SimEnv
+    from nexel_agent.rl.plan import of_structure
+    assert CH["tree"] in CLEARABLE and CH["flower"] in CLEARABLE
+    assert not {CH[k] for k in ("chest", "bed", "crop", "workbench", "stone_wall")} & CLEARABLE
+    env = SimEnv(ep_ticks=10 ** 6, roam=0, rivals=0)
+    env.reset(5)
+    obs, social = env.sim.observe(env.a), SimpleNamespace(home=None)
+    assert _look_further(obs, social, HUT) is None
+    tool, args = _look_further(obs, social, of_structure(Structure(DESIGNS["house"])))
+    assert tool == "move_to" and max(abs(args["x"] - env.a.x), abs(args["y"] - env.a.y)) >= 9
+    assert _look_further(obs, social, of_structure(Structure(DESIGNS["house"])))[1] == args     # (same tick: the same)
+
+
+@pytest.mark.parametrize("name, seed", [("tower", 44), ("round home", 23)])
+def test_a_build_with_no_spot_where_it_starts_finds_one_further_and_is_laid_whole(name, seed):
+    b = judge3d.built(DESIGNS[name], seed=seed)
+    assert b["sited"] and b["failed"] == [], b
