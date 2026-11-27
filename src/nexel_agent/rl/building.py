@@ -49,6 +49,9 @@ class Building:
             return "you have no home yet", False
         if not r or r.get("far"):
             return "your home is too far to see how it stands", False
+        if "pieces" in r:                                    # (a drawn build: whole once every piece is done)
+            n, of = r["pieces"]
+            return (f"{n} of {of} pieces done" if n < of else "it stands whole"), n == of
         v = r["verdict"]
         lack = [LACKING.get(k, k.replace("_", " ")) for k in v["failed"]]
         return f"it stands at {v['grade']}/{v['of']}" + (f", lacking {', '.join(lack)}" if lack else ", whole"), v["grade"] >= BUILT

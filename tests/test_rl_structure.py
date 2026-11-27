@@ -263,3 +263,40 @@ def test_the_mind_adds_a_garden_beside_its_home_once_it_stands(tmp_path):
     gx, gy = env.social.plan.ground[0]
     j = judge3d.judge_at(env.sim, design_of(kept), *home, env.sim.world.level(home[0] + gx, home[1] + gy))
     assert j["failed"] == [], j["failed"]
+
+
+def test_the_mind_reads_a_drawn_build_by_what_is_done_and_counts_it_built_when_whole(tmp_path):
+    """A dug room seen on the land's view is no room the judge can read: a drawn build is told by its pieces done and
+    what is left, and it is built when every piece is done."""
+    from collections import Counter
+
+    from nexel_agent.rl import home as H
+    from nexel_agent.rl.actions import ACTIONS
+    from nexel_agent.rl.core import SimEnv
+    from nexel_agent.rl.dug import design_of
+    from nexel_agent.rl.mind import Mind
+    from nexel_agent.rl.now import Now
+    from nexel_agent.rl.plan import of_structure
+    s = design_of(DUG)
+    env = SimEnv(ep_ticks=10 ** 6, roam=0, rivals=0)
+    env.reset(20)
+    env.folk = []
+    env.social.plan = of_structure(s)
+    env.a.inventory.clear()
+    env.a.inventory.update(Counter(p for *_, p in s.cells() if p != "dig"))
+    env.a.inventory.update({"pickaxe": 1})
+    b = next(i for i, a in enumerate(ACTIONS) if a[0] == "build")
+    env.step(b)
+    r = H.reading(env.sim.observe(env.a), env.social.home, env.social)
+    assert 0 < r["pieces"][0] < r["pieces"][1] and "dig" in r["left"]
+    assert "pieces done; left:" in H.told(env.sim.observe(env.a), r=r)
+    for _ in range(300):
+        if not env.encoded()["mask"][b]:
+            break
+        env.step(b)
+    obs = env.sim.observe(env.a)
+    r = H.reading(obs, env.social.home, env.social)
+    assert r["pieces"][0] == r["pieces"][1] and "whole" in H.told(obs, r=r)
+    m = Mind("Rook", "", "", None, tmp_path / "memory.json", Now("Rook"))
+    m.home, m.home_read = env.social.home, r
+    assert m.stands() == ("it stands whole", True)

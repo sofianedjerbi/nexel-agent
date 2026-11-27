@@ -8,13 +8,14 @@ The judge reads a world; the mind has the observation: Seen is the world as the 
 legend, its heights and roofs, VIEW_R round the player). Past it nothing is known: open ground."""
 
 import math
+from collections import Counter
 
 from nexel_worlds.sim.constants import DAY_TICKS, TICK_HZ, VIEW_R
 from nexel_worlds.tiles import BLOCKS, GROUNDS, RECIPES
 
 from . import judge
 from .actions import LEVEL
-from .build import WALLS, plan_of
+from .build import HUT, WALLS, plan_of
 from .facts import compass, counted
 
 _BLOCK, _GROUND = {b.name for b in BLOCKS}, {g.name for g in GROUNDS}
@@ -64,10 +65,21 @@ def lacks(obs: dict, home, social=None) -> dict:
     made of what their recipe takes (one step down: wood, fiber, stone), all as {item: n}."""
     world, have = Seen(obs), dict((obs.get("self") or {}).get("inventory") or {})
     pieces: dict = {}
-    for dx, dy, p in plan_of(social).pieces:
-        if not stands(world, home[0] + dx, home[1] + dy, p):
-            item = PIECE_ITEM.get(p, p)
-            pieces[item] = pieces.get(item, 0) + 1
+    plan = plan_of(social)
+    if plan is not HUT and social is not None and getattr(social, "home", None):   # (a drawn build: each cell not done)
+        from .build import laid_by
+        is_laid = laid_by(obs, social, plan)
+        left = [c[3] for c in plan.cells if not is_laid(c)]
+        for p in left:
+            if p == "dig" or (p == "till" and have.get("hoe")):
+                continue                                     # (the land dug is the pack's; a hoe tills them all)
+            item = "hoe" if p == "till" else PIECE_ITEM.get(p, p)
+            pieces[item] = 1 if item == "hoe" else pieces.get(item, 0) + 1
+    else:
+        for dx, dy, p in plan.pieces:
+            if not stands(world, home[0] + dx, home[1] + dy, p):
+                item = PIECE_ITEM.get(p, p)
+                pieces[item] = pieces.get(item, 0) + 1
     out: dict = {}
     for item, n in pieces.items():
         short, r = n - have.get(item, 0), RECIPES.get(item)
@@ -92,6 +104,14 @@ def reading(obs: dict, home, social=None) -> dict:
          "far": max(abs(x - me["x"]), abs(y - me["y"])) > VIEW_R - 2}
     if r["far"]:
         return r
+    if plan_of(social) is not HUT:                           # (a build the architect drew: how far it is laid - a
+        from .build import laid_by                           # dug room, a garden, the parts of a compound read on
+        plan = plan_of(social)                               # the land's view are no room to judge)
+        is_laid = laid_by(obs, social, plan)
+        left = [c[3] for c in plan.cells if not is_laid(c)]
+        r.update(pieces=[len(plan.cells) - len(left), len(plan.cells)], left=dict(Counter(left)),
+                 lacks=lacks(obs, home, social))
+        return r
     ix, iy = inside(home, social)
     v = judge.verdict(world, ix, iy)
     r.update(verdict={k: v[k] for k in ("grade", "of", "checks", "failed")}, told=judge.told(v), closed=v["report"]["closed"])
@@ -111,6 +131,11 @@ def told(obs: dict, home=None, r: dict | None = None) -> str:
     lacking = lambda k: f"some {k[3:].replace('_', ' ')}" if k.startswith("no_") else f"no {k.replace('_', ' ')}"   # (no_stray failed: "some stray", not "no no stray")
     if r["far"]:
         return f"Your home is {r['where']}: too far to see how it stands."
+    if "pieces" in r:
+        n, of = r["pieces"]
+        left = ", ".join(f"{k} x{v}" if v > 1 else k for k, v in r["left"].items())
+        return (f"Your build {r['where']}: {n} of {of} pieces done" + (f"; left: {left}" if left else ", whole")
+                + (f"; it lacks {counted(r['lacks'])}." if r["lacks"] else "; you have all it takes."))
     line = f"Your home {r['where']}: {r['told']}"
     if r["closed"]:
         if r["sense"]["failed"]:
