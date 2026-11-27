@@ -232,6 +232,7 @@ def test_a_goal_is_judged_live_as_in_the_sim_and_ends(tmp_path):
     m.apply({"goal": "ask", "with": "Mira", "item": "hoe"})
     m.track({**obs, "tick": 101 + TIMEOUT, "entities": []}, [], {})
     assert m.goal.kind == "free" and "timed out" in m.ended and "now out of sight" in m.ended
+    assert m.tried == {"ask wood (with Mira)": [1, 1], "ask hoe (with Mira)": [1, 0]}     # (live trial 5: all "0 of n")
     m.apply({"goal": "ask", "with": "Mira", "item": "good_hoe"})
     assert m.goal.kind == "free" and "no item called good_hoe" in m.ended and "Your last goal" in m.facts(obs)
 
@@ -287,7 +288,7 @@ def test_the_facts_tell_how_its_goals_went(tmp_path):
     m = Mind("Rook", "a quiet player", "http://x", FakeHTTP("{}"), tmp_path / "memory.json")
     for _ in range(3):
         m.end(Goal("ask", "wood", "Mira"), "timed out, not done")
-    m.end(Goal("gather", "wood"), "done")
+    m.end(Goal("gather", "wood"), "4 s of 180 s, done", done=True)
     m.now.see(OBS)
     assert "ask wood (with Mira): 0 of 3; gather wood: 1 of 1" in m.messages(OBS)[1]["content"]
 
