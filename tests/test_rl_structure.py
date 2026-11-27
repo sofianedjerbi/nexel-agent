@@ -325,3 +325,10 @@ def test_with_no_spot_in_view_it_looks_further_and_clears_only_what_grows():
 def test_a_build_with_no_spot_where_it_starts_finds_one_further_and_is_laid_whole(name, seed):
     b = judge3d.built(DESIGNS[name], seed=seed)
     assert b["sited"] and b["failed"] == [], b
+
+
+def test_the_planner_is_told_every_kind_it_can_build():
+    """What the architect and the build verb can lay is what the planner is told it may name: else it asks for huts."""
+    from nexel_agent.rl.mind import GOALS_DOC
+    for kind in ("tower", "round", "underground", "garden", "gabled", "earth", "beside it"):
+        assert kind in GOALS_DOC, kind

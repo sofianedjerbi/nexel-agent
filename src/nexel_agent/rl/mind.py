@@ -29,8 +29,10 @@ PROMISE = sec(120)         # a promise to hand something over is kept within thi
 THINK_S = 20.0             # (the model it asks: rl/voice.py MODEL, the same server as the words)
 HOME = "home"               # an aim that is no item: its home, what it takes its lacks (rl/home.py)
 GOALS_DOC = ("Goals: gather (an item), craft (an item), give (an item, to a person), ask (a person, for an item), "
-             "stay (with a person), help (a person, in a fight), avoid (a person), build (your home: the body lays "
-             "it, walls, door, fire, bed, roof, from what you carry, making what it lacks), free (no goal). Change it "
+             "stay (with a person), help (a person, in a fight), avoid (a person), build (what you describe in "
+             "\"build\": a home, a tower of up to 3 storeys, a round house or a walled yard, a home dug underground, a "
+             "garden; its roof flat, gabled or domed, of shingles, planks, stone or earth; once your home stands, "
+             "another build named is set beside it - the body lays it all, making what it lacks), free (no goal). Change it "
              "whenever you see fit: a goal you leave before it is done is kept, set aside, in your facts")
 def item_name(s) -> str:
     """An item as the game spells it ("Stone Block" is stone_block)."""
