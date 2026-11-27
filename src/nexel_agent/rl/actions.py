@@ -222,7 +222,14 @@ def legal(obs: dict, facing: str = "S", social=None, goal=None) -> np.ndarray:
     fch, frel, frim = fronts.get(facing, fronts["S"])
     weapon = max((w for w in WEAPONS if inv.get(w)), key=lambda w: WEAPONS[w], default=None)
     hs = obs.get("heights")
+    from .build import own
+    mine, at = own(social) if social is not None else set(), (me.get("x"), me.get("y"))
     for i, (kind, d, arg) in enumerate(ACTIONS):
+        if kind in ("dig", "dig_at", "dig_down") and mine:     # (the home's tiles: dug by the builder only)
+            dx, dy = STEP[d or facing] if kind != "dig_down" else (0, 0)
+            if at[0] is not None and (at[0] + dx, at[1] + dy) in mine:
+                m[i] = False
+                continue
         ch, rel, rim = fronts[d] if d else (fch, frel, frim)
         if kind == "step":
             m[i] = rel <= 0 and ch not in SOLID_CH

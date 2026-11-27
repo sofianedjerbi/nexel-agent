@@ -44,13 +44,14 @@ def _walk(obs, dx, dy, ground_ch=None):
     return "move_to", {"x": obs["self"]["x"] + dx, "y": obs["self"]["y"] + dy}
 
 
-def gather(obs, item, ground_ch, tool_for, dirs, blocked=()):
+def gather(obs, item, ground_ch, tool_for, dirs, blocked=(), keep=()):
+    """The next step to get `item`: a pile picked up, else a block that gives it dug (none of `keep`: the home's)."""
     me = obs["self"]
     pile = next(((dx, dy) for dx, dy, items in _piles(obs) if items.get(item) and (me["x"] + dx, me["y"] + dy) not in blocked), None)
     if pile is not None:
         return ("pick_up", {}) if pile == (0, 0) else ("move_to", {"x": obs["self"]["x"] + pile[0], "y": obs["self"]["y"] + pile[1]})
     inv = me.get("inventory", {})
-    cell = next(iter(_cells(obs, {c for c in DROPS.get(item, ()) if c not in NEEDS or inv.get(NEEDS[c])}, blocked)), None)
+    cell = next(iter(_cells(obs, {c for c in DROPS.get(item, ()) if c not in NEEDS or inv.get(NEEDS[c])}, set(blocked) | set(keep))), None)
     if cell is None:
         return None
     d = next((k for k, v in dirs.items() if v == cell), None)
@@ -64,15 +65,15 @@ def _piles(obs):
     return [(p["dx"], p["dy"], dict(p["items"])) for p in obs.get("items") or [] if p.get("items")]
 
 
-def craft(obs, item, ground_ch, tool_for, dirs, depth=0, blocked=()):
+def craft(obs, item, ground_ch, tool_for, dirs, depth=0, blocked=(), keep=()):
     r = RECIPES.get(item)
     if r is None or depth > DEPTH:
         return None
     inv = obs["self"].get("inventory", {})
     lacks = [k for k, n in r.inputs.items() if inv.get(k, 0) < n]
     for lack in lacks:        # (what it can get at now - the stone in view while no tree is -: dug or picked up
-        step = gather(obs, lack, ground_ch, tool_for, dirs, blocked)                  # where something here gives it,
-        step = step or craft(obs, lack, ground_ch, tool_for, dirs, depth + 1, blocked)     # else made)
+        step = gather(obs, lack, ground_ch, tool_for, dirs, blocked, keep)            # where something here gives it,
+        step = step or craft(obs, lack, ground_ch, tool_for, dirs, depth + 1, blocked, keep)   # else made)
         if step is not None:
             return step
     if lacks:
@@ -84,7 +85,7 @@ def craft(obs, item, ground_ch, tool_for, dirs, depth=0, blocked=()):
             if inv.get(r.station):
                 d = next((k for k, (dx, dy) in dirs.items() if obs["grid"][VIEW_R + dy][VIEW_R + dx] in ground_ch - {WATER}), None)
                 return ("place", {"dir": d, "item": r.station}) if d else None
-            return craft(obs, r.station, ground_ch, tool_for, dirs, depth + 1, blocked)
+            return craft(obs, r.station, ground_ch, tool_for, dirs, depth + 1, blocked, keep)
         return _walk(obs, *at, ground_ch)                   # (in view, not in reach: walk to it)
     return "craft", {"recipe": item}
 
@@ -108,10 +109,11 @@ def next_step(obs, goal, social, *, person, wanted, handed, tool_for, ground_ch,
     """The goal's next tool call (tool, args), or None. The helpers are rl/actions.py's own (one reading of a goal)."""
     if goal is None or goal.kind == "free":
         return None
+    from .build import own
     if goal.kind == "gather" and goal.item:
-        return gather(obs, goal.item, ground_ch, tool_for, dirs, goal.blocked)
+        return gather(obs, goal.item, ground_ch, tool_for, dirs, goal.blocked, own(social))
     if goal.kind == "craft" and goal.item:
-        return craft(obs, goal.item, ground_ch, tool_for, dirs, blocked=goal.blocked)
+        return craft(obs, goal.item, ground_ch, tool_for, dirs, blocked=goal.blocked, keep=own(social))
     if goal.kind in ("ask", "give", "stay"):
         return with_person(obs, goal, social, person(obs, goal), wanted, handed, ground_ch)
     return None
