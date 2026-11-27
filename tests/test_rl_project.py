@@ -128,3 +128,11 @@ def test_a_thought_that_fails_is_kept_with_its_cause(tmp_path):
     asyncio.run(m.think({"self": {}}))
     log = (tmp_path / "mind_errors.log").read_text()
     assert m.stats["errors"] == 1 and "Error" in log and not m.busy
+
+
+def test_inside_its_own_site_the_builder_steps_off_to_put_a_bench_down():
+    """The round home, seed 9: standing inside the site, every tile round it the home's, the bench had nowhere to
+    go; the walls were skipped and 80 stayed unlaid with the wood in hand."""
+    from test_rl_structure import DESIGNS
+    env, left, n = run(DESIGNS["round home"], 9, 1500)
+    assert left == [], (n, len(left))
