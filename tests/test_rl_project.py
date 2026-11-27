@@ -34,6 +34,18 @@ def run(spec, seed, steps):
     return env, left, n
 
 
+def test_the_bill_is_the_least_raw_material_a_demand_takes():
+    """Research notes, Theorem 1. A recipe yielding two (a wood: 2 shingles) is crafted ceil(n / 2) times for n,
+    not once a cell (107 shingles: 54 wood, not 107); a station once; what the pack holds first."""
+    from collections import Counter
+
+    from nexel_agent.rl.project import bill
+    assert bill(Counter({"roof": 107}), {}) == {"wood": 54}
+    assert bill(Counter({"wood_wall": 4}), {}) == {"wood": 6 + 4}          # (2 crafts of 3 wood, a workbench of 4)
+    assert bill(Counter({"wood_wall": 4}), {"workbench": 1, "wood": 2}) == {"wood": 4}
+    assert bill(Counter({"roof": 3, "plank": 3}), {"roof": 1}) == {"wood": 1 + 2}
+
+
 def test_what_a_plan_lacks_is_read_down_to_the_land():
     plan = of_structure(design_of(HOUSE))
     need = lacking(plan, lambda c: False, {})
