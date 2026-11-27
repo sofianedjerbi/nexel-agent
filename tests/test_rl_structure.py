@@ -223,3 +223,43 @@ def test_no_build_is_sited_where_water_runs():
     env.sim.world.set(a.x + 3, a.y, ground="water")
     wet = _near_water(env.sim.observe(a))
     assert (a.x + 3 + WET, a.y) in wet and (a.x + 4 + WET, a.y) not in wet
+
+
+def test_the_mind_adds_a_garden_beside_its_home_once_it_stands(tmp_path):
+    """The home drawn and laid; then, the mind naming another build in its words, that part is drawn beside it on the
+    same site and laid, and the whole stands, each part judged as itself."""
+    import json
+    import time
+    from collections import Counter
+
+    from nexel_agent.rl.actions import ACTIONS
+    from nexel_agent.rl.core import SimEnv
+    from nexel_agent.rl.dug import design_of
+    replies = iter([json.dumps(DESIGNS["house"]), json.dumps({**GARDEN, "at": "east"})])
+    d = architect.Drafting(lambda msgs: next(replies), tmp_path / "plan.json", "a farmer")
+    env = SimEnv(ep_ticks=10 ** 6, roam=0, rivals=0)
+    env.reset(20)
+    env.folk = []
+    whole = design_of({"parts": [DESIGNS["house"], {**GARDEN, "at": "east"}]})
+    env.a.inventory.clear()
+    env.a.inventory.update(Counter("stone_wall" if p == "wall" else p for *_, p in whole.cells() if p != "till"))
+    env.a.inventory.update({"hoe": 1})
+    b = next(i for i, a in enumerate(ACTIONS) if a[0] == "build")
+
+    def build(words):
+        for _ in range(400):
+            while d.holds(env.social, True, env.sim.observe(env.a), None, words):
+                time.sleep(0.01)
+            if not env.encoded()["mask"][b]:
+                return
+            env.step(b)
+    build("a stone house")
+    home = env.social.home
+    assert home is not None and json.loads((tmp_path / "plan.json").read_text())["spec"] == DESIGNS["house"]
+    build("a vegetable garden by the house")
+    assert env.social.home == home                                                   # (the same site: it grew)
+    kept = json.loads((tmp_path / "plan.json").read_text())["spec"]
+    assert [p.get("garden", False) for p in kept["parts"]] == [False, True]
+    gx, gy = env.social.plan.ground[0]
+    j = judge3d.judge_at(env.sim, design_of(kept), *home, env.sim.world.level(home[0] + gx, home[1] + gy))
+    assert j["failed"] == [], j["failed"]
