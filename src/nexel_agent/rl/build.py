@@ -28,7 +28,7 @@ from .pursue import craft
 W = H = 3                                                   # the inside
 DOOR = (1, H)                                               # in the south wall's middle
 FURNITURE = ((0, 0, "campfire"), (W - 1, 0, "bed"))         # a corner each
-FAR = 64                    # a home further off is given up (fallen, back at spawn; an errand for wood goes 30+)
+FAR = 240                   # a home further off is given up (fallen, back at spawn); a trip for wood or stone goes 100+
 _SOLID = {b.name: b.solid for b in BLOCKS}
 CH = {b.name: b.char for b in BLOCKS}
 WALLS = tuple(k for k in ENCLOSE if _SOLID[k])
@@ -140,9 +140,9 @@ def next_step(obs, social, *, ground_ch, tool_for, dirs):
         if dz <= 0 and piece not in (*CELL_BLOCKS, "dig") and _at(obs, "grid", X, Y) not in ground_ch:
             continue                                         # (someone or something on it: the next piece)
         if piece != "dig" and _item(piece, inv) is None:
-            if piece == "till" and (step := craft(obs, TILL_TOOL, ground_ch, tool_for, dirs)):
+            if piece == "till" and (step := craft(obs, TILL_TOOL, ground_ch, tool_for, dirs, keep=own(social))):
                 return step                                  # (no hoe: one made)
-            step = next((s for w in (WALLS if piece == "wall" else (piece,)) if (s := craft(obs, w, ground_ch, tool_for, dirs))), None)
+            step = next((s for w in (WALLS if piece == "wall" else (piece,)) if (s := craft(obs, w, ground_ch, tool_for, dirs, keep=own(social)))), None)
             if step is not None:
                 return step
             continue
@@ -161,9 +161,9 @@ def next_step(obs, social, *, ground_ch, tool_for, dirs):
     far = [(hx + c[0], hy + c[1]) for c in plan.cells if _at(obs, "grid", hx + c[0], hy + c[1]) is None and not is_laid(c)]
     if far:                                                  # (what is left is out of view - the other end of a
         fx, fy = min(far, key=lambda p: abs(p[0] - me["x"]) + abs(p[1] - me["y"]))     # compound: a view nearer it)
-        d = math.hypot(fx - me["x"], fy - me["y"])
-        k = min(1, (VIEW_R - 2) / d)
-        return "move_to", {"x": me["x"] + round((fx - me["x"]) * k), "y": me["y"] + round((fy - me["y"]) * k)}
+        to = [(me["x"] + round((fx - me["x"]) * k), me["y"] + round((fy - me["y"]) * k)) for k in   # (the furthest
+              (min(1, (VIEW_R - 2) * i / 8 / math.hypot(fx - me["x"], fy - me["y"])) for i in range(8, 0, -1))]  # open
+        return "move_to", dict(zip("xy", next((p for p in to if _at(obs, "grid", *p) in ground_ch), to[0])))  # ground)
     return None
 
 
