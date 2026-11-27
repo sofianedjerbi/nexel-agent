@@ -166,6 +166,19 @@ def model(url: str, *, max_tokens: int = 600, temperature: float = 0.4):
     return ask
 
 
+STUFF = ("wood", "stone", "fiber", "plank", "roof", "stone_block", "dirt", "wood_wall", "stone_wall", "door", "fence",
+         "gate", "bed", "campfire", "chest", "table", "chair", "workbench", "seed", "hoe", "pickaxe", "stairs")
+
+
+def carried(obs) -> str:
+    """What the builder carries of what builds are made of, for the brief: a design of it goes up sooner (live trial
+    3: a two-storey house drawn with 69 wood still to gather, and 25 minutes went by gathering it)."""
+    inv = (obs.get("self") or {}).get("inventory") or {}
+    have = [f"{inv[k]} {k}" for k in STUFF if inv.get(k)]
+    return (". What they carry now: " + ", ".join(have) + " (what it is built of is gathered first: a design of what they"
+            " carry goes up sooner)") if have else ". They carry nothing to build with yet: a small design goes up sooner"
+
+
 def plan_from(kept: dict):
     """The plan of a design kept: a build of storeys (its JSON), or a grid."""
     from .build import drawn
@@ -212,7 +225,7 @@ class Drafting:
         want = self._wanted(social, obs, words)
         if want is None:
             return False
-        self.want, self.brief = want, want[1] + (f". It is for: {self.who}" if self.who else "")
+        self.want, self.brief = want, want[1] + (f". It is for: {self.who}" if self.who else "") + carried(obs)
         self.tried.add(words or "")
         self.task = concurrent.futures.ThreadPoolExecutor(1).submit(design, self.brief, self.ask, ROUNDS, want[2])
         return True

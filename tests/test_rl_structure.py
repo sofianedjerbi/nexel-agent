@@ -402,3 +402,23 @@ def test_a_build_the_mind_names_is_drawn_over_a_hut_the_body_began(tmp_path):
         time.sleep(0.01)
     assert not d.holds(social, False, obs)                                           # (the mind moved on: kept)
     assert json.loads((tmp_path / "plan.json").read_text())["spec"]["shape"] == "round" and social.home is None
+
+
+def test_the_architect_is_told_what_the_builder_carries(tmp_path):
+    """Live trial 3: the design took 69 wood more than the pack held, and the run went by gathering it. The brief now
+    says what is carried of what builds are made of."""
+    import json
+    import time
+    from types import SimpleNamespace
+    seen = []
+
+    def ask(msgs):
+        seen.append(msgs[0]["content"])
+        return json.dumps(DESIGNS["house"])
+    obs = {"self": {"x": 0, "y": 0, "inventory": {"wood": 12, "roof": 14, "apple": 3}}, "grid": []}
+    d = architect.Drafting(ask, tmp_path / "plan.json", "a builder")
+    d.holds(SimpleNamespace(home=None, plan=None), True, obs, None, "a small house")
+    while not d.task.done():
+        time.sleep(0.01)
+    assert "What they carry now: 12 wood, 14 roof" in seen[0] and "apple" not in seen[0]
+    assert "carry nothing to build with" in architect.carried({"self": {"inventory": {"apple": 2}}})
