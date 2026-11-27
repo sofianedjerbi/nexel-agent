@@ -20,6 +20,7 @@ from nexel_worlds.tiles import GROUNDS, TILL_TOOL
 from nexel_worlds.tiles import BLOCKS
 
 from .judge import ENCLOSE
+from .social import laid_as
 from .plan import BLOCKS as CELL_BLOCKS
 from .site import _at, _pit, flat, site
 from .plan import Plan, drawn, of_pieces  # noqa: F401  (drawn: the grid's plan, for its callers)
@@ -250,7 +251,7 @@ def laid_by(obs, social, plan):
             return False
         if p in CELL_BLOCKS and dz == STOREY and _at(obs, "roofs", X, Y) == "1":
             return True
-        return (X, Y, land + dz) in up
+        return (X, Y, land + dz, laid_as(p)) in up
     return is_laid
 
 
