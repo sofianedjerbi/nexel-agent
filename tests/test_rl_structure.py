@@ -367,4 +367,6 @@ def test_eaves_are_the_roofs_outer_ring_whatever_its_style():
     assert all((m == "stone_block") == edge(x, y) for x, y, m in roof)
     b = judge3d.built({**DESIGNS["house"], "roof": {"style": "flat", "eaves": "stone_block"}}, seed=5)
     assert b["failed"] == [], b
-    assert architect._rank({"failed": ["cost"], "grade": 22}) < architect._rank({"failed": ["v2.chest"], "grade": 18})
+    assert architect._rank({"ok": True, "failed": ["cost"], "grade": 22}) < \
+        architect._rank({"ok": True, "failed": ["v2.chest"], "grade": 18})
+    assert architect._rank({"ok": False, "failed": [], "grade": 0}) < architect._rank({"ok": True, "failed": ["cost"], "grade": 16})

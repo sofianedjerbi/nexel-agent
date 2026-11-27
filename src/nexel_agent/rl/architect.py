@@ -129,8 +129,8 @@ def judged(reply: str, budget: int) -> dict:
 
 
 def _rank(j) -> tuple:
-    """Within budget first (what cannot be gathered is no design to lay), then the grade."""
-    return "cost" not in j.get("failed", ()), j["grade"]
+    """A design read before none; within budget first (what cannot be gathered is no design to lay); then the grade."""
+    return bool(j.get("ok")), "cost" not in j.get("failed", ()), j["grade"]      # (no design at all: last)
 
 
 def design(brief: str, ask, rounds: int = ROUNDS, budget: int = BUDGET) -> dict:
