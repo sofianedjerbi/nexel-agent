@@ -266,3 +266,12 @@ def test_a_way_shut_before_a_storey_stood_is_tried_again():
     from test_rl_structure import DESIGNS
     env, left, n = run(DESIGNS["tower"], 304, 1500)
     assert not left, (n, left[:4])
+
+
+def test_shut_in_a_notch_of_its_walls_it_digs_out():
+    """The T on seed 504: in a notch of its own walls, by two trees under its roof's overhang (its own tiles, never
+    cleared), every way off shut (357 walks), no workbench put down, the build ended with 254 cells left. Shut in, it
+    digs through a tree, even on its own ground."""
+    from test_rl_wings import WINGS
+    env, left, n = run({**WINGS["T"], "roof": {"style": "gable", "material": "roof", "ridge": "plank"}}, 504, 3000)
+    assert not left, (n, left[:4])

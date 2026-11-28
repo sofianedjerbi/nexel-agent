@@ -142,7 +142,15 @@ def craft(obs, item, ground_ch, tool_for, dirs, depth=0, blocked=(), keep=(), lo
                     #                                  (every tile round it the home's or a slope: a step off the
                     off = next(((dx, dy) for dx, dy in _cells(obs, ground_ch - {WATER}, blocked)          # site first -
                                 if (dx, dy) != (0, 0) and (me["x"] + dx, me["y"] + dy) not in keep), None)  # the round
-                    return _walk(obs, *off, ground_ch) if off else None                     # home, 80 walls left)
+                    if off:                                                                 # home, 80 walls left)
+                        return _walk(obs, *off, ground_ch)
+                    from .build import CLEARABLE                                            # (shut in, every way
+                    d = next((k for k, (dx, dy) in dirs.items() if obs["grid"][VIEW_R + dy][VIEW_R + dx] in CLEARABLE  # off
+                              or (me["x"] + dx, me["y"] + dy) not in keep and obs["grid"][VIEW_R + dy][VIEW_R + dx]
+                              not in ground_ch | {WATER}), None)    # shut: a tree, even under its own eaves, or what is
+                    #                                                 not its own, dug through
+                    return ("dig", {"dir": d, **({"with": w} if (w := tool_for(obs, d)) else {})}) if d else None
+                    #  (the T on seed 504: in a notch of its walls by two trees under its roof's overhang)
                 return ("place", {"dir": d, "item": r.station}) if d else None
             return craft(obs, r.station, ground_ch, tool_for, dirs, depth + 1, blocked, keep, look)
         return _walk(obs, *at, ground_ch)                   # (in view, not in reach: walk to it)
