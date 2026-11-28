@@ -216,16 +216,37 @@ def walked_nowhere(social, to: dict, me: dict) -> bool:
     return False
 
 
-def way_out(obs, ground_ch, keep, dirs, tool_for, clearable=frozenset()):
-    """Walled in - its own wall, a rock, a bush on every side (the T on seed 7: every walk "no path", 199 times) - a
-    dig through what is not the home's, the nearest way out; None when a side is open."""
+def way_out(obs, ground_ch, keep, dirs, tool_for, clearable=frozenset(), passable=frozenset()):
+    """Walled in - its own wall, a rock, a bush round the open ground it stands on, the pocket closed inside its view
+    (the T on seed 7: every walk "no path", 199 times; live trial 12: a hut's stone walls begun before the design came
+    and the garden's fence laid across their open side, 50 minutes of walks to stands outside) - a dig through what
+    is not the home's, the nearest way out, walked to inside the pocket; None when the ground it stands on goes on
+    out of view. A door or a gate is a way through (`passable`)."""
     me, grid = obs["self"], obs.get("grid") or []
-    if not grid or any(_at(obs, "grid", me["x"] + dx, me["y"] + dy) in ground_ch for dx, dy in dirs.values()):
+    if not grid:
         return None
-    d = next((k for k, (dx, dy) in dirs.items() if (me["x"] + dx, me["y"] + dy) not in keep), None) or next(
-        (k for k, (dx, dy) in dirs.items() if _at(obs, "grid", me["x"] + dx, me["y"] + dy) in clearable), None)  # (a tree
-    #  on its own ground, to be cleared anyway - the round home on seed 203: its walls and two trees round it)
-    return ("dig", {"dir": d, **({"with": w} if (w := tool_for(obs, d)) else {})}) if d else None
+    here, open_ = (me["x"], me["y"]), ground_ch | LIQUID_CH | set(passable) | {YOU}   # (water is swum: no wall)
+    pocket, todo = {here}, [here]
+    while todo:
+        x, y = todo.pop()
+        for dx, dy in dirs.values():
+            q = (x + dx, y + dy)
+            ch = _at(obs, "grid", *q)
+            if ch is None:
+                return None                                  # (the ground goes on out of view: no pocket)
+            if q not in pocket and ch in open_:
+                pocket.add(q)
+                todo.append(q)
+    rim = sorted(((p, q) for p in pocket for q in ((p[0] + dx, p[1] + dy) for dx, dy in dirs.values())
+                  if q not in pocket and (q not in keep or _at(obs, "grid", *q) in clearable)),   # (a tree on its own
+                 key=lambda pq: (abs(pq[0][0] - here[0]) + abs(pq[0][1] - here[1]), pq))   # ground: cleared anyway -
+    if not rim:                                              # the round home on seed 203: its walls, two trees round it)
+        return None
+    (sx, sy), (qx, qy) = rim[0]
+    if (sx, sy) != here:
+        return "move_to", {"x": sx, "y": sy}
+    d = next(k for k, v in dirs.items() if v == (qx - sx, qy - sy))
+    return "dig", {"dir": d, **({"with": w} if (w := tool_for(obs, d)) else {})}
 
 
 SEARCH = tuple((dx * k, dy * k) for k in (1, 2)                # (a view's walk each way in turn, then two views)

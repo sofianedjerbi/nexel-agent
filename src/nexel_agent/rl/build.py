@@ -87,7 +87,7 @@ def next_step(obs, social, *, ground_ch, tool_for, dirs):
     again = lambda: next_step(obs, social, ground_ch=ground_ch, tool_for=tool_for, dirs=dirs)    # noqa: E731
     hx, hy = social.home
     me, inv = obs["self"], obs["self"].get("inventory", {})
-    if (out := way_out(obs, ground_ch, own(social), dirs, tool_for, CLEARABLE)) is not None:
+    if (out := way_out(obs, ground_ch, own(social), dirs, tool_for, CLEARABLE, DOOR_CH)) is not None:
         return out
     cx, cy = min(((hx + x, hy + y) for x, y in plan.clear), key=lambda p: abs(p[0] - me["x"]) + abs(p[1] - me["y"]))
     if _at(obs, "grid", cx, cy) is None:                     # (none of it in view: walk home, a view at a time, to its
@@ -128,7 +128,8 @@ def next_step(obs, social, *, ground_ch, tool_for, dirs):
         wet = ch == WATER and (earth := next((k for k in EARTH if inv.get(k)), None))   # (water in it, met once the site
         if wet and max(abs(X - me["x"]), abs(Y - me["y"])) <= REACH and not tried(social, X, Y, (me["x"], me["y"])):
             return "place", {"item": earth, "x": X, "y": Y}  # was chosen out of view: filled with earth, as a pit - 21)
-        if wet or ch in CLEARABLE and not (piece and laid(obs, X, Y, piece)):
+        if wet or ch in CLEARABLE and not (piece and laid(obs, X, Y, piece)) or ch in WALL_CH and piece != "wall":   # (a wall
+            #  where its door or its floor goes - an old hut's, in the way since: dug, as a player knocks it out)
             d = None if wet else next((k for k, v in dirs.items() if v == (X - me["x"], Y - me["y"])), None)
             if d is not None and not tried(social, X, Y, (me["x"], me["y"]), count=not me.get("action"), at=obs.get("tick")):   # (a dig under way: no try)
                 return "dig", {"dir": d, **({"with": w} if (w := tool_for(obs, d)) else {})}
