@@ -111,7 +111,7 @@ def next_step(obs, social, *, ground_ch, tool_for, dirs):
                 return "move_to", {"x": hx + sx, "y": hy + sy}       # down - r63 left a closed room for a pit 4 tiles off)
             return "place", {"item": earth, "x": px, "y": py}
         if (bump := _bump(obs, hx, hy, plan, ground_ch)) is not None and not tried(
-                social, *bump[0][:2], bump[1], count=(me["x"], me["y"]) == bump[1] and not me.get("action")):
+                social, *bump[0][:2], bump[1], count=(me["x"], me["y"]) == bump[1] and not me.get("action"), at=obs.get("tick")):
             (bx, by, h), (sx, sy), d = bump                  # (a bump on it, met once begun - seed 708, a hill under
             pick = max((k for k in inv if "pickaxe" in k and inv[k]), key=lambda k: TIER.get(k, 0), default=None)
             go = {} if (me["x"], me["y"]) == (sx, sy) else {"go": {"x": sx, "y": sy}}   # its annex: dug down from the
@@ -130,11 +130,13 @@ def next_step(obs, social, *, ground_ch, tool_for, dirs):
             return "place", {"item": earth, "x": X, "y": Y}  # was chosen out of view: filled with earth, as a pit - 21)
         if wet or ch in CLEARABLE and not (piece and laid(obs, X, Y, piece)):
             d = None if wet else next((k for k, v in dirs.items() if v == (X - me["x"], Y - me["y"])), None)
-            if d is not None and not tried(social, X, Y, (me["x"], me["y"]), count=not me.get("action")):  # (a dig under way: no try)
+            if d is not None and not tried(social, X, Y, (me["x"], me["y"]), count=not me.get("action"), at=obs.get("tick")):   # (a dig under way: no try)
                 return "dig", {"dir": d, **({"with": w} if (w := tool_for(obs, d)) else {})}
-            by = next(((X + i, Y + j) for i, j in dirs.values() if _at(obs, "grid", X + i, Y + j) in ground_ch  # (to a tile
-                       and not tried(social, X, Y, (X + i, Y + j), count=False)), None if d or wet else (X, Y))  # beside
-            if by is None:                                   # it; a flower is walked onto; refused from every side: left)
+            by = next(((X + i, Y + j) for i, j in dirs.values() if _at(obs, "grid", X + i, Y + j) in ground_ch | DOOR_CH
+                       and (X + i, Y + j) not in no_way(social)      # (to a tile beside it, its doorway too - a tree
+                       and not tried(social, X, Y, (X + i, Y + j), count=False)),   # grown back in a room by its door,
+                      None if d or wet or (X, Y) in no_way(social) else (X, Y))   # trial 11; a way found shut: another;
+            if by is None:                                   # a flower is walked onto; refused from every side: left)
                 continue
             return "move_to", {"x": by[0], "y": by[1]}
     land = home_level(obs, social, plan)
