@@ -14,7 +14,10 @@ from .structure import SIDE, Structure
 
 class Garden(Structure):
     def __init__(self, spec: dict):
-        super().__init__({**spec, "storeys": 1, "roof": False, "furniture": {}})
+        if spec.get("roof") or spec.get("furniture") or (spec.get("storeys") or 1) > 1:   # (a house drawn with
+            raise ValueError('a garden has no roof, storeys or furniture: a house with a garden beside it is two parts, '  # "garden":
+                             '{"parts": [the house, {"garden": true, "width": ..., "depth": ..., "door": ..., "at": "<side>"}]}')
+        super().__init__({**spec, "storeys": 1, "roof": False, "furniture": {}})  # true - live trial 12: its roof lost)
         self.beds_kind = spec.get("beds", "rows")
         if self.beds_kind not in ("rows", "full"):
             raise ValueError('beds are "rows" or "full"')
