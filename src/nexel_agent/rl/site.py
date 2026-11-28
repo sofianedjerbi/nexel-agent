@@ -29,10 +29,10 @@ def flat(obs, X, Y, plan=None) -> bool:
     from .actions import LEVEL
     if not obs.get("heights"):
         return True                                          # (no relief in view at all)
-    sx, sy = plan.ground[0]
-    lv = LEVEL.get(_at(obs, "heights", X + sx, Y + sy))
-    if lv is None:
-        return False
+    lv = next((h for sx, sy in (*plan.ground, *sorted(plan.clear)) if (h := LEVEL.get(_at(obs, "heights", X + sx, Y + sy)))
+               is not None), None)                 # (its ground out of view: read on what of it is in view - the T on
+    if lv is None:                                 # seed 203 gave up four sites gathering beside them; none in view:
+        return True                                # unknown, not uneven)
     for dx, dy in plan.clear | plan.rim:                     # (its own tiles and those round them: a compound's
         h = LEVEL.get(_at(obs, "heights", X + dx, Y + dy))   # ground between its parts is the land's own)
         if h is None or (dx, dy) in plan.dug_tiles:          # (its own trench and room dug: no pit to fill)
@@ -134,11 +134,13 @@ def walked_nowhere(social, to: dict, me: dict) -> bool:
     return False
 
 
-def way_out(obs, ground_ch, keep, dirs, tool_for):
+def way_out(obs, ground_ch, keep, dirs, tool_for, clearable=frozenset()):
     """Walled in - its own wall, a rock, a bush on every side (the T on seed 7: every walk "no path", 199 times) - a
     dig through what is not the home's, the nearest way out; None when a side is open."""
     me, grid = obs["self"], obs.get("grid") or []
     if not grid or any(_at(obs, "grid", me["x"] + dx, me["y"] + dy) in ground_ch for dx, dy in dirs.values()):
         return None
-    d = next((k for k, (dx, dy) in dirs.items() if (me["x"] + dx, me["y"] + dy) not in keep), None)
+    d = next((k for k, (dx, dy) in dirs.items() if (me["x"] + dx, me["y"] + dy) not in keep), None) or next(
+        (k for k, (dx, dy) in dirs.items() if _at(obs, "grid", me["x"] + dx, me["y"] + dy) in clearable), None)  # (a tree
+    #  on its own ground, to be cleared anyway - the round home on seed 203: its walls and two trees round it)
     return ("dig", {"dir": d, **({"with": w} if (w := tool_for(obs, d)) else {})}) if d else None

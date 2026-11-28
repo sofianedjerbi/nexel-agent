@@ -216,3 +216,45 @@ def test_a_stand_with_no_way_to_it_is_given_up_for_another():
     from test_rl_wings import WINGS
     env, left, n = run({**WINGS["T"], "roof": {"style": "gable", "material": "roof", "ridge": "plank"}}, 100, 2000)
     assert not left, (n, left[:4])
+
+
+def test_a_site_found_uneven_is_looked_past_not_given_up():
+    """The tower on seed 202: the site found was not flat, dropped, and no other in view - the builder said nothing to
+    do and the executor stopped at its first decision. It looks further instead."""
+    from test_rl_structure import DESIGNS
+    env, left, n = run(DESIGNS["tower"], 202, 1500)
+    assert not left, (n, left[:4])
+
+
+def test_a_site_whose_ground_is_out_of_view_is_kept():
+    """The T on seed 203: gathering beside its site, the site's first ground tile out of view read as uneven, and the
+    site (nothing laid yet) given up, four times, then the search ran out. Its level is read on what is in view."""
+    from test_rl_wings import WINGS
+    env, left, n = run({**WINGS["T"], "roof": {"style": "gable", "material": "roof", "ridge": "plank"}}, 203, 1500)
+    assert not left, (n, left[:4])
+
+
+def test_a_walk_over_the_land_ends_on_open_ground():
+    """The house on seed 209: a search's walks, and the walk back home, each ended in a river (no path, 2281 times),
+    and nothing was laid. A walk over the land ends on the furthest open ground on its line."""
+    env, left, n = run(HOUSE, 209, 1500)
+    assert not left, (n, left[:4])
+
+
+def test_a_house_stops_short_of_a_drop_and_turns_off_a_shut_way_home():
+    """Seeds 306 and 307: looking for fibre, walks went down cliffs into a pit with no way back up, and the walk home,
+    shut, was ordered 1352 times. A land walk ends short of a drop of more than a step, and a shut way home turns to
+    the open way nearest it."""
+    from test_rl_structure import DESIGNS
+    for spec, seed in ((HOUSE, 306), (DESIGNS["two storeys"], 307)):
+        env, left, n = run(spec, seed, 1500)
+        assert not left, (seed, n, left[:4])
+
+
+def test_shut_in_by_its_own_walls_and_trees_it_clears_its_way_out():
+    """The round home on seed 203: its own walls south and west, trees on its site north and east; way_out dug only
+    what is not the home's, and the door's stand was walked to 713 times. A tree on its own ground is dug out, a shut
+    stand never chosen."""
+    from test_rl_structure import DESIGNS
+    env, left, n = run(DESIGNS["round home"], 203, 1500)
+    assert not left, (n, left[:4])
