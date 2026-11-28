@@ -11,7 +11,7 @@ from nexel_agent.rl.dug import design_of
 from nexel_agent.rl.plan import of_structure
 from nexel_agent.rl.project import BUILD, Project, lacking
 
-HOUSE = {"width": 3, "depth": 3, "door": "south", "roof": {"style": "gable"},
+HOUSE = {"width": 3, "depth": 3, "door": "south", "roof": {"style": "gable", "eaves": "plank"},
          "furniture": {"bed": [0, 0], "campfire": [2, 0], "chest": [0, 2], "chair": [2, 2]}}
 
 

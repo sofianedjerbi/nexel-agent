@@ -125,6 +125,7 @@ def judge_at(sim, s: Structure, x0, y0, lv) -> dict:
                                                                                 if "bed" in (r["v2"]["facts"].get("core") or {})))
         if not dug:
             checks["roof_over"] = per[-1]["v3"]["checks"]["roof"]
+            checks["crafted_roof"] = crafted(s)
     if not dug:                                           # (a dug room's looks are the land's: its trench is its way)
         checks["path"] = g["v3"]["checks"]["path"]
         checks["no_stray"] = g["v3"]["checks"]["no_stray"]
@@ -142,7 +143,19 @@ def judge_at(sim, s: Structure, x0, y0, lv) -> dict:
 WHY = {"roofed": "not covered (a floor or the roof over it)", "lit": "no light (a campfire)", "bed": "no bed",
        "chest": "no chest", "seat": "no table or chair", "roof_over": "the roof stops at the walls",
        "closed": "the walls do not close it", "door": "no door in its walls",
-       "reachable": "a piece is not reached on foot from its door (furniture blocks the way)"}
+       "reachable": "a piece is not reached on foot from its door (furniture blocks the way)",
+       "crafted_roof": "the roof is one material seen from above: a craftsman's roof mixes them (its eaves or ridge in "
+                       "another: planks round stone, a stone ridge on shingles)"}
+
+
+def crafted(s) -> bool:
+    """Is the roof more than one material, as it is seen from above (the top block over each tile)? The owner's
+    word: a roof is made by a craftsman of different blocks, not only of shingles (2026-11-28)."""
+    top = {}
+    for x, y, z, m in s.cells():
+        if z >= STOREY * s.n and z >= top.get((x, y), (-1, None))[0]:
+            top[(x, y)] = (z, m)
+    return len({m for _, m in top.values()}) > 1
 
 
 def told(j) -> str:

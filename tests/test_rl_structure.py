@@ -8,12 +8,12 @@ from nexel_agent.rl.structure import UPSTAIRS_FURNITURE, Structure, footprint
 
 HOME = {"bed": [0, 0], "campfire": [2, 0], "chest": [0, 2], "chair": [2, 2]}
 DESIGNS = {
-    "house": {"width": 3, "depth": 3, "door": "south", "furniture": HOME},
-    "two storeys": {"width": 3, "depth": 3, "door": "south", "storeys": 2,
+    "house": {"width": 3, "depth": 3, "door": "south", "furniture": HOME, "roof": {"eaves": "plank"}},
+    "two storeys": {"width": 3, "depth": 3, "door": "south", "storeys": 2, "roof": {"eaves": "plank"},
                     "furniture": {"campfire": [2, 0], "chest": [0, 2], "bed": [0, 0], "table": [1, 0, 1], "chair": [0, 0, 1]}},
     "round base": {"shape": "round", "radius": 4, "door": "south", "roof": False, "furniture": {"campfire": [3, 3]}},
-    "round home": {"shape": "round", "radius": 3, "door": "south", "furniture": HOME},
-    "tower": {"width": 3, "depth": 3, "door": "south", "storeys": 3,
+    "round home": {"shape": "round", "radius": 3, "door": "south", "furniture": HOME, "roof": {"eaves": "plank"}},
+    "tower": {"width": 3, "depth": 3, "door": "south", "storeys": 3, "roof": {"eaves": "plank"},
               "furniture": {"campfire": [2, 0], "chest": [0, 2], "bed": [0, 0], "table": [0, 0, 1], "chair": [1, 0, 2]}},
 }
 
@@ -81,8 +81,8 @@ def test_the_architect_chooses_a_build_of_storeys_and_hears_what_failed():
     assert "no light" in seen[1] or "no chest" in seen[1], seen[1]
 
 
-ROOFS = {"gable of shingles": {"style": "gable"}, "hip of planks, stone eaves": {"style": "hip", "material": "plank", "eaves": "stone_block"},
-         "gable of earth, a plank ridge": {"style": "gable", "material": "dirt", "ridge": "plank"}, "flat stone": {"material": "stone_block"}}
+ROOFS = {"gable of shingles, a plank ridge": {"style": "gable", "ridge": "plank"}, "hip of planks, stone eaves": {"style": "hip", "material": "plank", "eaves": "stone_block"},
+         "gable of earth, a plank ridge": {"style": "gable", "material": "dirt", "ridge": "plank"}, "flat stone, plank eaves": {"material": "stone_block", "eaves": "plank"}}
 
 
 @pytest.mark.parametrize("roof", ROOFS)
@@ -187,7 +187,7 @@ def test_a_garden_is_fenced_tilled_and_sown_by_building_alone(spec):
 
 
 COMPOUNDS = {
-    "house and garden": {"parts": [{**DESIGNS["house"], "roof": {"style": "gable"}}, {**GARDEN, "at": "east"}]},
+    "house and garden": {"parts": [{**DESIGNS["house"], "roof": {"style": "gable", "ridge": "plank"}}, {**GARDEN, "at": "east"}]},
     "dug home and its beds": {"parts": [DUG, {"garden": True, "width": 3, "depth": 3, "door": "north", "beds": "full",
                                               "at": "north"}]},
     "two storeys and a walled yard": {"parts": [DESIGNS["two storeys"], {**DESIGNS["round base"], "at": "west"}]},
@@ -336,7 +336,7 @@ def test_the_planner_is_told_every_kind_it_can_build():
 
 def test_the_mind_is_told_what_its_build_is_in_a_few_words():
     from nexel_agent.rl.compound import describe
-    assert describe(DESIGNS["tower"]) == "a three-storey tower"
+    assert describe(DESIGNS["tower"]) == "a three-storey tower, a flat roof of shingles"
     assert describe(DESIGNS["round base"]) == "a round walled yard"
     assert describe({**DESIGNS["house"], "roof": {"style": "gable", "material": "dirt"}}) == "a house, a gable roof of earth"
     assert describe(COMPOUNDS["house and garden"]) == "a house, a gable roof of shingles; a garden east"
@@ -354,7 +354,7 @@ def test_over_budget_the_architect_is_told_what_costs_most_and_any_design_is_rea
     assert "cost" in j["failed"] and "roof" in j["told"] and "walls" in j["told"] and "flat roof" in j["told"]
     assert architect.spec_of(json.dumps({"garden": True})) == {"garden": True}                # (read as a design...)
     assert "width and depth" in architect.judged('{"garden": true}', 82)["told"]               # (...and told what it lacks)
-    assert architect.judged(json.dumps({**DESIGNS["house"], "roof": {"style": "gable"}}), architect.BUDGET)["failed"] == []
+    assert architect.judged(json.dumps({**DESIGNS["house"], "roof": {"style": "gable", "ridge": "plank"}}), architect.BUDGET)["failed"] == []
 
 
 def test_eaves_are_the_roofs_outer_ring_whatever_its_style():
@@ -395,7 +395,7 @@ def test_a_build_the_mind_names_is_drawn_over_a_hut_the_body_began(tmp_path):
     social = SimpleNamespace(home=(env.a.x + 2, env.a.y + 2), plan=None, up_laid=set())
     env.sim.world.set(env.a.x + 1, env.a.y + 1, block="stone_wall")              # (a piece of the hut, laid)
     obs = env.sim.observe(env.a)
-    d = architect.Drafting(lambda msgs: json.dumps({**DESIGNS["round home"], "roof": "hip"}), tmp_path / "plan.json")
+    d = architect.Drafting(lambda msgs: json.dumps({**DESIGNS["round home"], "roof": {"style": "hip", "eaves": "plank"}}), tmp_path / "plan.json")
     assert not d.holds(social, True, obs)                                            # (no words: the hut goes on)
     assert d.holds(social, True, obs, None, "a round house with a domed roof")
     while not d.task.done():

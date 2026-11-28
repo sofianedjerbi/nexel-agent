@@ -19,16 +19,16 @@ def test_the_words_ask_a_roof_a_round_and_storeys_and_nothing_they_leave_out():
 def test_a_design_unlike_the_words_fails_them_and_is_told_how():
     """Live trial 4: "a gabled roof made of shingles" asked, a flat roof drawn at full marks."""
     words = "a small home with a gabled roof made of shingles"
-    flat = json.dumps({**DESIGNS["house"], "roof": {"style": "flat"}})
+    flat = json.dumps({**DESIGNS["house"], "roof": {"style": "flat", "eaves": "plank"}})
     j = architect.judged(flat, architect.NAMED, asked(words))
     assert j["failed"] == ["words"] and "the words ask for a gable roof, this one is flat" in j["told"]
-    good = architect.judged(json.dumps({**DESIGNS["house"], "roof": {"style": "gable"}}), architect.NAMED, asked(words))
+    good = architect.judged(json.dumps({**DESIGNS["house"], "roof": {"style": "gable", "ridge": "plank"}}), architect.NAMED, asked(words))
     assert good["failed"] == [] and good["grade"] == good["of"] == j["of"]
     assert unlike({**DESIGNS["house"], "garden": True}, {"roof": "gable"}) == ""          # (a garden: not read here)
 
 
 def test_the_architect_keeps_redrawing_until_the_words_are_kept():
-    replies = iter([json.dumps({**DESIGNS["house"], "roof": {"style": "flat"}}),
-                    json.dumps({**DESIGNS["house"], "roof": {"style": "gable"}})])
+    replies = iter([json.dumps({**DESIGNS["house"], "roof": {"style": "flat", "eaves": "plank"}}),
+                    json.dumps({**DESIGNS["house"], "roof": {"style": "gable", "ridge": "plank"}})])
     d = architect.design("a home. What they carry now: 12 roof", lambda m: next(replies), words="a home under a gable roof")
     assert d["failed"] == [] and len(d["history"]) == 2 and json.loads(json.dumps(d["spec"]))["roof"]["style"] == "gable"

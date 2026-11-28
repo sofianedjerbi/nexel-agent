@@ -35,12 +35,12 @@ and "walled": the side of its gate, for a wall of stone round the whole site (a 
 A roof is made of blocks, as a builder makes one: "flat" is one layer; "gable" steps up a layer a row to a ridge
 along the long side; "hip" steps up on all four sides (on a round: a dome). Its material: {materials} ("roof" is
 shingles; stone or earth sits on a deck of planks); "eaves" (the lowest ring) and "ridge" (the top) in another
-material if you like: a craftsman's roof mixes them.
+material: a craftsman's roof mixes them (planks round stone, a stone ridge on shingles, earth eaves on planks).
 
 A good home, as the game judges it: every storey closed with its door and covered; 6 to 40 tiles inside the ground
 storey of a one-storey home; a bed, a campfire within 3 tiles of the bed (light, a station), a chest, a table or
-chair; each piece reached on foot from its storey's door; the wall with the door an odd number of tiles long (the
-door at its middle, the build mirror-symmetric). A base is a round or a yard left open (no roof): closed, a door
+chair; each piece reached on foot from its storey's door; a roof of two materials or more, seen from above; the
+wall with the door an odd number of tiles long (the door at its middle, the build mirror-symmetric). A base is a round or a yard left open (no roof): closed, a door
 or gate, a campfire in it. Every wall, plank and roof tile is gathered and made by hand: at most {budget} in all
 (a 3 by 3 one-storey home with a flat roof takes 64, under a gable about 130; each storey more about 40; a gable or
 hip is one and a half to twice its flat roof, each step standing on the block under it; stone or earth a deck more).
