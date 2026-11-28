@@ -128,7 +128,7 @@ def next_step(obs, social, *, ground_ch, tool_for, dirs):
                 continue
             return "move_to", {"x": by[0], "y": by[1]}
     land = home_level(obs, social, plan)
-    open_ = lambda s: _at(obs, "grid", hx + s[0], hy + s[1]) in ground_ch | {YOU}       # noqa: E731
+    open_ = lambda s: _at(obs, "grid", hx + s[0], hy + s[1]) in ground_ch | {YOU} and (hx + s[0], hy + s[1]) not in no_way(social)  # noqa: E731
     underfoot = None
     for cell in plan.cells:
         dx, dy, dz, piece = cell

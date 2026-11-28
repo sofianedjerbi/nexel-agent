@@ -208,3 +208,11 @@ def test_a_station_is_never_put_on_its_last_way_out():
     still open, else a step off first."""
     env, left, n = run(HOUSE, 107, 1500)
     assert not left, (n, left[:4])
+
+
+def test_a_stand_with_no_way_to_it_is_given_up_for_another():
+    """The T's gabled roof on seed 100: a ring's walk to its stand had no path, ordered 2585 times, 80 roof cells
+    left. A ring's walk counts as a walk: shut, the stand is left for another."""
+    from test_rl_wings import WINGS
+    env, left, n = run({**WINGS["T"], "roof": {"style": "gable", "material": "roof", "ridge": "plank"}}, 100, 2000)
+    assert not left, (n, left[:4])
