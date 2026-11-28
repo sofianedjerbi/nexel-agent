@@ -58,14 +58,15 @@ class Plan:
         """Can one stand there now: the way to it laid (an upper storey's stairs, a dug tile's cells)."""
         return all(laid(c) for c in self.ways.get(s, ()))
 
-    def stand_for(self, cell, open_=lambda s: True, laid=lambda c: True):
+    def stand_for(self, cell, open_=lambda s: True, laid=lambda c: True, shut=lambda s: False):
         """The stand nearest `cell` that reaches it (the game's reach, height counted): not on a thing's own tile, a
         spare one only when `open_`, one up a storey or down a dug way only once the way is laid; a flight of stairs or
-        a dig from its own stand. None."""
+        a dig from its own stand. None. Never one `shut`: a walk found no way to it (the round home on seed 203: shut in
+        by its own walls, the door's stand outside, 713 walks)."""
         dx, dy, dz, p = cell
         if cell in self.from_:
-            return next((s for s in self.from_[cell] if (open_(s) or s in self.stands) and self.usable(s, laid)), None)
-        ok = [s for s in self.stands if self.usable(s, laid)] + [s for s in self.spare if open_(s)]
+            return next((s for s in self.from_[cell] if (open_(s) or s in self.stands) and self.usable(s, laid) and not shut(s)), None)
+        ok = [s for s in self.stands if self.usable(s, laid) and not shut(s)] + [s for s in self.spare if open_(s) and not shut(s)]
         ok = [s for s in ok if self.reaches(s, cell)]
         return min(ok, key=lambda s: (dx - s[0]) ** 2 + (dy - s[1]) ** 2 + ((dz - s[2]) / 2) ** 2, default=None)
 

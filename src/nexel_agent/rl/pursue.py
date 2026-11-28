@@ -54,9 +54,32 @@ def _cells(obs, chars, blocked=()):
     return sorted(out, key=lambda d: math.hypot(*d))
 
 
-def _walk(obs, dx, dy, ground_ch=None):
-    """move_to the thing: the server's path finding goes beside what nobody can stand on (sim/movement.py)."""
+def _walk(obs, dx, dy, ground_ch=None, land=False):
+    """move_to the thing: the server's path finding goes beside what nobody can stand on (sim/movement.py). With
+    land, a walk over the land toward a tile (not to a thing) ends on the furthest open ground on its line - the
+    house on seed 209: every way to its home ended in a river, no path, 2281 times), through water when swimming,
+    never down more than a step (seeds 306, 307: down cliffs into a pit, no way back up, 1352 walks home)."""
+    grid = obs.get("grid") or []
+    if land and ground_ch and grid and (dx, dy) != (0, 0):
+        from .actions import LEVEL
+        hs, way = obs.get("heights"), ground_ch if obs["self"].get("swimming") else ground_ch - {WATER}
+        low = lambda i, j: hs and LEVEL.get(hs[VIEW_R + j][VIEW_R + i], 0) < LEVEL.get(hs[VIEW_R][VIEW_R], 0) - 1  # noqa: E731
+        on = lambda i, j: (0 <= VIEW_R + j < len(grid) and 0 <= VIEW_R + i < len(grid[0]) and grid[VIEW_R + j][VIEW_R + i] in way  # noqa: E731
+                           and not low(i, j))     # (nor down a drop it cannot climb back: seeds 306, 307 - a pit)
+        dx, dy = next(((round(dx * k / 8), round(dy * k / 8)) for k in range(8, 0, -1)
+                       if on(round(dx * k / 8), round(dy * k / 8))), (dx, dy))
     return "move_to", {"x": obs["self"]["x"] + dx, "y": obs["self"]["y"] + dy}
+
+
+def toward(obs, dx, dy, ground_ch, blocked=()):
+    """A land walk a view toward (dx, dy) (rl/pursue.py _walk); that way shut, the open way nearest it (seed 307: the
+    way home shut from a pit, 839 walks); None when every way is shut."""
+    me, d = obs["self"], math.hypot(dx, dy) or 1
+    for wx, wy in sorted(((dx / d, dy / d), *LOOK), key=lambda w: -(w[0] * dx + w[1] * dy) / math.hypot(*w)):
+        step = _walk(obs, round(wx / math.hypot(wx, wy) * (VIEW_R - 1)), round(wy / math.hypot(wx, wy) * (VIEW_R - 1)), ground_ch, land=True)
+        if (step[1]["x"], step[1]["y"]) not in blocked and (step[1]["x"], step[1]["y"]) != (me["x"], me["y"]):
+            return step
+    return None
 
 
 def gather(obs, item, ground_ch, tool_for, dirs, blocked=(), keep=(), look=False):
@@ -71,15 +94,15 @@ def gather(obs, item, ground_ch, tool_for, dirs, blocked=(), keep=(), look=False
         if not look or not DROPS.get(item):          # as time goes; else finding one is the policy's, as it learned)
             return None
         k = (obs.get("tick", 0) // LOOK_TICKS) % len(LOOK)          # (the way of the time, else the next not shut)
-        dx, dy = next((w for w in LOOK[k:] + LOOK[:k] if (me["x"] + w[0] * (VIEW_R - 1), me["y"] + w[1] * (VIEW_R - 1))
-                       not in blocked), LOOK[k])
+        go = next((st for w in LOOK[k:] + LOOK[:k] if (st := _walk(obs, w[0] * (VIEW_R - 1), w[1] * (VIEW_R - 1)))[1]
+                   not in ({"x": x, "y": y} for x, y in {*blocked, (me["x"], me["y"])})), None)
+        dx = go and go[1]["x"]
         if keep:                         # (a home: no further than LOOK_R from it - seed 102: 230 tiles off for stone,
-            ax, ay = sum(x for x, _ in keep) / len(keep), sum(y for _, y in keep) / len(keep)    # the home given up)
-            far = math.hypot(ax - me["x"], ay - me["y"])
-            if far > LOOK_R:
-                k = (VIEW_R - 1) / far
-                return _walk(obs, round((ax - me["x"]) * k), round((ay - me["y"]) * k), ground_ch)
-        return _walk(obs, dx * (VIEW_R - 1), dy * (VIEW_R - 1), ground_ch)
+            ax, ay = sum(x for x, _ in keep) / len(keep), sum(y for _, y in keep) / len(keep)    # the home given up;
+            far = math.hypot(ax - me["x"], ay - me["y"])                 # every way shut, back toward it - the house
+            if far > LOOK_R or (dx is None and far > VIEW_R):           # on seed 209: 165 tiles off, all shut)
+                return toward(obs, ax - me["x"], ay - me["y"], ground_ch, blocked)
+        return go or (None if keep else _walk(obs, LOOK[k][0] * (VIEW_R - 1), LOOK[k][1] * (VIEW_R - 1)))   # (no home: on)
     d = next((k for k, v in dirs.items() if v == cell), None)
     if d is None:
         return _walk(obs, *cell, ground_ch)

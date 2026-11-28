@@ -24,7 +24,7 @@ from .social import laid_as
 from .plan import BLOCKS as CELL_BLOCKS
 from .site import _at, _pit, flat, no_way, site, tried, way_out
 from .plan import Plan, drawn, of_pieces  # noqa: F401  (drawn: the grid's plan, for its callers)
-from .pursue import craft
+from .pursue import craft, toward
 
 W, H, DOOR = 3, 3, (1, 3)                                   # the inside; the door in the south wall's middle
 FURNITURE = ((0, 0, "campfire"), (W - 1, 0, "bed"))         # a corner each
@@ -86,7 +86,7 @@ def next_step(obs, social, *, ground_ch, tool_for, dirs):
     again = lambda: next_step(obs, social, ground_ch=ground_ch, tool_for=tool_for, dirs=dirs)    # noqa: E731
     hx, hy = social.home
     me, inv = obs["self"], obs["self"].get("inventory", {})
-    if (out := way_out(obs, ground_ch, own(social), dirs, tool_for)) is not None:
+    if (out := way_out(obs, ground_ch, own(social), dirs, tool_for, CLEARABLE)) is not None:
         return out
     cx, cy = min(((hx + x, hy + y) for x, y in plan.clear), key=lambda p: abs(p[0] - me["x"]) + abs(p[1] - me["y"]))
     if _at(obs, "grid", cx, cy) is None:                     # (none of it in view: walk home, a view at a time, to its
@@ -95,15 +95,14 @@ def next_step(obs, social, *, ground_ch, tool_for, dirs):
         if d > FAR:                                          # (far off - fallen and back at spawn: a home here)
             social.home = None
             return again()
-        k = (VIEW_R - 1) / d
-        return "move_to", {"x": me["x"] + round(dx * k), "y": me["y"] + round(dy * k)}
+        return toward(obs, dx, dy, ground_ch, no_way(social))     # (on open ground, no drop, not a way shut: rl/pursue.py)
     is_laid = laid_by(obs, social, plan)
     if not flat(obs, hx, hy, plan):                          # (dug into since: the game refuses a wall by a pit)
         pit = _pit(obs, hx, hy, plan)
         earth = next((k for k in EARTH if inv.get(k)), None)
         if not any(is_laid(c) for c in plan.cells):
             social.home = None                               # (nothing laid on it yet: another spot)
-            return again() if site(obs, ground_ch, plan) else None
+            return again() if site(obs, ground_ch, plan) else _look_further(obs, social, plan)   # (none here: on - tower, seed 202)
         if pit is not None and earth:                        # (a home begun is kept and mended: the pit filled, as a
             (px, py), (sx, sy) = pit                         # player fills one, from where it stands, with earth from
             if (me["x"], me["y"]) != (hx + sx, hy + sy):     # the pack; without earth it goes on with what still goes
@@ -128,7 +127,7 @@ def next_step(obs, social, *, ground_ch, tool_for, dirs):
                 continue
             return "move_to", {"x": by[0], "y": by[1]}
     land = home_level(obs, social, plan)
-    open_ = lambda s: _at(obs, "grid", hx + s[0], hy + s[1]) in ground_ch | {YOU} and (hx + s[0], hy + s[1]) not in no_way(social)  # noqa: E731
+    open_ = lambda s: _at(obs, "grid", hx + s[0], hy + s[1]) in ground_ch | {YOU}       # noqa: E731
     underfoot = None
     for cell in plan.cells:
         dx, dy, dz, piece = cell
@@ -147,7 +146,7 @@ def next_step(obs, social, *, ground_ch, tool_for, dirs):
             if step is not None:
                 return step
             continue
-        stand = plan.stand_for(cell, open_, is_laid)
+        stand = plan.stand_for(cell, open_, is_laid, shut=lambda s: (hx + s[0], hy + s[1]) in no_way(social))
         if stand is None:
             continue
         run = _run(obs, hx, hy, ground_ch, inv, plan, stand, is_laid, land)
