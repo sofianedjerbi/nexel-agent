@@ -154,6 +154,9 @@ class Structure:
         most = max(depth(p) for p in base)                       # standing under: laid on a deck of planks)
         top = min(ROOF_RISE - deck, most)                        # (a slope spread to the ridge: no flat top)
         rise = {p: round(depth(p) * top / most) if most else 0 for p in base}
+        foot = self.inside | self.ring                   # (the ridge stops flush with a gable's end wall: its end over
+        rise = {p: min(r, top - 1) if p not in foot and top else r for p, r in rise.items()}   # the overhang, 9 layers
+        #                                                  up past the wall, is out of reach - live trial 8, 2 of 203)
         out = [[] for _ in range(top + 1 + deck)]
         for p in base:
             d = rise[p]

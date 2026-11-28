@@ -184,3 +184,19 @@ def test_where_a_flight_is_laid_from_is_part_of_the_site():
     assert all(p in s.clear() for _, _, at, _ in s.stairs for p in at)
     env, left, n = run(DESIGNS["tower"], 107, 2000)
     assert left == [], (n, len(left))
+
+
+TRIAL8 = {"shape": "rect", "width": 4, "depth": 3, "storeys": 2, "door": "east",
+          "roof": {"style": "gable", "material": "roof", "eaves": "plank", "ridge": "plank"},
+          "furniture": {"bed": [[1, 1]], "campfire": [1, 2], "chest": [2, 2], "table": [2, 1], "chair": [3, 1]}, "path": 2}
+
+
+def test_a_gables_ridge_stops_flush_with_its_end_walls_so_every_cell_is_in_reach():
+    """Live trial 8: a two-storey gabled house stood at 201 of 203; the two left were the ridge's ends, 9 layers up
+    over the overhang past the end walls, out of reach from every stand. The ridge now stops at the walls."""
+    s = design_of(TRIAL8)
+    foot = s.inside | s.ring
+    top = max(c[2] for c in s.cells())
+    assert all(c[:2] in foot for c in s.cells() if c[2] == top)
+    env, left, n = run(TRIAL8, 7, 2000)
+    assert left == [], (n, len(left), left[:3])
