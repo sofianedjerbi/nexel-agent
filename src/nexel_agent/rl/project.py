@@ -22,7 +22,7 @@ CALM = np.array([a[0] not in UNASKED for a in ACTIONS])   # (what the learned bo
                                                           # workbenches placed while the build waited; trial 5: its site dug)
 PURSUE = next(k for k, a in enumerate(ACTIONS) if a[0] == "pursue")
 NOT_MADE = ("dig", "till")                   # (the land dug, soil tilled: a tool's work, no material)
-AS_ITEM = {"wall": "wood_wall"}              # (a wall of the pack's choosing: wood, the cheaper, counted)
+AS_ITEM = {"wall": "wood_wall", "floor": "plank", "stone_floor": "path"}              # (a wall of the pack's choosing: wood, the cheaper, counted)
 _BUILT = {b.char for b in BLOCKS if b.name in set(PLACEABLE.values())}
 LAND = {k for k, chars in DROPS.items() if chars - _BUILT}      # (what the land gives: a tree wood, a rock stone - not
                                                                 # a wall dug back up)

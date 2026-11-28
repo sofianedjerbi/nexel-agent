@@ -19,6 +19,7 @@ from nexel_worlds.sim.storeys import EARTH, STOREY
 from nexel_worlds.tiles import GROUNDS, TILL_TOOL
 from nexel_worlds.tiles import BLOCKS
 
+from .floor import FLOORS
 from .judge import ENCLOSE
 from .social import laid_as
 from .plan import BLOCKS as CELL_BLOCKS
@@ -78,8 +79,10 @@ def laid(obs, X, Y, piece) -> bool:
     if piece == "roof":
         return _at(obs, "roofs", X, Y) == "1"
     ch = _ch(obs, X, Y)
-    if piece == "path":
+    if piece in ("path", "stone_floor"):
         return ch == PATH_CH
+    if piece == "floor":
+        return ch == GROUND_OF["floor"]
     if piece == "till":                                     # (tilled, or sown already)
         return ch in TILLED_CH or ch in SOWN_CH
     if piece == "seed":
@@ -169,7 +172,7 @@ def next_step(obs, social, *, ground_ch, tool_for, dirs):
         if piece != "dig" and (_item(piece, inv) is None or inv.get(piece, 0) < getattr(plan, "flights", {}).get((dx, dy), 0)):
             if piece == "till" and (step := craft(obs, TILL_TOOL, ground_ch, tool_for, dirs, blocked=no_way(social), keep=own(social))):
                 return step                                  # (no hoe: one made)
-            step = next((s for w in (WALLS if piece == "wall" else (piece,)) if (s := craft(obs, w, ground_ch, tool_for, dirs, blocked=no_way(social), keep=own(social)))), None)
+            step = next((s for w in (WALLS if piece == "wall" else (FLOORS.get(piece, piece),)) if (s := craft(obs, w, ground_ch, tool_for, dirs, blocked=no_way(social), keep=own(social)))), None)
             if step is not None:
                 return step
             continue
@@ -252,6 +255,7 @@ def _item(piece, inv):
         return TILL_TOOL if inv.get(TILL_TOOL) else None
     if piece == "wall":
         return max((w for w in WALLS if inv.get(w)), key=inv.get, default=None)
+    piece = FLOORS.get(piece, piece)                         # (a floor: planks or a path laid on the ground, rl/floor.py)
     return piece if inv.get(piece) else None
 
 

@@ -19,6 +19,7 @@ from nexel_worlds.sim.storeys import STOREY, UPSTAIRS
 from nexel_worlds.tiles import PLACEABLE
 
 from . import blueprint as bp
+from .floor import with_floor
 from .wings import gable as _gable, wings as _wings
 
 SHAPES = ("rect", "round", "wings")      # (wings: rectangles joined, an L, a T, a cross)
@@ -122,7 +123,7 @@ class Structure:
 
     def cells(self) -> list:
         """(dx, dy, dz, piece) from the walls' top-left, in the order laid (see the module's table)."""
-        out = [(x, y, 0, p) for (x, y), p in _shell_first(self.storeys[0])] + [(x, y, 0, "path") for x, y in self.path]
+        out = with_floor(self, [(x, y, 0, p) for (x, y), p in _shell_first(self.storeys[0])]) + [(x, y, 0, "path") for x, y in self.path]
         foot = self.inside | self.ring
         for k in range(1, self.n):
             under = {p for p, t in self.storeys[k - 1].items() if t in ("wall", "door")}
