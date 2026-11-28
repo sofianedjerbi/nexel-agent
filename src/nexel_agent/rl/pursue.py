@@ -111,10 +111,12 @@ def craft(obs, item, ground_ch, tool_for, dirs, depth=0, blocked=(), keep=(), lo
             if inv.get(r.station):
                 me = obs["self"]                     # (not on the home's own tiles: a bench put on a wall's tile
                 hs = obs.get("heights")              # (and on its own level: a bench put on a slope is refused,
-                d = next((k for k, (dx, dy) in dirs.items() if obs["grid"][VIEW_R + dy][VIEW_R + dx] in ground_ch - {WATER}
-                          and (me["x"] + dx, me["y"] + dy) not in keep          # 580 times over, scenario craft axe)
-                          and (not hs or hs[VIEW_R + dy][VIEW_R + dx] == hs[VIEW_R][VIEW_R] and not _rim(hs, dx, dy))), None)
-                if d is None and keep:               # (every tile round it the home's or a slope: a step off the
+                free = [k for k, (dx, dy) in dirs.items() if obs["grid"][VIEW_R + dy][VIEW_R + dx] in ground_ch - {WATER}]
+                level = lambda dx, dy: not hs or hs[VIEW_R + dy][VIEW_R + dx] == hs[VIEW_R][VIEW_R] and not _rim(hs, dx, dy)  # noqa: E731
+                d = next((k for k in free if (me["x"] + dirs[k][0], me["y"] + dirs[k][1]) not in keep   # 580 times over,
+                          and level(*dirs[k])), None) if len(free) > 1 else None       # scenario craft axe; never on its
+                if d is None and (keep or free):     # last way out - house, seed 107: put down, dug back up, 611 times)
+                    #                                  (every tile round it the home's or a slope: a step off the
                     off = next(((dx, dy) for dx, dy in _cells(obs, ground_ch - {WATER}, blocked)          # site first -
                                 if (dx, dy) != (0, 0) and (me["x"] + dx, me["y"] + dy) not in keep), None)  # the round
                     return _walk(obs, *off, ground_ch) if off else None                     # home, 80 walls left)

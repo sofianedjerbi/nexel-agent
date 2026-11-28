@@ -200,3 +200,11 @@ def test_a_gables_ridge_stops_flush_with_its_end_walls_so_every_cell_is_in_reach
     assert all(c[:2] in foot for c in s.cells() if c[2] == top)
     env, left, n = run(TRIAL8, 7, 2000)
     assert left == [], (n, len(left), left[:3])
+
+
+def test_a_station_is_never_put_on_its_last_way_out():
+    """The house on seed 107: between a tree, its own wall and a tree, the workbench put on the one open side, then
+    dug back up to get out (way_out), 611 times; 120 cells left at 7999 decisions. A station goes down with a way
+    still open, else a step off first."""
+    env, left, n = run(HOUSE, 107, 1500)
+    assert not left, (n, left[:4])
