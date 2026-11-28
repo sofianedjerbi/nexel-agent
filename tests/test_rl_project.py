@@ -99,7 +99,8 @@ def test_a_flight_waits_for_its_doors_column():
     plan = of_structure(design_of(DESIGNS["tower"]))
     top = [c for c in plan.cells if c[3] == "stairs"][-1]
     after = plan.after[top]
-    assert any(c[3] == "door" and c[2] == 6 for c in after) and any(c[3] == "wall" and c[2] == 3 for c in after)
+    assert any(c[3] == "plank" and c[2] == 6 for c in after) and any(c[3] == "wall" and c[2] == 3 for c in after)
+    assert not any(c[3] == "door" for c in after)       # (Theorem 2: a door or nothing; waiting on it, seed 107 deadlocked)
     assert not plan.held(top, lambda c: c not in after) and plan.held(top, lambda c: True)
 
 
