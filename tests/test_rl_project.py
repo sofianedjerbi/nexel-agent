@@ -175,3 +175,12 @@ def test_a_bench_is_not_put_down_on_a_hills_rim():
     spec = {**WINGS["cross"], "roof": {"style": "hip", "material": "roof", "eaves": "plank"}}
     env, left, n = run(spec, 109, 2000)
     assert left == [], (n, len(left))
+
+
+def test_where_a_flight_is_laid_from_is_part_of_the_site():
+    """The tower on seed 107: a tree and the builder's own bench on the two tiles its first flight is laid from."""
+    from test_rl_structure import DESIGNS
+    s = design_of(DESIGNS["tower"])
+    assert all(p in s.clear() for _, _, at, _ in s.stairs for p in at)
+    env, left, n = run(DESIGNS["tower"], 107, 2000)
+    assert left == [], (n, len(left))

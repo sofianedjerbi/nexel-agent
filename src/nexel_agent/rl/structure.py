@@ -193,7 +193,8 @@ class Structure:
 
     def clear(self) -> set:
         """The tiles that must be open ground for it: what stands on the land, the path, the stairs and their foot."""
-        return self.inside | self.ring | set(self.path) | {p for _, steps, _, _ in self.stairs for p in steps}
+        return self.inside | self.ring | set(self.path) | {p for _, steps, at, _ in self.stairs for p in (*steps, *at)}
+        # (where each flight is laid from too: a tree or the builder's own bench there left the tower on seed 107 unclimbed)
 
     def grid(self, k=0) -> list:
         """Storey k as the architect's grid (the floor '.', the legend's characters), for a look."""
