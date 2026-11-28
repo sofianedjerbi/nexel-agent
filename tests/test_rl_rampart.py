@@ -9,7 +9,7 @@ HOUSE = {"width": 3, "depth": 3, "door": "south", "furniture": {"bed": [0, 0], "
 BASE = {"parts": [HOUSE, {"garden": True, "width": 5, "depth": 3, "at": "east"},
                   {"shape": "round", "radius": 3, "door": "south", "storeys": 2, "at": "west",
                    "furniture": {"campfire": [3, 3], "bed": [1, 2], "chest": [3, 1], "table": [1, 1, 1]},
-                   "roof": {"style": "hip", "material": "plank"}}],
+                   "roof": {"style": "hip", "material": "plank", "eaves": "stone_block"}}],
         "walled": "south"}
 
 
