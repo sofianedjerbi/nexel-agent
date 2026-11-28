@@ -90,7 +90,7 @@ class Project:
             return None
         inv = obs["self"].get("inventory", {})
         if self.item and inv.get(self.item, 0) < self.until:
-            return self.gather(obs, social)
+            return self.gather(obs, social, build_ok)
         self.item = None
         plan = plan_of(social)
         need = lacking(plan, laid_by(obs, social, plan), inv) if getattr(social, "home", None) else Counter()
@@ -99,14 +99,15 @@ class Project:
             return (BUILD, None) if build_ok else None              # built() proves; no spot yet: it chooses one)
         self.item = max(need, key=lambda k: (need[k], k))
         self.until = inv.get(self.item, 0) + min(need[self.item], self.BATCH)
-        return self.gather(obs, social)
+        return self.gather(obs, social, build_ok)
 
-    def gather(self, obs, social):
-        """The gather verb after the item, or None when it has no way to it here (none in sight: the project waits)."""
-        from .actions import pursued
+    def gather(self, obs, social, build_ok=False):
+        """The gather verb after the item, or None when it has no way to it here (none in sight: the project waits);
+        shut in a pocket, the build verb, which digs its way out first (rl/site.py way_out - live trial 12)."""
+        from .actions import pursued, shut_in
         g = Goal("gather", self.item, None, obs.get("tick", 0), obs["self"].get("inventory", {}).get(self.item, 0))
         g.look = True                         # (none in view: it walks to look further - rl/pursue.py gather)
         if pursued(obs, g, social) is None:
             self.item = None
-            return None
+            return (BUILD, None) if build_ok and shut_in(obs, social) else None
         return PURSUE, g

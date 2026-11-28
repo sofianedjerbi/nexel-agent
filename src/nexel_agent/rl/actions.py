@@ -165,8 +165,8 @@ def to_command(i: int, obs: dict, facing: str, social=None, goal=None):
         from .site import walked_nowhere
         step = pursued(obs, goal, social)
         if step and step[0] == "move_to" and social is not None and walked_nowhere(social, step[1], obs["self"]):
-            step = pursued(obs, goal, social)         # (that way shut: the next one - craft axe, seed 12: 586 walks in place)
-        return step
+            step = shut_in(obs, social) or pursued(obs, goal, social)   # (that way shut: out of a pocket it is shut in,
+        return step                                  # else the next way - craft axe, seed 12: 586 walks in place)
     if kind == "build":
         from .site import walked_nowhere
         step = built(obs, social)
@@ -182,6 +182,15 @@ def pursued(obs, goal, social):
     from .pursue import next_step                         # (it reads the goal with the helpers here)
     return next_step(obs, goal, social, person=person, wanted=wanted, handed=handed, tool_for=tool_for,
                      ground_ch=GROUND_CH, dirs=STEP)
+
+
+def shut_in(obs, social):
+    """The way out of a pocket of open ground it is shut in (rl/site.py way_out), the home's own pieces kept; None
+    when the ground goes on (live trial 12: walks to trees outside a pen of its own fence and an old hut's walls)."""
+    from .build import CLEARABLE, DOOR_CH, own
+    from .site import way_out
+    keep = own(social) if getattr(social, "home", None) else set()
+    return way_out(obs, GROUND_CH - {WATER, ITEMS}, keep, STEP, tool_for, CLEARABLE, DOOR_CH)
 
 
 def built(obs, social):
