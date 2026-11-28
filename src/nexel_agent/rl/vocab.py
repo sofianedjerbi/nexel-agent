@@ -8,6 +8,20 @@ What the game has and this does not: a tile char reads as unknown (0), an item, 
 a new action goes after these (rl/actions.py), masked for a policy that never had it (rl/npolicy.py). A run learns
 them when they are appended here, at a run boundary (rl/train.py --init grows the rows): never inserted."""
 
+from nexel_worlds.ores import RENAMED       # (the game's own renames, nexel-worlds#403: the same thing, a new name)
+
+
+def now(name):
+    """A frozen name as the game calls the same thing now: "sword" is "iron_sword", "craft_ingot" is
+    "craft_iron_ingot" (a learned row or slot keeps its place and its meaning, under the game's new name: #94)."""
+    if not isinstance(name, str):
+        return name
+    kind, _, rest = name.partition("_")
+    if kind in ("craft", "collect", "place") and rest in RENAMED:
+        return f"{kind}_{RENAMED[rest]}"
+    return RENAMED.get(name, name)
+
+
 CHARS = '!"#$%&\'()*+,-.:;=?@BCDEFGHIJKLMOPQRSTUVWXYZ^_bcefghiklmnopqrstuvwxyz~'
 ITEMS = (
     'axe', 'bandana', 'basket', 'bed', 'berries', 'blue_slippers', 'boat', 'bread', 'campfire', 'carrot',

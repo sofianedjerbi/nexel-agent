@@ -33,7 +33,7 @@ def _items():
 
 PACK = _items()                      # every thing a pack can hold, in the game now: what is made, dug, picked, dropped
 ITEMS = vocab.ITEMS                  # those the body has a slot for (rl/vocab.py)
-ITEM_ID = {k: i for i, k in enumerate(ITEMS)}
+ITEM_ID = {name: i for i, k in enumerate(ITEMS) for name in {k, vocab.now(k)}}     # (a goal names it as the game does now)
 KINDS = vocab.KINDS                  # (tuple(CREATURES) + ("agent",) when it was learned: rl/vocab.py)
 N_NEAR = 3
 BODY = 16
@@ -46,7 +46,7 @@ ACTIONS_V2 = 181                     # the actions an r13-r15 policy knew (their
 ACTIONS_V3 = 185                     # the actions an r28-r36 policy knew (their slots before the done bits)
 V3 = (BODY + len(ITEMS) + N_NEAR * (3 + len(KINDS)) + ACTIONS_V1 + SOCIAL_FLAGS + (ACTIONS_V2 - ACTIONS_V1) + GOAL + PEOPLE
       + (ACTIONS_V3 - ACTIONS_V2))
-DONE_ID = {a: i for i, a in enumerate(vocab.KNOWN)}        # done already, this life: what its own acts tell it (rl/achieve.py)
+DONE_ID = {vocab.now(a): i for i, a in enumerate(vocab.KNOWN)}        # done already, this life: what its own acts tell it (rl/achieve.py)
 ACTIONS_V4 = 200                     # the actions an r57 policy knew (their slots before the pack's second block)
 V4 = V3 + len(vocab.KNOWN) + (ACTIONS_V4 - ACTIONS_V3)
 ITEMS_V2 = vocab.ITEMS_V2            # the pack's items that came after ITEMS (rl/vocab.py): their own block, at V4
@@ -83,7 +83,7 @@ def encode(obs: dict, facing: str = "S", last_action: int = 0, last_ok: float = 
                 *(float(facing == d) for d in DIRS))
     o = BODY
     for j, it in enumerate(ITEMS):
-        v[o + j] = math.log1p(inv.get(it, 0)) / 3
+        v[o + j] = math.log1p(inv.get(vocab.now(it), 0)) / 3     # (a slot reads its thing as the game names it now)
     o += len(ITEMS)
     for e in obs.get("entities", [])[:N_NEAR]:
         v[o:o + 3] = (e["dx"] / VIEW_R, e["dy"] / VIEW_R, e.get("hp", 0) / 12)

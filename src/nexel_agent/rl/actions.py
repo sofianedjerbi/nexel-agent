@@ -160,7 +160,7 @@ def to_command(i: int, obs: dict, facing: str, social=None, goal=None):
         p = person(obs, goal)
         return "move_to", {"x": me["x"] + (p["dx"] if p else 0), "y": me["y"] + (p["dy"] if p else 0)}
     if kind == "craft":
-        return "craft", {"recipe": arg}
+        return "craft", {"recipe": vocab.now(arg)}      # (a learned row, as the game names its recipe now: rl/vocab.py)
     if kind == "pursue":
         from .site import walked_nowhere
         step = pursued(obs, goal, social)
@@ -274,7 +274,7 @@ def legal(obs: dict, facing: str = "S", social=None, goal=None, held=None) -> np
         elif kind == "eat":
             m[i] = bool(inv.get(arg)) and me.get("hunger", 0) < FOOD_MAX
         elif kind == "craft":
-            r = RECIPES.get(arg)                  # (a learned action the game no longer has: never legal, rl/vocab.py)
+            r = RECIPES.get(vocab.now(arg))       # (a learned action the game no longer has: never legal, rl/vocab.py)
             m[i] = r is not None and not short(r, inv) and (not r.station or _STATION_CH[r.station] in near) and not (
                 held and arg not in held[1] and held[0] & set(r.inputs))
         elif kind == "water":
