@@ -26,15 +26,14 @@ def flat(obs, X, Y, plan=None) -> bool:
     """The hut whose inside's top-left is (X, Y) stands on one level, clear of a hill's rim: no lower tile beside it,
     diagonals too (the game builds nothing there: world.rim). A pit dug in it since makes it no site."""
     plan = plan or _hut()
-    from .actions import LEVEL
     if not obs.get("heights"):
         return True                                          # (no relief in view at all)
-    lv = next((h for sx, sy in (*plan.ground, *sorted(plan.clear)) if (h := LEVEL.get(_at(obs, "heights", X + sx, Y + sy)))
+    lv = next((h for sx, sy in (*plan.ground, *sorted(plan.clear)) if (h := _land(obs, X, Y, plan, sx, sy))
                is not None), None)                 # (its ground out of view: read on what of it is in view - the T on
     if lv is None:                                 # seed 203 gave up four sites gathering beside them; none in view:
         return True                                # unknown, not uneven)
     for dx, dy in plan.clear | plan.rim:                     # (its own tiles and those round them: a compound's
-        h = LEVEL.get(_at(obs, "heights", X + dx, Y + dy))   # ground between its parts is the land's own)
+        h = _land(obs, X, Y, plan, dx, dy)                   # ground between its parts is the land's own)
         if h is None or (dx, dy) in plan.dug_tiles:          # (its own trench and room dug: no pit to fill)
             continue                                         # (out of view: unknown, not lower - r59 left home after
         if h < lv or ((dx, dy) in plan.clear and h != lv):   # home each time it walked 9 tiles off)
@@ -54,14 +53,40 @@ def _over(plan) -> dict:
     return plan._over
 
 
+def level_at(obs, X, Y) -> int:
+    """The land's level at a tile, from the observation's heights (none sent: all the low ground, 0)."""
+    from .actions import LEVEL
+    return LEVEL.get(_at(obs, "heights", X, Y), 0) if obs.get("heights") else 0
+
+
+def _built_over(plan) -> dict:
+    """{(dx, dy): the lowest layer of the plan's own land laid over that tile (stone, earth: what the heights show)}."""
+    from .structure import LAND_IN_CELL
+    if getattr(plan, "_built_over", None) is None:
+        plan._built_over = {}
+        for x, y, z, p in plan.cells:
+            if z > 0 and p in LAND_IN_CELL:
+                plan._built_over[(x, y)] = min(z, plan._built_over.get((x, y), z))
+    return plan._built_over
+
+
+def _land(obs, X, Y, plan, dx, dy):
+    """The land's level at the plan's tile (dx, dy) as the view's heights show it, or None: out of view, or read on
+    the build itself - a stone or earth roof is land laid up there, and the heights show its top (live trial 10: from
+    the far end of a stone-roofed house the land under the roof read 7 high, the site 'dug into', 45 minutes of walks
+    to fill a pit that was the roof)."""
+    from .actions import LEVEL
+    h = LEVEL.get(_at(obs, "heights", X + dx, Y + dy))
+    return None if h is not None and h >= _built_over(plan).get((dx, dy), 99) else h
+
+
 def _pit(obs, X, Y, plan=None):
     """A tile in reach of a stand that is lower than the spot, on or beside it: ((x, y), the stand), or None."""
     plan = plan or _hut()
-    from .actions import LEVEL
     sx, sy = plan.ground[0]
-    lv = LEVEL.get(_at(obs, "heights", X + sx, Y + sy))
+    lv = _land(obs, X, Y, plan, sx, sy)
     for dx, dy in sorted(plan.clear | plan.rim, key=lambda q: (q[0], q[1])):
-        h = LEVEL.get(_at(obs, "heights", X + dx, Y + dy))
+        h = _land(obs, X, Y, plan, dx, dy)
         if (dx, dy) in plan.dug_tiles:
             continue
         s = next((s for s in plan.ground if max(abs(s[0] - dx), abs(s[1] - dy)) <= REACH), None)

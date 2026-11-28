@@ -226,7 +226,7 @@ class LiveBody:
                 enc = encode(obs, self.facing, self.last, self.last_ok, self.hurt, self.social.flags(obs), goal,
                              self.social.people_flags(obs, N_NEAR), self.ledger.done)
                 mask = legal(obs, self.facing, self.social, goal, self.mind.held(obs) if self.mind else None) if self.a.mask else None
-                i = self.pol.act(enc, self.rng, mask & CALM if mask is not None and not self.hurt else mask)
+                i = chose = self.pol.act(enc, self.rng, mask & CALM if mask is not None and not self.hurt else mask)
                 words = self.mind.build_words if self.mind else None                # (named in any goal: drawn)
                 if self.mind and not (self.draft and self.draft.holds(self.social, self.mind.building or bool(words), obs, self.stats, words)):
                     i = self.mind.steer(i, mask, self.hurt)        # (a home not begun is drawn first: rl/architect.py)
@@ -234,7 +234,8 @@ class LiveBody:
                     i, goal = (p[0], p[1] or goal) if p else (i, goal)       # (the project owns the body; hurt, reflexes)
                     if not p and not self.hurt and goal is not None and goal.kind in ("gather", "craft") and (mask is None or mask[PURSUE]):
                         i = PURSUE                     # (a goal's skill acts when it has a step: tools/scenarios.py, 2-22x fewer)
-                kind = ACTIONS[i][0]
+                i = chose if ACTIONS[chose][0] == "eat" else i      # (the body's own meal stands: live trial 10, food at
+                kind = ACTIONS[i][0]                                 # 1 of 20, 30 fruit carried, a project at the helm)
                 steered = bool(self.mind and self.mind.building and kind == "build")    # (the mind's build: rl/mind.py steer)
                 if self.hurt > 0:
                     self.reactions[kind] = self.reactions.get(kind, 0) + 1

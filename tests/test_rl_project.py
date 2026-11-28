@@ -15,13 +15,14 @@ HOUSE = {"width": 3, "depth": 3, "door": "south", "roof": {"style": "gable"},
          "furniture": {"bed": [0, 0], "campfire": [2, 0], "chest": [0, 2], "chair": [2, 2]}}
 
 
-def run(spec, seed, steps):
+def run(spec, seed, steps, pack=None):
     env = SimEnv(ep_ticks=10 ** 7, roam=0, rivals=0)
     env.reset(seed)
     env.folk = []
     env.goals = SimpleNamespace(goal=None, step=lambda *a: 0, draw=lambda *a, **k: None, counts={})
     env.social.plan = of_structure(design_of(spec))
     env.a.inventory.clear()
+    env.a.inventory.update(pack or {})
     p, n = Project(), 0
     for n in range(steps):
         a = p.act(env.obs, env.social, bool(env.encoded()["mask"][BUILD]))
@@ -274,4 +275,24 @@ def test_shut_in_a_notch_of_its_walls_it_digs_out():
     digs through a tree, even on its own ground."""
     from test_rl_wings import WINGS
     env, left, n = run({**WINGS["T"], "roof": {"style": "gable", "material": "roof", "ridge": "plank"}}, 504, 3000)
+    assert not left, (n, left[:4])
+
+
+ROOF10 = {"style": "flat", "material": "stone_block", "eaves": "plank", "ridge": "plank"}
+LIVE10 = {"parts": [                                         # (live trial 10's draft, rl_runs/score/20261128-114221)
+    {"width": 5, "depth": 4, "storeys": 2, "door": "south", "roof": ROOF10, "path": 2,
+     "furniture": {"bed": [[2, 1]], "campfire": [2, 2], "chest": [4, 1], "table": [1, 1, 0], "chair": [1, 2, 0],
+                   "workbench": [3, 1, 0]}},
+    {"at": "east", "width": 5, "depth": 4, "storeys": 2, "door": "south", "roof": ROOF10, "path": 3,
+     "furniture": {"bed": [[2, 2]], "campfire": [[2, 3]], "chest": [[1, 1]], "table": [[4, 1]], "chair": [[4, 2]]}}]}
+
+
+@pytest.mark.parametrize("seed", [9, 21])
+def test_a_stone_roofed_house_and_its_annex_stand_from_a_full_pack(seed):
+    """Live trial 10's design: two storeys under a flat roof of stone on a plank deck, an annex of the same beside it.
+    A stone block laid is land, and the view's heights show the roof's top over its rooms: read as the land, the site
+    was 'dug into' from the annex's end, a pit walked to and back 45 minutes live (5,521 decisions on seed 9); on 21 the
+    annex ran into water unseen when the site was chosen. The heights read on the build itself are not the land's;
+    water on the site is filled with earth from the pack."""
+    env, left, n = run(LIVE10, seed, 1500, pack={"stone_block": 400, "wood": 300})
     assert not left, (n, left[:4])
