@@ -22,7 +22,8 @@ from nexel_worlds.tiles import BLOCKS
 from .judge import ENCLOSE
 from .social import laid_as
 from .plan import BLOCKS as CELL_BLOCKS
-from .site import REACH, _at, _land, _pit, flat, fresh, level_at, no_way, site, tried, way_out
+from .site import REACH, _at, _bump, _land, _look_further, _pit, climb_out, flat, fresh, level_at, no_way, site, tried, \
+    way_out
 from .plan import Plan, drawn, of_pieces  # noqa: F401  (drawn: the grid's plan, for its callers)
 from .pursue import craft, toward
 
@@ -95,7 +96,7 @@ def next_step(obs, social, *, ground_ch, tool_for, dirs):
         if d > FAR:                                          # (far off - fallen and back at spawn: a home here)
             social.home = None
             return again()
-        return toward(obs, dx, dy, ground_ch, no_way(social))     # (on open ground, no drop, not a way shut: rl/pursue.py)
+        return toward(obs, dx, dy, ground_ch, no_way(social)) or climb_out(obs, social, dx, dy, dirs, tool_for, ground_ch)
     is_laid = laid_by(obs, social, plan)
     fresh(social, sum(map(is_laid, plan.cells)))
     if not flat(obs, hx, hy, plan):                          # (dug into since: the game refuses a wall by a pit)
@@ -109,6 +110,12 @@ def next_step(obs, social, *, ground_ch, tool_for, dirs):
             if (me["x"], me["y"]) != (hx + sx, hy + sy):     # the pack; without earth it goes on with what still goes
                 return "move_to", {"x": hx + sx, "y": hy + sy}       # down - r63 left a closed room for a pit 4 tiles off)
             return "place", {"item": earth, "x": px, "y": py}
+        if (bump := _bump(obs, hx, hy, plan, ground_ch)) is not None and not tried(
+                social, *bump[0][:2], bump[1], count=(me["x"], me["y"]) == bump[1] and not me.get("action")):
+            (bx, by, h), (sx, sy), d = bump                  # (a bump on it, met once begun - seed 708, a hill under
+            pick = max((k for k in inv if "pickaxe" in k and inv[k]), key=lambda k: TIER.get(k, 0), default=None)
+            go = {} if (me["x"], me["y"]) == (sx, sy) else {"go": {"x": sx, "y": sy}}   # its annex: dug down from the
+            return "ring", {"pieces": [(bx, by, "dig", h, d, pick)], **go}            # tile beside, as a player levels it)
     on_land = {(x, y): p for x, y, z, p in plan.cells if z <= 0 and p not in (*CELL_BLOCKS, "dig")}   # (a dug floor's too)
     near_me = lambda q: (abs(hx + q[0] - me["x"]) + abs(hy + q[1] - me["y"]), q[1], q[0])    # noqa: E731
     for dx, dy in sorted(plan.clear, key=near_me):          # (the ground cleared first, the nearest first, as a player clears
@@ -168,35 +175,6 @@ def next_step(obs, social, *, ground_ch, tool_for, dirs):
         to = [(me["x"] + round((fx - me["x"]) * k), me["y"] + round((fy - me["y"]) * k)) for k in   # (the furthest
               (min(1, (VIEW_R - 2) * i / 8 / math.hypot(fx - me["x"], fy - me["y"])) for i in range(8, 0, -1))]  # open
         return "move_to", dict(zip("xy", next((p for p in to if _at(obs, "grid", *p) in ground_ch), to[0])))  # ground)
-    return None
-
-
-SEARCH = tuple((dx * k, dy * k) for k in (1, 2)                # (a view's walk each way in turn, then two views)
-               for dx, dy in ((1, 0), (0, 1), (-1, 0), (0, -1), (1, 1), (-1, 1), (-1, -1), (1, -1)))
-
-
-def _look_further(obs, social, plan):
-    """No spot in view for a drawn build: a view's walk from where it began looking, a way at a time, a look again
-    there, as a player goes looking for flat land; the next way once there with none, or stuck (the sea in the way).
-    The hut, the body's own, is sited in view or not at all, as it was trained."""
-    if plan is HUT:
-        return None
-    me, t = obs["self"], obs.get("tick")
-    pos = (me["x"], me["y"])
-    s = getattr(social, "search", None)
-    if s is None:
-        s = social.search = {"from": pos, "i": 0, "seen": None, "stuck": 0}
-    while s["i"] < len(SEARCH):
-        dx, dy = SEARCH[s["i"]]
-        tx, ty = s["from"][0] + dx * (VIEW_R - 1), s["from"][1] + dy * (VIEW_R - 1)
-        if s["seen"] is not None and s["seen"][1] != t:      # (ticks went by: moved, or not)
-            s["stuck"] = s["stuck"] + 1 if s["seen"][0] == pos else 0
-        if s["seen"] is None or s["seen"][1] != t:
-            s["seen"] = (pos, t)
-        if max(abs(tx - pos[0]), abs(ty - pos[1])) <= 2 or s["stuck"] >= 3:
-            s["i"], s["stuck"], s["seen"] = s["i"] + 1, 0, None
-            continue
-        return "move_to", {"x": tx, "y": ty}
     return None
 
 

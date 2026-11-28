@@ -102,6 +102,7 @@ def of_structure(s) -> Plan:
     stands, spare = s.stands()
     plan = Plan(s.cells(), stands, spare, clear=s.clear(), from_=s.from_(), ways=s.ways(),
                 part=s.part_of() if hasattr(s, "part_of") else None)
+    plan.steps = {p for top, steps, _, _ in getattr(s, "stairs", []) for p in (top, *steps)}   # (its flights' tiles)
     plan.flights = {top: len(steps) for top, steps, _, _ in getattr(s, "stairs", [])}   # (stairs a flight takes: a step
     plan.after = {}                                                                   # each, the game runs them out)
     for top, steps, _, k in getattr(s, "stairs", []):     # (the game runs a flight up to the first open place beside its
