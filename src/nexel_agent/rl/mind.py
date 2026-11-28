@@ -191,7 +191,7 @@ class Mind(Building):
         aims = [a for a in self.aims if a in RECIPES and not have.get(a)]
         for item, n in {k: n for a in aims for k, n in short(RECIPES[a], have).items()}.items():
             had = [", ".join([p + (" (here)" if p in here else "")] + self.now.standing(p)) for p in self.now.who_has(item)[:2]]
-            src = sorted({BLOCK_NAME[c].replace("_", " ") for c in DROPS.get(item, ()) & seen})
+            src = sorted({BLOCK_NAME[c].replace("_", " ") for c in set(DROPS.get(item, ())) & seen})   # (rope: no drop)
             land = sorted({BLOCK_NAME[c].replace("_", " ") for c in DROPS.get(item, ())})
             out.append(f"{n} {item} (" + ("; ".join(had) if had else "nobody you know had any")
                        + (f"; in sight, {' or '.join(src)} gives it" if src
