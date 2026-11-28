@@ -133,7 +133,7 @@ def main():
                            "verdict": {"grade": 3, "of": 6, "checks": {**dict.fromkeys(CHECKS, False), "closed": True, "door": True, "room_enough": True},
                                        "failed": ["roofed", "lit", "bed"]},
                            "sense": {"grade": 3, "of": len(SENSE), "failed": ["chest", "station", "seat", "fit", "light_by_bed"]},
-                           "looks": {"grade": 4, "of": len(LOOKS), "failed": ["roof", "windows", "path", "no_stray"]},
+                           "looks": {"grade": 4, "of": len(LOOKS), "failed": ["roof", "path", "no_stray"]},
                            "lacks": {"roof": 9, "bed": 1}}
         b.homed(f)
         time.sleep(1.0)

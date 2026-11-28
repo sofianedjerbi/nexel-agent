@@ -21,7 +21,7 @@ GOOD = """
 def test_a_good_home_drawn_passes_every_check_it_can():
     j = blueprint.judged(GOOD)
     assert j["ok"] and j["failed"] == [] and j["grade"] == j["of"], j
-    assert j["of"] == len(judge.CHECKS) + len(judge.SENSE) + len(judge.LOOKS) - len(blueprint.CANNOT)
+    assert j["of"] == len(judge.CHECKS) + len(judge.SENSE) + len(judge.LOOKS)
 
 
 @pytest.mark.parametrize("change, failed", [
@@ -104,7 +104,7 @@ def test_a_drawn_home_is_laid_by_building_alone_and_judged_as_drawn(grid):
     w = env.sim.world
     assert judge.verdict(w, hx + px, hy + py)["failed"] == [], judge.told(judge.verdict(w, hx + px, hy + py))
     assert judge.sense(w, hx + px, hy + py)["failed"] == []
-    assert [c for c in judge.looks(w, hx + px, hy + py)["failed"] if f"v3.{c}" not in blueprint.CANNOT] == []
+    assert judge.looks(w, hx + px, hy + py)["failed"] == []
 
 
 def test_live_a_home_not_begun_waits_for_its_drawing_and_keeps_it(tmp_path):

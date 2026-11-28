@@ -151,20 +151,20 @@ def _beside(p):
 
 
 # ---- v3 part 1 (#32): does it look good? The rules a builder would name, on the room's own shape. (Part 2, a vision
-# model on renders, is not here.) A window is a fence in the wall: the game's shelter does not count it as one (it is
-# no ENCLOSE piece: a room with a window is open to it), so its look is read with fences closing it.
-WINDOWS = ("fence",)
-LOOK_CLOSERS = (*ENCLOSE, *WINDOWS)
+# model on renders, is not here.) A fence is open: it closes a plot (a garden), never a room, so a fence in a wall is a
+# gap, and the game has no window that closes a room: a room is looked at as the game shelters it, by ENCLOSE alone.
+FENCES = ("fence",)
+PLOT_CLOSERS = (*ENCLOSE, *FENCES)
 PATH = ("cobble",)                    # the ground a path is (the path item lays it)
-PIECES = (*ENCLOSE, *WINDOWS)         # what a build is made of: one standing near it, not in its wall, is stray
-LOOKS = ("material", "rectangles", "straight", "roof", "symmetric", "windows", "path", "no_stray")
+PIECES = (*ENCLOSE, *FENCES)         # what a build is made of: one standing near it, not in its wall, is stray
+LOOKS = ("material", "rectangles", "straight", "roof", "symmetric", "path", "no_stray")
 
 
 def looks(world, x, y) -> dict:
     """The build around (x, y), v3's rules: {"grade", "of", "checks", "failed", "facts"}. facts: the walls'
     materials, the footprint's box, the jogs in its walls, how much of the roof is there (over the inside, the
-    walls, past them), the door's axis, the windows, the path's length, the stray pieces."""
-    tiles = inside(world, x, y, LOOK_CLOSERS)
+    walls, past them), the door's axis, the path's length, the stray pieces."""
+    tiles = inside(world, x, y, ENCLOSE)
     if tiles is None or len(tiles) < AREA:
         return {"grade": 0, "of": len(LOOKS), "checks": dict.fromkeys(LOOKS, False), "failed": list(LOOKS),
                 "facts": {"closed": False}}
@@ -196,7 +196,6 @@ def looks(world, x, y) -> dict:
         across = door[1] in (y0 - 1, y1 + 1)
         mirror = (lambda p: (2 * door[0] - p[0], p[1])) if across else (lambda p: (p[0], 2 * door[1] - p[1]))
     symmetric = bool(mirror) and all(mirror(p) in tiles for p in tiles) and all(walls.get(mirror(p), b) == b for p, b in walls.items())
-    windows = sorted(p for p, b in edge.items() if b in WINDOWS)
     path = _path(world, door, tiles | set(edge)) if door else 0
     near = _around(_around(ring)) - tiles - ring                         # (two tiles round the walls)
     stray = sorted(p for p in near if world.block(*p) in PIECES)
@@ -205,13 +204,12 @@ def looks(world, x, y) -> dict:
               "straight": not jogs,
               "roof": roof_in == 1 and roof_walls == 1 and roof_past >= .5,
               "symmetric": symmetric,
-              "windows": bool(windows),
               "path": path >= 2,
               "no_stray": not stray}
     return {"grade": sum(checks.values()), "of": len(LOOKS), "checks": checks, "failed": [k for k in LOOKS if not checks[k]],
             "facts": {"closed": True, "area": len(tiles), "box": (x1 - x0 + 1, y1 - y0 + 1), "materials": dict(mats),
                       "jogs": jogs, "roof": {"inside": round(roof_in, 2), "walls": round(roof_walls, 2), "past": round(roof_past, 2)},
-                      "door": door, "windows": windows, "path": path, "stray": stray}}
+                      "door": door, "path": path, "stray": stray}}
 
 
 def _around(ps) -> set:
