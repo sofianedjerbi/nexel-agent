@@ -170,8 +170,9 @@ def to_command(i: int, obs: dict, facing: str, social=None, goal=None):
     if kind == "build":
         from .site import walked_nowhere
         step = built(obs, social)
-        if step and step[0] == "move_to" and walked_nowhere(social, step[1], obs["self"]):
-            step = built(obs, social)                 # (that way shut: the next step without it - rl/site.py)
+        walk = step and (step[1] if step[0] == "move_to" else step[1].get("go") if step[0] == "ring" else None)
+        if walk and walked_nowhere(social, walk, obs["self"]):   # (a ring's walk to its stand too - the T on seed 100:
+            step = built(obs, social)                 # 2585 times) - that way shut: the next step without it (rl/site.py)
         return step
     return "eat", {"item": arg}
 
