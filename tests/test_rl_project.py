@@ -296,3 +296,22 @@ def test_a_stone_roofed_house_and_its_annex_stand_from_a_full_pack(seed):
     water on the site is filled with earth from the pack."""
     env, left, n = run(LIVE10, seed, 1500, pack={"stone_block": 400, "wood": 300})
     assert not left, (n, left[:4])
+
+
+@pytest.mark.parametrize("seed", [702, 708])
+def test_a_build_wider_than_the_view_is_sited_and_its_bumps_dug_down(seed):
+    """The stone annex is 20 tiles wide, the view 19: no spot ever held it whole in view, and it stood only where the
+    hut's spot, chosen first, happened to (5 of 10 fresh seeds). On 702 nothing was laid; on 708 the annex ran onto
+    a hill a layer up, out of view when sited, and its walls were refused on the hill's edge 4,442 times. A wide build
+    is sited on what of it is in view; a bump on the site is dug down from beside, its stairs' tiles left."""
+    env, left, n = run(LIVE10, seed, 1500, pack={"stone_block": 400, "wood": 300})
+    assert not left, (n, left[:4])
+
+
+def test_fallen_into_a_hollow_it_cuts_steps_out():
+    """The round home on seed 704: walking home with its wood, the game's path dropped it 3 layers into a hollow (it
+    climbs one); every walk home found no way, and the build ended there, 107 cells left. It digs the side toward
+    home down a layer at a time and steps up, as a player cuts steps out of a pit."""
+    from test_rl_structure import DESIGNS
+    env, left, n = run(DESIGNS["round home"], 704, 1500)
+    assert not left, (n, left[:4])

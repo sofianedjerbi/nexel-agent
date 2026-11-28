@@ -95,22 +95,66 @@ def _pit(obs, X, Y, plan=None):
     return None
 
 
+def climb_out(obs, social, tx, ty, dirs, tool_for, ground_ch):
+    """Every walk toward (tx, ty) found no way (a hollow deeper than a climb: the game drops any height, climbs one
+    layer - seed 704, a round home, fell 3 into one walking home): a tile on toward it, the side the nearest its way
+    first - stepped onto if a climb, else dug down a layer (as a player cuts steps out of a pit), or None."""
+    from .actions import LEVEL
+    me = obs["self"]
+    here = LEVEL.get(_at(obs, "heights", me["x"], me["y"]))
+    if here is None:
+        return None
+    for d, (i, j) in sorted(dirs.items(), key=lambda kv: -(kv[1][0] * tx + kv[1][1] * ty)):
+        X, Y = me["x"] + i, me["y"] + j
+        h = LEVEL.get(_at(obs, "heights", X, Y))
+        if h is None or i * tx + j * ty <= 0 or _at(obs, "grid", X, Y) not in ground_ch:
+            continue                                         # (on toward it, bare ground)
+        if here <= h <= here + 1:
+            no_way(social).clear()                           # (a step up: the ways found shut from below, tried again)
+            return "move_to", {"x": X, "y": Y}
+        if h > here + 1:
+            return "dig", {"dir": d, "z": h, "x": X, "y": Y, **({"with": w} if (w := tool_for(obs, d)) else {})}
+    return None
+
+
+def _bump(obs, X, Y, plan, ground_ch):
+    """A tile of the site higher than its land, with a lower one of it beside to dig it down from: ((x, y, its
+    level), (x, y) the tile beside, the way from there to it), or None (the inverse of _pit)."""
+    lv = next((h for p in (*plan.ground, *sorted(plan.clear)) if (h := _land(obs, X, Y, plan, *p)) is not None), None)
+    if lv is None:
+        return None
+    ways = {"N": (0, -1), "E": (1, 0), "S": (0, 1), "W": (-1, 0)}
+    for dx, dy in sorted(plan.clear):
+        h = _land(obs, X, Y, plan, dx, dy)
+        if h is None or h <= lv or (dx, dy) in plan.dug_tiles or (dx, dy) in getattr(plan, "steps", ()) \
+                or _at(obs, "grid", X + dx, Y + dy) not in ground_ch:
+            continue                                         # (bare land: not a flight of its stairs, nothing on it)
+        for d, (i, j) in ways.items():                       # (from a tile at the land's level, open, in view)
+            sx, sy = X + dx - i, Y + dy - j
+            if _land(obs, X, Y, plan, dx - i, dy - j) == lv and _at(obs, "grid", sx, sy) in ground_ch | {YOU}:
+                return (X + dx, Y + dy, h), (sx, sy), d
+    return None
+
+
 def site(obs, ground_ch, plan=None, clearable=frozenset()) -> tuple | None:
-    """The plan's origin (the hut's inside top-left) at the nearest spot in view where it all stands on flat, open
-    ground."""
+    """The plan's origin (the hut's inside top-left) at the nearest spot in view where it stands on flat, open ground.
+    A build wider than the view (an annex beside a house: 20 tiles, the view 19) is judged on what of it is in view,
+    its first floor tile in it: the rest is seen walking there, and mended or the spot given up (rl/build.py) - it
+    stood on 5 of 10 fresh seeds only where the hut's spot, chosen first, happened to hold it."""
     plan = plan or _hut()
     me = obs["self"]
     best = None
     x0, y0, x1, y1 = plan.box()
     sx, sy = plan.ground[0]
+    wide = x1 - x0 > 2 * VIEW_R - 3 or y1 - y0 > 2 * VIEW_R - 3
     wet = _near_water(obs)
-    for oy in range(-VIEW_R + 1 - y0, VIEW_R - 1 - y1):
-        for ox in range(-VIEW_R + 1 - x0, VIEW_R - 1 - x1):
+    for oy in range(-VIEW_R + 1 - sy, VIEW_R - sy) if wide else range(-VIEW_R + 1 - y0, VIEW_R - 1 - y1):
+        for ox in range(-VIEW_R + 1 - sx, VIEW_R - sx) if wide else range(-VIEW_R + 1 - x0, VIEW_R - 1 - x1):
             X, Y = me["x"] + ox, me["y"] + oy
             chs = [_at(obs, "grid", X + dx, Y + dy) for dx, dy in plan.clear]
-            if all(ch in (ground_ch - LIQUID_CH) | {YOU} | clearable for ch in chs) \
+            if all(ch in (ground_ch - LIQUID_CH) | {YOU} | clearable or wide and ch is None for ch in chs) \
                     and not any((X + dx, Y + dy) in wet for dx, dy in plan.clear) and flat(obs, X, Y, plan):
-                d = math.hypot(ox + sx, oy + sy) + 2 * sum(ch in clearable for ch in chs)   # (a tree to clear: a step more)
+                d = math.hypot(ox + sx, oy + sy) + 2 * sum(ch in clearable for ch in chs) + sum(ch is None for ch in chs)
                 if best is None or d < best[0]:
                     best = (d, (X, Y))
     return best and best[1]
@@ -178,3 +222,35 @@ def way_out(obs, ground_ch, keep, dirs, tool_for, clearable=frozenset()):
         (k for k, (dx, dy) in dirs.items() if _at(obs, "grid", me["x"] + dx, me["y"] + dy) in clearable), None)  # (a tree
     #  on its own ground, to be cleared anyway - the round home on seed 203: its walls and two trees round it)
     return ("dig", {"dir": d, **({"with": w} if (w := tool_for(obs, d)) else {})}) if d else None
+
+
+SEARCH = tuple((dx * k, dy * k) for k in (1, 2)                # (a view's walk each way in turn, then two views)
+               for dx, dy in ((1, 0), (0, 1), (-1, 0), (0, -1), (1, 1), (-1, 1), (-1, -1), (1, -1)))
+
+
+def _look_further(obs, social, plan):
+    """No spot in view for a drawn build: a view's walk from where it began looking, a way at a time, a look again
+    there, as a player goes looking for flat land; the next way once there with none, or stuck (the sea in the way).
+    The hut, the body's own, is sited in view or not at all, as it was trained."""
+    if plan is _hut():
+        return None
+    me, t = obs["self"], obs.get("tick")
+    pos = (me["x"], me["y"])
+    s = getattr(social, "search", None)
+    if s is None:
+        s = social.search = {"from": pos, "i": 0, "seen": None, "stuck": 0}
+    while s["i"] < len(SEARCH):
+        dx, dy = SEARCH[s["i"]]
+        tx, ty = s["from"][0] + dx * (VIEW_R - 1), s["from"][1] + dy * (VIEW_R - 1)
+        if s["seen"] is not None and s["seen"][1] != t:      # (ticks went by: moved, or not)
+            s["stuck"] = s["stuck"] + 1 if s["seen"][0] == pos else 0
+        if s["seen"] is None or s["seen"][1] != t:
+            s["seen"] = (pos, t)
+        if max(abs(tx - pos[0]), abs(ty - pos[1])) <= 2 or s["stuck"] >= 3:
+            s["i"], s["stuck"], s["seen"] = s["i"] + 1, 0, None
+            continue
+        return "move_to", {"x": tx, "y": ty}
+    if max(abs(pos[0] - s["from"][0]), abs(pos[1] - s["from"][1])) > VIEW_R:   # (none round there: it goes on looking
+        social.search = None                                 # from where it got to - seed 702, a two-storey house)
+        return _look_further(obs, social, plan)
+    return None
