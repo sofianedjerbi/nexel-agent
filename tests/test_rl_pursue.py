@@ -100,3 +100,22 @@ def test_ask_walks_up_to_the_person_and_asks(monkeypatch):
             f.act = sim.tick                                       # (asked: now she acts, and brings it)
             env.step(0)
     assert a.count("wood") >= 1 and env.goals.counts["ask"][0] == 1
+
+
+def test_a_look_walk_with_no_way_turns_to_the_next():
+    """Craft axe on seed 12: no tree in view, the way of the time a walk on the spot (ordered 586 times, the pack
+    empty at the budget's end). A walk shut from where it stands is left for the next way."""
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
+    from scenarios import env_for
+    from nexel_agent.rl.goals import Goal
+    from nexel_agent.rl.project import PURSUE
+    env = env_for(12)
+    env.goals.goal = Goal("craft", "axe", None, env.obs["tick"], 0)
+    env.goals.goal.look = True
+    for _ in range(300):
+        env.step(PURSUE)
+        if env.a.inventory.get("axe"):
+            break
+    assert env.a.inventory.get("axe"), (env.a.x, env.a.y, dict(env.a.inventory))

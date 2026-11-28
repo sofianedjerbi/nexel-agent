@@ -162,7 +162,11 @@ def to_command(i: int, obs: dict, facing: str, social=None, goal=None):
     if kind == "craft":
         return "craft", {"recipe": arg}
     if kind == "pursue":
-        return pursued(obs, goal, social)
+        from .site import walked_nowhere
+        step = pursued(obs, goal, social)
+        if step and step[0] == "move_to" and social is not None and walked_nowhere(social, step[1], obs["self"]):
+            step = pursued(obs, goal, social)         # (that way shut: the next one - craft axe, seed 12: 586 walks in place)
+        return step
     if kind == "build":
         from .site import walked_nowhere
         step = built(obs, social)

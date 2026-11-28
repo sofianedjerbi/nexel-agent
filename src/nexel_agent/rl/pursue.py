@@ -70,7 +70,9 @@ def gather(obs, item, ground_ch, tool_for, dirs, blocked=(), keep=(), look=False
     if cell is None:                     # (none in view: for a project, a view's walk to look further, the way turning
         if not look or not DROPS.get(item):          # as time goes; else finding one is the policy's, as it learned)
             return None
-        dx, dy = LOOK[(obs.get("tick", 0) // LOOK_TICKS) % len(LOOK)]
+        k = (obs.get("tick", 0) // LOOK_TICKS) % len(LOOK)          # (the way of the time, else the next not shut)
+        dx, dy = next((w for w in LOOK[k:] + LOOK[:k] if (me["x"] + w[0] * (VIEW_R - 1), me["y"] + w[1] * (VIEW_R - 1))
+                       not in blocked), LOOK[k])
         if keep:                         # (a home: no further than LOOK_R from it - seed 102: 230 tiles off for stone,
             ax, ay = sum(x for x, _ in keep) / len(keep), sum(y for _, y in keep) / len(keep)    # the home given up)
             far = math.hypot(ax - me["x"], ay - me["y"])
@@ -142,10 +144,12 @@ def next_step(obs, goal, social, *, person, wanted, handed, tool_for, ground_ch,
     if goal is None or goal.kind == "free":
         return None
     from .build import own
+    from .site import no_way
+    blocked = set(goal.blocked) | no_way(social)
     if goal.kind == "gather" and goal.item:
-        return gather(obs, goal.item, ground_ch, tool_for, dirs, goal.blocked, own(social), getattr(goal, "look", False))
+        return gather(obs, goal.item, ground_ch, tool_for, dirs, blocked, own(social), getattr(goal, "look", False))
     if goal.kind == "craft" and goal.item:
-        return craft(obs, goal.item, ground_ch, tool_for, dirs, blocked=goal.blocked, keep=own(social), look=getattr(goal, "look", False))
+        return craft(obs, goal.item, ground_ch, tool_for, dirs, blocked=blocked, keep=own(social), look=getattr(goal, "look", False))
     if goal.kind in ("ask", "give", "stay"):
         return with_person(obs, goal, social, person(obs, goal), wanted, handed, ground_ch)
     return None
