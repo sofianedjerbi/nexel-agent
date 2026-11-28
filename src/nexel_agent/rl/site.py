@@ -179,13 +179,17 @@ TRIES = 4                     # (a dig refused this often from one stand: tried 
                               # a rock takes 54 ticks, the T's on seed 7 was given up and walked from forever)
 
 
-def tried(social, X, Y, here, count=True) -> bool:
-    """Has clearing (X, Y) from `here` been tried TRIES times (counting this try, unless count is False)?"""
+def tried(social, X, Y, here, count=True, at=None) -> bool:
+    """Has clearing (X, Y) from `here` been tried TRIES times (counting this try, unless count is False)? A try is
+    counted once at the game's tick `at`: the home's step is asked for more than once a decision (the mask, the act,
+    the step after a way found shut), and a stump dug once from a doorway was given up as dug at four times."""
     t = social.__dict__.setdefault("clear_tries", {})
+    last = social.__dict__.setdefault("clear_at", {})
     if t.get((X, Y, here), 0) >= TRIES:
         return True
-    if count:
+    if count and (at is None or last.get((X, Y, here)) != at):
         t[(X, Y, here)] = t.get((X, Y, here), 0) + 1
+        last[(X, Y, here)] = at
     return False
 
 
