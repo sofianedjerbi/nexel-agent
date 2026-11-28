@@ -19,9 +19,9 @@ NAMES: list = []                  # the achievements (rl/achieve.py, game side):
 
 # r6's 66 achievements (the first set), to compare runs across the widening
 R6_SET = tuple([f"collect_{x}" for x in ("wood", "fiber", "stone", "stone_block", "dirt", "berries", "seed", "fruit", "flower",
-                                          "mushroom", "ore", "meat", "wheat", "egg", "milk", "hay")]
+                                          "mushroom", "iron_ore", "meat", "wheat", "egg", "milk", "hay")]
                + [f"craft_{x}" for x in ("workbench", "plank", "stone", "campfire", "torch", "rope", "axe", "pickaxe", "hoe",
-                                         "spear", "cooked_meat", "bread", "ingot", "sword", "door", "fence", "chest",
+                                         "spear", "cooked_meat", "bread", "iron_ingot", "iron_sword", "door", "fence", "chest",
                                          "wood_wall", "stone_wall", "bed", "ladder", "stairs", "path")]
                + [f"place_{x}" for x in ("workbench", "campfire", "chest", "bed", "door", "fence", "wood_wall", "stone_wall",
                                          "dirt", "stone_block", "plank", "path", "torch")]

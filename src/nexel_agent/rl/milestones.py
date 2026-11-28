@@ -72,7 +72,7 @@ class Milestones:
         r += self.ladder(L, "fill", sum((a.x + dx, a.y + dy) in self.mine and sim.world.block(a.x + dx, a.y + dy) in
                                         sim.ENCLOSE for dx in (-1, 0, 1) for dy in (-1, 0, 1) if dx or dy))
         r += self.ladder(L, "stock", sum(a.count(w) for w in ("stone_wall", "wood_wall")))
-        if a.count("axe") and a.count("pickaxe") and a.count("hoe") and (a.count("spear") or a.count("sword")):
+        if a.count("axe") and a.count("pickaxe") and a.count("hoe") and (a.count("spear") or a.count("iron_sword")):
             r += u("toolkit")
         if sim.swimming(a):
             self.swim_from = self.swim_from or (a.x, a.y)

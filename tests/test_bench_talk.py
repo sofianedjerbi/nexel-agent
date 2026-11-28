@@ -57,7 +57,7 @@ def test_the_cases_are_forty_or_so_and_each_names_what_the_game_has():
 def test_a_good_answer_keeps_every_rule():
     good = {
         "rook got any wood?": {"heard": ["ask wood"], "say": "sure, 2 coming", "promise": "wood 2"},
-        "got a sword i can have?": {"heard": ["ask sword"], "say": "nah no sword sorry", "promise": ""},
+        "got an iron sword i can have?": {"heard": ["ask iron_sword"], "say": "nah no iron sword sorry", "promise": ""},
         "how do you make a workbench": {"heard": ["how workbench"], "say": "4 wood, no station needed"},
         "hey, i'm mira": {"heard": ["greet"], "say": "hey mira"},
         "ok": {"heard": ["chat"], "say": ""},
@@ -73,12 +73,12 @@ def test_a_good_answer_keeps_every_rule():
 def test_each_rule_catches_what_a_bad_answer_does():
     bad = {
         "rook got any wood?": {"heard": ["ask wood"], "say": "sure here you go", "promise": ""},     # met, no promise
-        "got a sword i can have?": {"heard": ["chat"], "say": "nope", "promise": "sword 1"},         # wrong act, a promise of nothing carried
+        "got an iron sword i can have?": {"heard": ["chat"], "say": "nope", "promise": "iron_sword 1"},         # wrong act, a promise of nothing carried
         "how do you make a workbench": {"heard": ["how workbench"], "say": "no idea"},               # no recipe in it
         "hey, i'm mira": {"heard": ["greet"], "say": "hey, stone block 26, dirt 13, still got fruit"},  # the dump
         "thanks for the wood you gave me!": {"heard": ["thanks wood"], "say": "np", "deed": "gave wood"},  # a gift never given
         "nice hut btw": {"heard": ["chat"], "say": "THANKS!! I Built It Myself Over Many Long Days Of Work Out Here By The Lake"},
-        "what does a sword take?": {"heard": ["how sword"], "say": ""},                              # owed an answer
+        "what does an iron sword take?": {"heard": ["how iron_sword"], "say": ""},                              # owed an answer
     }
     rows = {r["id"]: r for r in run([case(i) for i in ("ask-wood", "ask-none-sword", "how-workbench", "dump-intro",
                                                        "deed-thanks-wood", "banter-house", "how-sword")], FakeModel(bad))}
