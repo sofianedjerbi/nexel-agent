@@ -361,3 +361,12 @@ def test_a_goal_with_someone_it_never_saw_is_not_set_and_it_is_told_so():
     assert m.goal.person == "Mira"                                            # (seen: as the game spells her)
     m.apply({"goal": "gather", "with": "nobody_here", "item": "wood"})
     assert (m.goal.kind, m.goal.person) == ("gather", None)                  # (a goal with no one: it stands)
+
+
+def test_an_aim_made_of_something_the_land_does_not_drop_is_told_without_failing(tmp_path):
+    """Live trial 8: an aim whose recipe takes a crafted item (rope, no block drops it) made every thought fail."""
+    from nexel_agent.rl.mind import Mind
+    m = Mind("Rook", "", "http://x", None, tmp_path / "m.json")
+    m.aims = ["firefly_charm"]                                     # (1 rope, 1 torch: neither dropped by the land)
+    out = m.lacks({}, set(), {"grid": ["..."], "self": {"inventory": {}}})
+    assert any("rope" in x for x in out)
