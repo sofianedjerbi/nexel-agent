@@ -105,8 +105,9 @@ def of_structure(s) -> Plan:
     plan.after = {}                                                                   # each, the game runs them out)
     for top, steps, _, k in getattr(s, "stairs", []):     # (the game runs a flight up to the first open place beside its
         door = (2 * top[0] - steps[1][0], 2 * top[1] - steps[1][1])    # top: its door's column laid first, else a storey
-        plan.after[(*top, 0, "stairs")] = [c for c in plan.cells        # under it is open and the flight stops there -
-                                           if c[:2] == door and c[2] <= STOREY * k and c[3] != "stairs"]   # the tower, #91)
+        plan.after[(*top, 0, "stairs")] = [c for c in plan.cells        # under it is open and the flight stops there;
+                                           if c[:2] == door and c[2] <= STOREY * k    # its own door need not stand, only
+                                           and c[3] not in ("stairs", "door")]        # its floor and the walls under it)
     return plan
 
 
