@@ -1,7 +1,7 @@
 """A home drawn as a tile grid, top-down, north up: what the architect (rl/architect.py) writes and the build verb lays
 (#66). One character a tile:
 
-    #  wall          D  door         w  window (a fence)      .  floor (inside, under the roof)
+    #  wall          D  door         .  floor (inside, under the roof)
     b  bed           f  campfire     c  chest                 t  table       h  chair      k  workbench
     =  path (cobble, outside)        (space or ,)  outside, left as it is
 
@@ -11,14 +11,11 @@ stamped on cleared grass in a sim world, so a design is known good or not before
 
 from . import judge
 
-LEGEND = {"#": "wall", "D": "door", "w": "fence", "b": "bed", "f": "campfire", "c": "chest", "t": "table",
+LEGEND = {"#": "wall", "D": "door", "b": "bed", "f": "campfire", "c": "chest", "t": "table",
           "h": "chair", "k": "workbench", "=": "path", ".": "floor"}
-SHELL = ("wall", "door", "fence")          # laid first: the ring, then what stands in the room, the path, the roof
+SHELL = ("wall", "door")          # laid first: the ring, then what stands in the room, the path, the roof
 MOST = 13                                  # tiles a side, at the most: a home, not a hall
 WALL = "wood_wall"                         # what a wall is stamped as when judged (the material is the pack's when built)
-# v3's window check cannot pass with v1's closed one: the game's shelter counts a window (a fence) as a gap. Left out
-# of a drawing's grade, until the game has a window that closes a room.
-CANNOT = ("v3.windows",)
 
 
 def parse(text: str) -> list:
@@ -82,7 +79,7 @@ def stamp(sim, rows, x, y):
             sim.world.set(X, Y, block=WALL if piece == "wall" else piece)
 
 
-OF = len(judge.CHECKS) + len(judge.SENSE) + len(judge.LOOKS) - len(CANNOT)
+OF = len(judge.CHECKS) + len(judge.SENSE) + len(judge.LOOKS)
 
 
 def judged(text: str) -> dict:
@@ -106,7 +103,7 @@ def judged(text: str) -> dict:
     px, py = x + p[0], y + p[1]
     out = {"v1": judge.verdict(sim.world, px, py), "v2": judge.sense(sim.world, px, py),
            "v3": judge.looks(sim.world, px, py)}
-    failed = [f"{k}.{c}" for k, v in out.items() for c in v["failed"] if f"{k}.{c}" not in CANNOT]
+    failed = [f"{k}.{c}" for k, v in out.items() for c in v["failed"]]
     return {"ok": True, "grade": OF - len(failed), "of": OF,
             "failed": failed, "told": told(out), "rows": rows, "by": {k: v["grade"] for k, v in out.items()}}
 
@@ -120,8 +117,7 @@ WHY = {"closed": "the walls do not close a room (a gap, or a tile outside reache
        "tidy": "land raised inside (a block of earth put down)", "light_by_bed": "no light near the bed",
        "material": "mixed wall materials", "rectangles": "the walls are not a clean rectangle (or a few)",
        "straight": "walls with one-tile jogs", "roof": "the roof stops at the walls",
-       "symmetric": "the door is off the middle of its wall", "windows": "no window (w) in the walls (but a window leaves the room open to the game: closed fails)",
-       "path": "no path (=) to the door", "no_stray": "a piece left standing outside the walls"}
+       "symmetric": "the door is off the middle of its wall", "path": "no path (=) to the door", "no_stray": "a piece left standing outside the walls"}
 
 
 def told(out: dict) -> str:
@@ -131,7 +127,7 @@ def told(out: dict) -> str:
                           f"tile beside it, joined to the door by free tiles; furniture blocks the way)",
              "fit": f"{f.get('area')} tiles inside: 6 to 40 for a home"}
     fails = [exact.get(c) if k == "v2" and c in exact and f.get("closed") else WHY.get(c, c)
-             for k, v in out.items() for c in v["failed"] if f"{k}.{c}" not in CANNOT]
+             for k, v in out.items() for c in v["failed"]]
     return "; ".join(dict.fromkeys(fails)) or "nothing failed"
 
 
@@ -140,7 +136,7 @@ def told(out: dict) -> str:
 # "furniture": {piece: [x, y] from the inside's top-left}, "path": tiles}
 
 SIDES = ("north", "south", "east", "west")
-FURNITURE = {v: k for k, v in LEGEND.items() if v not in ("wall", "door", "fence", "path", "floor")}
+FURNITURE = {v: k for k, v in LEGEND.items() if v not in ("wall", "door", "path", "floor")}
 
 
 def render(spec: dict) -> str:

@@ -192,11 +192,11 @@ def built(spec, seed=5, picks=800) -> dict:
 
 
 def garden_at(sim, s, x0, y0) -> dict:
-    """A garden as it stands: fenced all round (a fence closes a plot, if not a room: judge.LOOK_CLOSERS), a gate,
+    """A garden as it stands: fenced all round (a fence closes a plot, if not a room: judge.PLOT_CLOSERS), a gate,
     its beds tilled and sown (nine in ten at least), a path out of the gate."""
     w = sim.world
     walk = next(iter(s.walks or s.beds))
-    tiles = judge.inside(w, x0 + walk[0], y0 + walk[1], judge.LOOK_CLOSERS)
+    tiles = judge.inside(w, x0 + walk[0], y0 + walk[1], judge.PLOT_CLOSERS)
     beds = [(x0 + x, y0 + y) for x, y in s.beds]
     gate = (x0 + s.doors[0][0], y0 + s.doors[0][1])
     tilled = sum(w.ground(*p) in ("tilled", "wet_tilled") for p in beds) / max(1, len(beds))

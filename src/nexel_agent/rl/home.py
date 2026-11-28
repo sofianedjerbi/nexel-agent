@@ -125,7 +125,7 @@ def reading(obs: dict, home, social=None) -> dict:
 
 def told(obs: dict, home=None, r: dict | None = None) -> str:
     """The home in one line of facts: "Your home 12 tiles NW: closed, no roof (40%), no bed (grade 3 of 6); it makes
-    no sense yet: no chest, no seat; it does not look good: no roof, no windows; it lacks 6 wood, 3 fiber". From its
+    no sense yet: no chest, no seat; it does not look good: no roof, no path; it lacks 6 wood, 3 fiber". From its
     reading (r), or read now."""
     r = r or reading(obs, home)
     lacking = lambda k: f"some {k[3:].replace('_', ' ')}" if k.startswith("no_") else f"no {k.replace('_', ' ')}"   # (no_stray failed: "some stray", not "no no stray")
