@@ -22,7 +22,7 @@ from nexel_worlds.tiles import BLOCKS
 from .judge import ENCLOSE
 from .social import laid_as
 from .plan import BLOCKS as CELL_BLOCKS
-from .site import _at, _pit, flat, no_way, site, tried, way_out
+from .site import _at, _pit, flat, fresh, no_way, site, tried, way_out
 from .plan import Plan, drawn, of_pieces  # noqa: F401  (drawn: the grid's plan, for its callers)
 from .pursue import craft, toward
 
@@ -97,6 +97,7 @@ def next_step(obs, social, *, ground_ch, tool_for, dirs):
             return again()
         return toward(obs, dx, dy, ground_ch, no_way(social))     # (on open ground, no drop, not a way shut: rl/pursue.py)
     is_laid = laid_by(obs, social, plan)
+    fresh(social, sum(map(is_laid, plan.cells)))
     if not flat(obs, hx, hy, plan):                          # (dug into since: the game refuses a wall by a pit)
         pit = _pit(obs, hx, hy, plan)
         earth = next((k for k in EARTH if inv.get(k)), None)
