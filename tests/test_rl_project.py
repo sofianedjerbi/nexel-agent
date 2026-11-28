@@ -258,3 +258,11 @@ def test_shut_in_by_its_own_walls_and_trees_it_clears_its_way_out():
     from test_rl_structure import DESIGNS
     env, left, n = run(DESIGNS["round home"], 203, 1500)
     assert not left, (n, left[:4])
+
+
+def test_a_way_shut_before_a_storey_stood_is_tried_again():
+    """The tower on seed 304: its last roof cell's stand, up on the top floor, was walked to before the flight there
+    was laid, shut for good, and the build ended one cell short. Shut ways are tried again once the build grows."""
+    from test_rl_structure import DESIGNS
+    env, left, n = run(DESIGNS["tower"], 304, 1500)
+    assert not left, (n, left[:4])

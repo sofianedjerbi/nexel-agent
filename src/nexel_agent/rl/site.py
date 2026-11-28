@@ -125,6 +125,15 @@ def no_way(social) -> set:
     return social.__dict__.setdefault("no_way", set()) if social is not None else set()
 
 
+def fresh(social, laid: int):
+    """Ways found shut are tried again once the build has grown (`laid` pieces): a stand up a storey has no way to it
+    until its flight is laid - the tower on seed 304, its last roof cell's stand shut for good, one cell left."""
+    if social.__dict__.get("laid_n") != laid:
+        social.laid_n = laid
+        no_way(social).clear()
+        social.__dict__.get("clear_tries", {}).clear()
+
+
 def walked_nowhere(social, to: dict, me: dict) -> bool:
     """A walk ordered TRIES times from the same tile: the way is shut (the T on seed 7: a walk to a workbench with no
     path, ordered 199 times); kept in no_way."""
