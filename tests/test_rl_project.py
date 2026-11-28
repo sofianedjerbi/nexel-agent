@@ -167,3 +167,11 @@ def test_walled_in_by_its_own_wall_rocks_and_a_bush_the_builder_digs_its_way_out
     spec = {**WINGS["T"], "roof": {"style": "gable", "material": "roof", "ridge": "plank"}}
     env, left, n = run(spec, 7, 2000)
     assert left == [], (n, len(left))
+
+
+def test_a_bench_is_not_put_down_on_a_hills_rim():
+    """The cross on seed 109: the game keeps nothing on a hill's edge ("cliff_edge"); the bench went there 199 times."""
+    from test_rl_wings import WINGS
+    spec = {**WINGS["cross"], "roof": {"style": "hip", "material": "roof", "eaves": "plank"}}
+    env, left, n = run(spec, 109, 2000)
+    assert left == [], (n, len(left))

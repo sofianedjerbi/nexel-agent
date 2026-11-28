@@ -36,6 +36,16 @@ LOOK_TICKS = 600                  # (a way kept for this long: far enough to see
 LOOK_R = 200                      # (a search from a home stays this near it: rl/build.py gives a home up past FAR)
 
 
+def _rim(hs, dx, dy) -> bool:
+    """Is the tile (dx, dy) from the centre on a hill's rim - a lower tile beside it, diagonals too? The game keeps
+    nothing there ("cliff_edge": the cross on seed 109 put its bench down there 199 times)."""
+    from .actions import LEVEL
+    lv = LEVEL.get(hs[VIEW_R + dy][VIEW_R + dx])
+    return lv is not None and any(LEVEL.get(hs[VIEW_R + dy + j][VIEW_R + dx + i], lv) < lv
+                                  for i in (-1, 0, 1) for j in (-1, 0, 1) if 0 <= VIEW_R + dy + j < len(hs)
+                                  and 0 <= VIEW_R + dx + i < len(hs[0]))
+
+
 def _cells(obs, chars, blocked=()):
     """(dx, dy) of the tiles in view showing one of `chars`, nearest first, less those a walk found no way to."""
     grid, me = obs.get("grid") or [], obs["self"]
@@ -101,7 +111,7 @@ def craft(obs, item, ground_ch, tool_for, dirs, depth=0, blocked=(), keep=(), lo
                 hs = obs.get("heights")              # (and on its own level: a bench put on a slope is refused,
                 d = next((k for k, (dx, dy) in dirs.items() if obs["grid"][VIEW_R + dy][VIEW_R + dx] in ground_ch - {WATER}
                           and (me["x"] + dx, me["y"] + dy) not in keep          # 580 times over, scenario craft axe)
-                          and (not hs or hs[VIEW_R + dy][VIEW_R + dx] == hs[VIEW_R][VIEW_R])), None)
+                          and (not hs or hs[VIEW_R + dy][VIEW_R + dx] == hs[VIEW_R][VIEW_R] and not _rim(hs, dx, dy))), None)
                 if d is None and keep:               # (every tile round it the home's or a slope: a step off the
                     off = next(((dx, dy) for dx, dy in _cells(obs, ground_ch - {WATER}, blocked)          # site first -
                                 if (dx, dy) != (0, 0) and (me["x"] + dx, me["y"] + dy) not in keep), None)  # the round
