@@ -8,6 +8,7 @@ light, a chest and a seat somewhere, all reached; a base (no roof): a closed yar
 from nexel_worlds.sim.storeys import STOREY
 
 from . import judge
+from .floor import floor_of
 from .structure import Structure
 
 LIGHT = ("campfire", "torch")
@@ -52,8 +53,8 @@ def stamp(sim, s: Structure, x0, y0) -> int:
         if dz < 0:                                        # (on a dug floor: the tile's lowest ground)
             sim.world.set(X, Y, block=p)
             continue
-        if p == "path":
-            sim.world.set(X, Y, ground="cobble")
+        if p in ("path", "stone_floor", "floor"):            # (a path, a floor laid on the ground: rl/floor.py)
+            sim.world.set(X, Y, ground="floor" if p == "floor" else "cobble")
         elif p == "stairs":
             continue                                      # (the way up is the structure's: s.stairs)
         elif p in ("plank", "roof"):
@@ -126,6 +127,7 @@ def judge_at(sim, s: Structure, x0, y0, lv) -> dict:
         if not dug:
             checks["roof_over"] = per[-1]["v3"]["checks"]["roof"]
             checks["crafted_roof"] = crafted(s)
+            checks["floored"] = floor_of(s.spec) is not None
     if not dug:                                           # (a dug room's looks are the land's: its trench is its way)
         checks["path"] = g["v3"]["checks"]["path"]
         checks["no_stray"] = g["v3"]["checks"]["no_stray"]
@@ -144,6 +146,7 @@ WHY = {"roofed": "not covered (a floor or the roof over it)", "lit": "no light (
        "chest": "no chest", "seat": "no table or chair", "roof_over": "the roof stops at the walls",
        "closed": "the walls do not close it", "door": "no door in its walls",
        "reachable": "a piece is not reached on foot from its door (furniture blocks the way)",
+       "floored": 'the inside keeps the bare land: lay a floor ("floor": "plank" or "path")',
        "crafted_roof": "the roof is one material seen from above: a craftsman's roof mixes them (its eaves or ridge in "
                        "another: planks round stone, a stone ridge on shingles)"}
 

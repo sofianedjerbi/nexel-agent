@@ -13,15 +13,15 @@ BUDGET = 130                # walls and blocks, at the most: a home for one 3 by
 
 DRAW = """You design builds for a tile game seen from above, built in storeys. Choose the design; it is drawn
 for you: walls all round the inside, a door in the middle of the wall you name, a path out of it, a floor of
-planks over each storey that has one above it, a flight of stairs outside up to each upper storey's own door, a
-roof over the top (one tile past its walls) unless you leave it open.
+planks over each storey that has one above it, a floor laid over the ground storey's inside, a flight of stairs
+outside up to each upper storey's own door, a roof over the top (one tile past its walls) unless you leave it open.
 
 Answer with JSON only:
 {{"shape": "rect" or "round" or "wings", "width": tiles west to east, "depth": tiles north to south (rect),
   "radius": 2 to 6 (round), "wings": [[x, y, width, depth], ...] (2 to 4 rectangles joined side to side into one
   inside: an L, a T, a U, a cross; each wing under its own gable), "storeys": 1 to 3, "door": "north"|"south"|"east"|"west",
   "roof": false (open) or {{"style": "flat"|"gable"|"hip", "material": ..., "eaves": ..., "ridge": ...}},
-  "furniture": {{"bed": [x, y], "table": [x, y, storey], ...}}, "path": 2 or 3}}
+  "floor": "plank" (wood) or "path" (stone), "furniture": {{"bed": [x, y], "table": [x, y, storey], ...}}, "path": 2 or 3}}
 Places are from the inside's top-left (x west to east, y north to south; a round's inside is its box), storey 0
 the ground (the default); two of a piece: "bed": [[x, y], [x, y]]. Furniture: {furniture}; on an upper storey
 only {upstairs} (the game stands nothing else on a floor).

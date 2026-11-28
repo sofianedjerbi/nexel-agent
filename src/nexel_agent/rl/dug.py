@@ -77,8 +77,10 @@ def design_of(spec: dict) -> Structure:
     """A design drawn: dug into the land when it says so, else built up."""
     from .compound import Compound
     from .garden import Garden
+    from .floor import floor_of
     if spec.get("parts"):
         return Compound(spec)
+    floor_of(spec)                                           # (a floor of what there is: told otherwise, rl/floor.py)
     return Dug(spec) if spec.get("underground") else Garden(spec) if spec.get("garden") else Structure(spec)
 
 

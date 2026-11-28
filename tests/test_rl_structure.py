@@ -242,7 +242,8 @@ def test_the_mind_adds_a_garden_beside_its_home_once_it_stands(tmp_path):
     env.folk = []
     whole = design_of({"parts": [DESIGNS["house"], {**GARDEN, "at": "east"}]})
     env.a.inventory.clear()
-    env.a.inventory.update(Counter("stone_wall" if p == "wall" else p for *_, p in whole.cells() if p != "till"))
+    from nexel_agent.rl.floor import FLOORS
+    env.a.inventory.update(Counter("stone_wall" if p == "wall" else FLOORS.get(p, p) for *_, p in whole.cells() if p != "till"))
     env.a.inventory.update({"hoe": 1})
     b = next(i for i, a in enumerate(ACTIONS) if a[0] == "build")
 
