@@ -61,10 +61,23 @@ def plan_of(social) -> Plan:
     return getattr(social, "plan", None) or HUT
 
 
+GROUND_OF = {g.name: g.char for g in GROUNDS}
+
+
+def _ch(obs, X, Y):
+    """The tile's char as the grid draws it; under its own feet (the grid shows "@"), what it stands on, as the game
+    says it ("grass+door": live trial 13, a door laid and stood on read as not laid, a step off asked 1907 times)."""
+    me = obs["self"]
+    if (me["x"], me["y"]) != (X, Y) or not me.get("standing_on"):
+        return _at(obs, "grid", X, Y)
+    ground, _, block = me["standing_on"].partition("+")
+    return CH.get(block) if block else GROUND_OF.get(ground)
+
+
 def laid(obs, X, Y, piece) -> bool:
     if piece == "roof":
         return _at(obs, "roofs", X, Y) == "1"
-    ch = _at(obs, "grid", X, Y)
+    ch = _ch(obs, X, Y)
     if piece == "path":
         return ch == PATH_CH
     if piece == "till":                                     # (tilled, or sown already)
@@ -220,8 +233,8 @@ def laid_by(obs, social, plan):
         if p == "dig":                                       # (dug: as the game said, or the floor seen lower)
             return (X, Y, land + dz, "dug") in up or (obs.get("heights") is not None and level_at(obs, X, Y) < land + dz)
         if dz <= 0:                                          # (out of view now: as it was when last seen)
-            if _at(obs, "grid", X, Y) in (None, YOU):        # (under its feet too: the tile shows it, not what is
-                return (X, Y, dz, p) in seen                 # laid there)
+            if _ch(obs, X, Y) in (None, YOU):                # (out of view, or someone on it: as last seen)
+                return (X, Y, dz, p) in seen
             if laid(obs, X, Y, p):
                 seen.add((X, Y, dz, p))
                 return True
