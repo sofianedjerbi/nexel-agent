@@ -14,7 +14,7 @@ pieces from the grid's top-left and the floor tiles it is laid from, each piece 
 import math
 
 from nexel_worlds.sim.constants import VIEW_R
-from nexel_worlds.sim.observe import ITEMS, YOU
+from nexel_worlds.sim.observe import ITEMS, WATER, YOU
 from nexel_worlds.sim.storeys import EARTH, STOREY
 from nexel_worlds.tiles import GROUNDS, TILL_TOOL
 from nexel_worlds.tiles import BLOCKS
@@ -22,7 +22,7 @@ from nexel_worlds.tiles import BLOCKS
 from .judge import ENCLOSE
 from .social import laid_as
 from .plan import BLOCKS as CELL_BLOCKS
-from .site import _at, _pit, flat, fresh, no_way, site, tried, way_out
+from .site import REACH, _at, _land, _pit, flat, fresh, level_at, no_way, site, tried, way_out
 from .plan import Plan, drawn, of_pieces  # noqa: F401  (drawn: the grid's plan, for its callers)
 from .pursue import craft, toward
 
@@ -118,13 +118,16 @@ def next_step(obs, social, *, ground_ch, tool_for, dirs):
             return "move_to", {"x": X, "y": Y}
         if ch == YOU and any(i.get("dx") == 0 and i.get("dy") == 0 for i in obs.get("items") or []):
             return "pick_up", {}
-        if ch in CLEARABLE and not (piece and laid(obs, X, Y, piece)):
-            d = next((k for k, v in dirs.items() if v == (X - me["x"], Y - me["y"])), None)
+        wet = ch == WATER and (earth := next((k for k in EARTH if inv.get(k)), None))   # (water in it, met once the site
+        if wet and max(abs(X - me["x"]), abs(Y - me["y"])) <= REACH and not tried(social, X, Y, (me["x"], me["y"])):
+            return "place", {"item": earth, "x": X, "y": Y}  # was chosen out of view: filled with earth, as a pit - 21)
+        if wet or ch in CLEARABLE and not (piece and laid(obs, X, Y, piece)):
+            d = None if wet else next((k for k, v in dirs.items() if v == (X - me["x"], Y - me["y"])), None)
             if d is not None and not tried(social, X, Y, (me["x"], me["y"]), count=not me.get("action")):  # (a dig under way: no try)
                 return "dig", {"dir": d, **({"with": w} if (w := tool_for(obs, d)) else {})}
             by = next(((X + i, Y + j) for i, j in dirs.values() if _at(obs, "grid", X + i, Y + j) in ground_ch  # (to a tile
-                       and not tried(social, X, Y, (X + i, Y + j), count=False)), None if d else (X, Y))  # beside it; a
-            if by is None:                                   # flower is walked onto; refused from every side: left)
+                       and not tried(social, X, Y, (X + i, Y + j), count=False)), None if d or wet else (X, Y))  # beside
+            if by is None:                                   # it; a flower is walked onto; refused from every side: left)
                 continue
             return "move_to", {"x": by[0], "y": by[1]}
     land = home_level(obs, social, plan)
@@ -198,23 +201,17 @@ def _look_further(obs, social, plan):
 
 
 def home_level(obs, social, plan) -> int:
-    """The land's level at the home: read where it is in view, and kept (out of view it is not 0, and what was dug or
-    laid up there is known by its height)."""
+    """The land's level at the home: read where it is in view, and kept (out of view it is not 0; what is laid up there
+    is known by its height)."""
     hx, hy = social.home
-    X, Y = hx + plan.ground[0][0], hy + plan.ground[0][1]
-    kept = getattr(social, "home_at", None)
-    if kept and kept[0] == (X, Y) and _at(obs, "grid", X, Y) is None:
-        return kept[1]
-    lv = level_at(obs, X, Y)
-    if _at(obs, "grid", X, Y) is not None:
-        social.home_at = ((X, Y), lv)
+    X, Y, kept = hx + plan.ground[0][0], hy + plan.ground[0][1], getattr(social, "home_at", None)
+    if not obs.get("heights"):
+        return 0
+    lv = next((h for p in (*plan.ground, *sorted(plan.clear)) if (h := _land(obs, hx, hy, plan, *p)) is not None), None)
+    if lv is None:                                   # (its land in view, not a stone roof laid over it: site.py _land)
+        return kept[1] if kept and kept[0] == (X, Y) else 0
+    social.home_at = ((X, Y), lv)
     return lv
-
-
-def level_at(obs, X, Y) -> int:
-    """The land's level at a tile, from the observation's heights (none sent: all the low ground, 0)."""
-    from .actions import LEVEL
-    return LEVEL.get(_at(obs, "heights", X, Y), 0) if obs.get("heights") else 0
 
 
 def own(social) -> set:
