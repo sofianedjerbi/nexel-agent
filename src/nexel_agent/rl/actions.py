@@ -164,7 +164,11 @@ def to_command(i: int, obs: dict, facing: str, social=None, goal=None):
     if kind == "pursue":
         return pursued(obs, goal, social)
     if kind == "build":
-        return built(obs, social)
+        from .site import walked_nowhere
+        step = built(obs, social)
+        if step and step[0] == "move_to" and walked_nowhere(social, step[1], obs["self"]):
+            step = built(obs, social)                 # (that way shut: the next step without it - rl/site.py)
+        return step
     return "eat", {"item": arg}
 
 

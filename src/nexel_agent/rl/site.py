@@ -118,3 +118,27 @@ def tried(social, X, Y, here, count=True) -> bool:
     if count:
         t[(X, Y, here)] = t.get((X, Y, here), 0) + 1
     return False
+
+
+def no_way(social) -> set:
+    """Tiles a walk of the builder's found no way to (a workbench walled in): crafting looks past them."""
+    return social.__dict__.setdefault("no_way", set()) if social is not None else set()
+
+
+def walked_nowhere(social, to: dict, me: dict) -> bool:
+    """A walk ordered TRIES times from the same tile: the way is shut (the T on seed 7: a walk to a workbench with no
+    path, ordered 199 times); kept in no_way."""
+    if tried(social, to["x"], to["y"], (me["x"], me["y"])):
+        no_way(social).add((to["x"], to["y"]))
+        return True
+    return False
+
+
+def way_out(obs, ground_ch, keep, dirs, tool_for):
+    """Walled in - its own wall, a rock, a bush on every side (the T on seed 7: every walk "no path", 199 times) - a
+    dig through what is not the home's, the nearest way out; None when a side is open."""
+    me, grid = obs["self"], obs.get("grid") or []
+    if not grid or any(_at(obs, "grid", me["x"] + dx, me["y"] + dy) in ground_ch for dx, dy in dirs.values()):
+        return None
+    d = next((k for k, (dx, dy) in dirs.items() if (me["x"] + dx, me["y"] + dy) not in keep), None)
+    return ("dig", {"dir": d, **({"with": w} if (w := tool_for(obs, d)) else {})}) if d else None

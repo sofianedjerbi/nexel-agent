@@ -33,6 +33,7 @@ NEEDS = {b.char: b.needs_tool for b in BLOCKS if b.needs_tool}     # (ore: no st
 
 LOOK = ((1, 0), (0, 1), (-1, 0), (0, -1), (1, 1), (-1, 1), (-1, -1), (1, -1))
 LOOK_TICKS = 600                  # (a way kept for this long: far enough to see new land, then the next)
+LOOK_R = 200                      # (a search from a home stays this near it: rl/build.py gives a home up past FAR)
 
 
 def _cells(obs, chars, blocked=()):
@@ -60,6 +61,12 @@ def gather(obs, item, ground_ch, tool_for, dirs, blocked=(), keep=(), look=False
         if not look or not DROPS.get(item):          # as time goes; else finding one is the policy's, as it learned)
             return None
         dx, dy = LOOK[(obs.get("tick", 0) // LOOK_TICKS) % len(LOOK)]
+        if keep:                         # (a home: no further than LOOK_R from it - seed 102: 230 tiles off for stone,
+            ax, ay = sum(x for x, _ in keep) / len(keep), sum(y for _, y in keep) / len(keep)    # the home given up)
+            far = math.hypot(ax - me["x"], ay - me["y"])
+            if far > LOOK_R:
+                k = (VIEW_R - 1) / far
+                return _walk(obs, round((ax - me["x"]) * k), round((ay - me["y"]) * k), ground_ch)
         return _walk(obs, dx * (VIEW_R - 1), dy * (VIEW_R - 1), ground_ch)
     d = next((k for k, v in dirs.items() if v == cell), None)
     if d is None:
