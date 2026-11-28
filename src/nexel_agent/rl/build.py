@@ -187,11 +187,10 @@ def next_step(obs, social, *, ground_ch, tool_for, dirs):
         return "move_to", {"x": hx + st[0], "y": hy + st[1]}     # (all else done: a step off to see, and lay it)
     far = [(hx + c[0], hy + c[1]) for c in plan.cells if _at(obs, "grid", hx + c[0], hy + c[1]) is None and not is_laid(c)]
     if far:                                                  # (what is left is out of view - the other end of a
-        fx, fy = min(far, key=lambda p: abs(p[0] - me["x"]) + abs(p[1] - me["y"]))     # compound: a view nearer it)
-        to = [(me["x"] + round((fx - me["x"]) * k), me["y"] + round((fy - me["y"]) * k)) for k in   # (the furthest
-              (min(1, (VIEW_R - 2) * i / 8 / math.hypot(fx - me["x"], fy - me["y"])) for i in range(8, 0, -1))]  # open
-        return "move_to", dict(zip("xy", next((p for p in to if _at(obs, "grid", *p) in ground_ch), to[0])))  # ground)
-    return None
+        fx, fy = min(far, key=lambda p: abs(p[0] - me["x"]) + abs(p[1] - me["y"]))     # compound: a view nearer it,
+        return toward(obs, fx - me["x"], fy - me["y"], ground_ch, no_way(social)) or climb_out(   # on open ground, a way
+            obs, social, fx - me["x"], fy - me["y"], dirs, tool_for, ground_ch)   # shut skipped - live trial 14: a walk
+    return None                                              # onto a tree, "no path", 30 minutes; rl/pursue.py)
 
 
 def home_level(obs, social, plan) -> int:
